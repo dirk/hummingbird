@@ -13,7 +13,7 @@ Hummingbird has a few core goals that guide the design and development of the la
 
 ## Variables and Scope
 
-Non-strict scoping rules can be the cause of a great deal of confusion and bugs, especially for inexperienced programmers. Hummingbird takes a fairly strict approach to variable scoping. The most notable aspect of this strictness is explicit closing of variables in closures, and also strict binding of the scope of the instance in *all* closures in a class (no more buggy usages of `this`.
+Non-strict scoping rules can be the cause of a great deal of confusion and bugs, especially for inexperienced programmers. Hummingbird takes a fairly strict approach to variable scoping. The most notable aspect of this strictness is explicit closing of variables in closures, and also strict binding of the scope of the instance in *all* closures in a class (no more buggy usages of `this`).
 
 ```js
 // Defining variables with explicit and inferred types
