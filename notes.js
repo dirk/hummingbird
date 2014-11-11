@@ -1,5 +1,4 @@
 
-
 // Adapting Swift/C/etc. ideas of curly braces as an explicit block construct
 
 if condition == true {

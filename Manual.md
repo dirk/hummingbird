@@ -24,7 +24,29 @@ var b: String = "explicit string"
 // Attempting to use a variable in a function body without a new
 // `var` definition or explicit closing will raise a
 // compilation error.
-func c() -> String with a, b {
+var c = func () -> String with a, b {
   return a + " and " + b
 }
+```
+
+## Functions
+
+Hummingbird currently provides only anonymous functions. The named function syntax in JavaScript (eg. `function myFunction() {...}`) is not available.
+
+There are three critical parts to every function declaration: parameters, return type, and closure. The latter two are optional.
+
+```js
+// Defining a function with no parameters, no return type, and no closure
+var a = func () { }
+
+// A function with parameters and return type
+var b = func (c: String) -> String { return "Hello #{c}!" }
+
+// Function with all three parts
+var d = func (e: String) -> String with (b) { return b(e) }
+d("world") == "Hello world!"
+
+// Void function with closure
+var f = func () with (b) { return b("world") }
+f("world") == "Hello world!"
 ```
