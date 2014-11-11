@@ -49,4 +49,9 @@ d("world") == "Hello world!"
 // Void function with closure
 var f = func () with (b) { return b("world") }
 f("world") == "Hello world!"
+
+// Function with default parameters
+var g = func(h: String = "world") -> String with (b) { return b(h) }
+g("earth") == "Hello earth!"
+g() == "Hello world!"
 ```
