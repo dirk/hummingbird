@@ -55,3 +55,52 @@ var g = func(h: String = "world") -> String with (b) { return b(h) }
 g("earth") == "Hello earth!"
 g() == "Hello world!"
 ```
+
+## Classes
+
+Classes are composed of three things: properties, initializers, and methods.
+
+### Initializers
+
+Under the hood initializers are just special methods. Hummingbird does a little bit of work during compilation to make initialization easier for you: it sets default values for properties, resolves superclass initializers to make them available to you, and dispatches the actual initialization to the correct initializer method (the necessary heavy lifting for constructor overloading).
+
+```js
+class A {
+  var b: String
+  var c: Any
+
+  initializer() {
+    this.b = "Hello world!"
+  }
+  initializer(otherC: String) {
+    // Calling other initializers from within an initializer is allowed to make
+    // building higher-level initializing methods on top of lower-level ones
+    // possible.
+    initializer()
+    this.c = this.b + ' ' + otherC
+  }
+}
+
+class B extends A {
+  var d: String
+
+  initializer(this.d) {
+    super.initializer("#{this.d}")
+  }
+  // Looking above, you can see that Hummingbird also allows you to easily
+  // auto-assign properties via initializer arguments. At compile time the
+  // `this.d` is translated into a hidden parameter with type `String` and an
+  // assignment of that parameter to `this.d` is inserted at the top of the
+  // initializer body. In effect it generates the following:
+  //
+  //   initializer(_d: String) {
+  //     this.d = _d
+  //     super.initializer("#{this.d}")
+  //   }
+}
+
+var e = B("Hello programmer.")
+e.b == "Hello world!"
+e.c == "Hello world! Hello programmer"
+e.d == "Hello programmer."
+```
