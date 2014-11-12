@@ -69,14 +69,14 @@ class A {
   var b: String
   var c: Any
 
-  initializer() {
+  init() {
     this.b = "Hello world!"
   }
-  initializer(otherC: String) {
+  init(otherC: String) {
     // Calling other initializers from within an initializer is allowed to make
     // building higher-level initializing methods on top of lower-level ones
     // possible.
-    initializer()
+    init()
     this.c = this.b + ' ' + otherC
   }
 }
@@ -84,7 +84,7 @@ class A {
 class B extends A {
   var d: String
 
-  initializer(this.d) {
+  init(this.d) {
     super.initializer("#{this.d}")
   }
   // Looking above, you can see that Hummingbird also allows you to easily
@@ -93,7 +93,7 @@ class B extends A {
   // assignment of that parameter to `this.d` is inserted at the top of the
   // initializer body. In effect it generates the following:
   //
-  //   initializer(_d: String) {
+  //   init(_d: String) {
   //     this.d = _d
   //     super.initializer("#{this.d}")
   //   }
@@ -104,3 +104,13 @@ e.b == "Hello world!"
 e.c == "Hello world! Hello programmer"
 e.d == "Hello programmer."
 ```
+
+#### Use of `initializer` rather than `constructor`
+
+We hold the view that there is a semantic distinction to be made between construction and initialization of an instance of a class.
+
+* **Construction** deals with the actual allocation and low-level setup of an instance. In a lower-level language like C++ this would involve laying out the memory for the class to hold variable slots, pointers to the class record, and so forth. In high-level languages like JavaScript or Ruby this involves creating the basic object and the pointer to the class/prototype.
+
+* **Initialization** involves the operations performed to setup the class after the construction of the class has occurred. These depend on the instance actually existing in memory so that program can work with that memory.
+
+Construction happens in the language runtime—out of view from the code _you_ write—whereas the code you write does actually influence the initialization of the class instance once it has been constructed.
