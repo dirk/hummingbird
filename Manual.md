@@ -114,3 +114,33 @@ We hold the view that there is a semantic distinction to be made between constru
 * **Initialization** involves the operations performed to setup the class after the construction of the class has occurred. These depend on the instance actually existing in memory so that program can work with that memory.
 
 Construction happens in the language runtime—out of view from the code _you_ write—whereas the code you write does actually influence the initialization of the class instance once it has been constructed.
+
+## Control Flow
+
+Hummingbird supports the basic traditional control flow structures. Although a "for-in" style structure was considered, it was decided against for its propensity for introducing bugs and complexities in implementation.
+
+```js
+// Conditionals
+if true {
+  // Something
+} else {
+  // Another something
+}
+
+// Looping
+for var i = 1; i <= 42; i++ {
+  // Iterated something
+}
+while true {
+  // Infinity!
+}
+
+// Exception handling
+try {
+  // Something that throws an error
+} catch err {
+  // Log our `err`!
+} finally {
+  // Clean up after ourselves
+}
+```
