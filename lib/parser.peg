@@ -1,0 +1,53 @@
+
+grammar Hummingbird
+  root           <- statement_list
+
+  block          <- "{" allspace statement_list "}"
+
+  statement_list <- statement (terminator statement)* allspace
+  statement      <- assignment / expr / control
+
+  assignment <- lvalue space "=" space rvalue
+  lvalue     <- let / var / path
+  rvalue     <- expr
+  path       <- name (indexer / property)*              
+
+  expr       <- (literal !(_ binaryop)) / binary / unary / chain / group
+  lexpr      <- literal / unary / chain / group
+
+  control    <- if / while / try
+  if         <- "if" _ expr _ block
+  while      <- "while" _ expr _ block
+  try        <- "try" _ block _ "catch" space name _ block
+
+  let        <- "let" space name (":" space type)?
+  var        <- "var" space name (":" space type)?
+
+  name       <- [A-Za-z] [A-Za-z0-9_]*
+  type       <- [A-Z] [A-Za-z0-9_]*
+
+  chain      <- name (indexer / property / arguments)*
+  binary     <- lexpr _ binaryop _ expr
+  unary      <- unaryoperator expr
+  group      <- "(" _ expr _ ")"
+
+  indexer    <- "[" expr "]"
+  property   <- "." name
+  arguments  <- "(" _ (expr _ ("," _ expr _)* )? _ ")"
+
+  terminator <- _ "\n" allspace
+  space      <- [\s\t]+
+  _          <- space?
+  allspace   <- [\s\n\r\t]*
+
+  literal <-  integer
+  integer <- "0" / ("-"? [1-9] [0-9]*)
+
+  binaryop       <- add / sub / mul / div / mod
+  unaryoperator  <- not
+  add            <- "+"
+  sub            <- "-"
+  mul            <- "*"
+  div            <- "/"
+  mod            <- "%"
+  not            <- "!"
