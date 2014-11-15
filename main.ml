@@ -19,20 +19,37 @@ let end_of_stream stream =
   (Stream.peek stream) == None
 
 let main () =
-  let stream = Lexer.lex (Stream.of_string "for a TEST") in
+  let lex_stream = Lexer.lex (Stream.of_string "var a = b") in
+  try begin
+    let ast = Parser.parse lex_stream in
+    Ast.print_ast ast;
+    ()
+    (* while true do
+      let token = Stream.next lex_stream in
+      print_string (Lexer.stringify token);
+      print_string " "
+    done *)
+  end with
+  | Stream.Failure ->
+    if not (end_of_stream lex_stream)
+    then raise (Stream.Error "Failed reading stream")
+    else print_endline "";
+  | Stream.Error err ->
+    Printf.printf "Parser error at index: %d (%s)\n" (Stream.count lex_stream) err;
+
+  (*
   let rec loop stream =
     try begin
       let token = Stream.next stream in
       begin
         match token with
         | Lexer.Word t ->
-            print_string "w(";
+            print_string ":";
             print_string t;
-            print_string ")";
-        | Lexer.Keyword _ ->
-            print_string (Lexer.stringify token)
         | Lexer.Whitespace ->
             print_string " ";
+        | _ ->
+        print_string (Lexer.stringify token)
       end;
       loop stream;
     end with
@@ -47,6 +64,9 @@ let main () =
 
   if not ((Stream.peek stream) == None)
   then raise (Stream.Error "Didn't finish reading input");
+  *)
+
+
   (*
   let argv = Sys.argv in
   let argc = Array.length argv in

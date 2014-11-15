@@ -3,11 +3,20 @@ type keyword =
   | If
   | For
   | While
+  | Let
+  | Var
 
 type token =
   | Word of string
   | Keyword of keyword
   | Whitespace
+  | LParen
+  | RParen
+  | LSquare
+  | RSquare
+  | LBracket
+  | RBracket
+  | Equals
 
 val stringify : token -> string
 
