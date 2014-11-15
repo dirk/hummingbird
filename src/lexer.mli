@@ -9,6 +9,8 @@ type token =
   | Keyword of keyword
   | Whitespace
 
-val test : string
+val stringify : token -> string
 
 val lex : char Stream.t -> token Stream.t
+
+

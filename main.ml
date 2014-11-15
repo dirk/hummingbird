@@ -29,11 +29,8 @@ let main () =
             print_string "w(";
             print_string t;
             print_string ")";
-        | Lexer.Keyword kw ->
-            begin
-              match kw with
-              | Lexer.For -> print_string "kw(for)";
-            end;
+        | Lexer.Keyword _ ->
+            print_string (Lexer.stringify token)
         | Lexer.Whitespace ->
             print_string " ";
       end;
@@ -46,6 +43,7 @@ let main () =
         print_endline err;
   in
   loop stream;
+  print_endline "";
 
   if not ((Stream.peek stream) == None)
   then raise (Stream.Error "Didn't finish reading input");

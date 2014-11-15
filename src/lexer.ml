@@ -1,6 +1,4 @@
 
-let test = "Hello world!"
-
 type keyword =
   | If
   | For
@@ -13,23 +11,32 @@ type token =
 
 let new_buffer () = Buffer.create 256
 
+let stringify token =
+  match token with
+  | Keyword If    -> "if"
+  | Keyword For   -> "for"
+  | Keyword While -> "while"
+  | Word _        -> "word"
+  | _             -> ""
+
 let word_or_keyword word =
   match word with
-  | "for" -> Keyword For
-  | _     -> Word word
+  | "while" -> Keyword While
+  | "for"   -> Keyword For
+  | "if"    -> Keyword If
+  | _       -> Word word
+
 
 let rec lex = parser
-  
+  (* Gobble up white space *)
   | [< '' '; stream >] ->
       [< 'Whitespace; lex stream >]
 
+  (* Matching words and keywords *)
   | [< ' ('A' .. 'Z' | 'a' .. 'z' as c); stream >] ->
       let buffer = new_buffer () in
       Buffer.add_char buffer c;
       lex_word buffer stream
-
-  (* Keywords *)
-  (* | [< ''f'; ''o'; ''r'; stream >] -> [< 'Keyword For; lex stream >] *)
 
   | [< 'c >] ->
       Printf.printf "Unexpected character: '%c'\n" c;
@@ -44,5 +51,6 @@ and lex_word buffer = parser
   (* Any character not matched to the above will hit this rule *)
   | [< stream = lex >] ->
       let word = Buffer.contents buffer in
+      (* Figure out whether it's a word or a keyword *)
       let tok  = word_or_keyword word in
       [< 'tok; stream >]
