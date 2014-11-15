@@ -17,6 +17,7 @@ type token =
   | LBracket
   | RBracket
   | Equals
+  | Terminator
 
 val stringify : token -> string
 

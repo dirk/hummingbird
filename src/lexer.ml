@@ -17,6 +17,7 @@ type token =
   | LBracket
   | RBracket
   | Equals
+  | Terminator
 
 let new_buffer () = Buffer.create 256
 
@@ -36,6 +37,7 @@ let stringify token =
   | RBracket      -> "}"
   | Whitespace    -> "whitespace"
   | Equals        -> "="
+  | Terminator    -> ";"
   (*| _             -> "(unknown)"*)
 
 let word_or_keyword word =
@@ -56,9 +58,16 @@ let rec skip_space stream =
       end;
   | None -> ()
 
+
 let rec lex = parser
+  (* Single-line comments *)
+  | [< ''#'; stream >] -> lex_comment stream
+
   (* Gobble up white space *)
-  | [< ' (' ' | '\t'); stream >] -> chomp_space stream
+  | [< ' (' ' | '\t'); stream >] -> lex_space stream
+
+  (* Newlines and semicolons as statement *)
+  | [< ' ('\n' | ';'); stream >] -> [< 'Terminator; lex stream >]
 
   (* Matching words and keywords *)
   | [< ' ('A' .. 'Z' | 'a' .. 'z' as c); stream >] ->
@@ -99,10 +108,15 @@ and lex_word buffer = parser
       (* Add the new word/keyword to the stream *)
       [< 'tok; lex stream >]
 
-and chomp_space = parser
+and lex_space = parser
   (* Eat up space *)
   | [< ' (' ' | '\t'); stream >] ->
-      chomp_space stream
+      lex_space stream
   (* Add a whitespace token once we reach the end of this run of whitespace *)
   | [< stream = lex >] ->
       [< 'Whitespace; stream >]
+
+and lex_comment = parser
+  (* End lexing the comment when we reach a newline *)
+  | [< ''\n'; stream >] -> lex stream
+  | [< stream >] -> lex_comment stream
