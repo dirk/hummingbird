@@ -19,7 +19,9 @@ let end_of_stream stream =
   (Stream.peek stream) == None
 
 let main () =
-  let lex_stream = Lexer.lex (Stream.of_string "var a = b") in
+  (* "var a = b\nc = d\nif e { }\n" *)
+  (* "var a = b\nlet c = d\ne = f\n" *)
+  let lex_stream = Lexer.lex (Stream.of_string "a = b\nvar c = d\n") in
   try begin
     let ast = Parser.parse lex_stream in
     Ast.print_ast ast;

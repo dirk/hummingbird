@@ -46,6 +46,7 @@ let word_or_keyword word =
   | "for"   -> Keyword For
   | "if"    -> Keyword If
   | "var"   -> Keyword Var
+  | "let"   -> Keyword Let
   | _       -> Word word
 
 let rec skip_space stream =
