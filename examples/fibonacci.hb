@@ -14,10 +14,12 @@ let fibonacciRecursive = func (n: Integer) -> Integer {
 let fibonacciIterative = func (n: Integer) -> Integer {
 
   // Explicity typed variables
-  var current: Int = 0, next: Int = 1, future: Int = 1
+  var current: Int = 0
+  var next: Int = 1
+  var future: Int = 1
 
   // Looping
-  for var i = 0; i < n; i++ {
+  for var i = 0; i < n; i += 1 {
     current = next
     next    = future
     future  = current + next

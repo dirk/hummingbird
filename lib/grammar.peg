@@ -5,20 +5,22 @@ grammar Hummingbird
   block          <- "{" allspace statement_list "}"
 
   statement_list <- head:statement tail:(terminator statement)* allspace
-  statement      <- (assignment / expr / control)
+  statement      <- assignment / control / expr / comment
 
   assignment <- lvalue space "=" space rvalue <Assignment>
   lvalue     <- let / var / path
   rvalue     <- expr
   path       <- name (indexer / property)*
 
-  expr       <- (literal !(_ binaryop) / binary / unary / chain / group) <Expression>
+  expr       <- (literal !(_ binaryop) / binary / unary / func / chain / group) <Expression>
   lexpr      <- literal / unary / chain / group
 
-  control    <- if / while / try
-  if         <- "if" _ expr _ block
+  control    <- if / while / for / try / return
+  if         <- "if" (space expr)? _ block
+  for        <- "for" space statement? _ ";" _ statement? _ ";" _ statement? _ block
   while      <- "while" _ expr _ block
   try        <- "try" _ block _ "catch" space name _ block
+  return     <- "return" (space expr)?
 
   let        <- declarator:"let" space name typifier:(":" space type)?
   var        <- declarator:"var" space name typifier:(":" space type)?
@@ -26,28 +28,43 @@ grammar Hummingbird
   name       <- [A-Za-z] [A-Za-z0-9_]*
   type       <- [A-Z] [A-Za-z0-9_]*
 
-  chain      <- name (indexer / property / arguments)*
+  func       <- "func" _ args _ ret? _ block
+  args       <- "(" _ (arg _ ("," _ arg _)* )? _ ")"
+  arg        <- name _ (":" _ type)?
+  ret        <- "->" space type
+
+  chain      <- name (indexer / property / call)*
   binary     <- lexpr _ binaryop _ expr <Binary>
   unary      <- unaryoperator expr
   group      <- "(" _ expr _ ")" <Group>
 
   indexer    <- "[" expr "]"
   property   <- "." name
-  arguments  <- "(" _ (expr _ ("," _ expr _)* )? _ ")"
+  call       <- "(" _ (expr _ ("," _ expr _)* )? _ ")"
 
-  terminator <- _ "\n" allspace <Skip>
+  terminator <- _ comment? "\n" allspace <Skip>
   space      <- [ \t]+
   _          <- space?
   allspace   <- [ \n\r\t]* <Skip>
 
+  comment    <- "//" [^\n]*
+
   literal <- integer <Literal>
   integer <- ("0" / ("-"? [1-9] [0-9]*)) <Integer>
 
-  binaryop       <- add / sub / mul / div / mod
-  unaryoperator  <- not
+  binaryop       <- addeq /
+                    add / sub / mul / div / mod / eq / or / lt
+
   add            <- "+"
   sub            <- "-"
   mul            <- "*"
   div            <- "/"
   mod            <- "%"
+  eq             <- "=="
+  or             <- "||"
+  lt             <- "<"
+
+  addeq          <- "+="
+
+  unaryoperator  <- not
   not            <- "!"
