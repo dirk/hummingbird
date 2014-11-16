@@ -47,7 +47,7 @@ grammar Hummingbird
   _          <- space?
   allspace   <- [ \n\r\t]* <Skip>
 
-  comment    <- "//" [^\n]*
+  comment    <- "#" [^\n]* <Comment>
 
   literal <- integer <Literal>
   integer <- ("0" / ("-"? [1-9] [0-9]*)) <Integer>
