@@ -1,16 +1,16 @@
 
 grammar Hummingbird
-  root           <- statement_list
+  root           <- statements:statement_list <Root>
 
   block          <- "{" allspace statement_list "}"
 
-  statement_list <- statement (terminator statement)* allspace
-  statement      <- assignment / expr / control
+  statement_list <- head:statement tail:(terminator statement)* allspace
+  statement      <- (assignment / expr / control)
 
-  assignment <- lvalue space "=" space rvalue
+  assignment <- lvalue space "=" space rvalue <Assignment>
   lvalue     <- let / var / path
   rvalue     <- expr
-  path       <- name (indexer / property)*              
+  path       <- name (indexer / property)*
 
   expr       <- (literal !(_ binaryop)) / binary / unary / chain / group
   lexpr      <- literal / unary / chain / group
@@ -20,8 +20,8 @@ grammar Hummingbird
   while      <- "while" _ expr _ block
   try        <- "try" _ block _ "catch" space name _ block
 
-  let        <- "let" space name (":" space type)?
-  var        <- "var" space name (":" space type)?
+  let        <- declarator:"let" space name typifier:(":" space type)?
+  var        <- declarator:"var" space name typifier:(":" space type)?
 
   name       <- [A-Za-z] [A-Za-z0-9_]*
   type       <- [A-Z] [A-Za-z0-9_]*
@@ -35,10 +35,10 @@ grammar Hummingbird
   property   <- "." name
   arguments  <- "(" _ (expr _ ("," _ expr _)* )? _ ")"
 
-  terminator <- _ "\n" allspace
-  space      <- [\s\t]+
+  terminator <- _ "\n" allspace <Skip>
+  space      <- [ \t]+
   _          <- space?
-  allspace   <- [\s\n\r\t]*
+  allspace   <- [ \n\r\t]* <Skip>
 
   literal <-  integer
   integer <- "0" / ("-"? [1-9] [0-9]*)

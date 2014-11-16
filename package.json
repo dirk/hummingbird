@@ -5,6 +5,6 @@
     "canopy": "~0.2.0"
   },
   "scripts": {
-    "build-parser": "node_modules/canopy/bin/canopy lib/parser.peg"
+    "build-parser": "node_modules/canopy/bin/canopy lib/grammar.peg"
   }
 }
