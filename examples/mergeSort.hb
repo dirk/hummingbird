@@ -3,7 +3,7 @@ let mergeSort = func (arr: Array<Any>, low: Integer, high: Integer) {
     return;
   }
 
-  var mid: Int = Math.floor(low/high)
+  var mid: Int = Math.floor((low + high)/2)
 
   mergeSort(arr, low, mid)
   mergeSort(arr, mid + 1, high)
