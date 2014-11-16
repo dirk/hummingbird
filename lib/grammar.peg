@@ -12,7 +12,7 @@ grammar Hummingbird
   rvalue     <- expr
   path       <- name (indexer / property)*
 
-  expr       <- (literal !(_ binaryop)) / binary / unary / chain / group
+  expr       <- (literal !(_ binaryop) / binary / unary / chain / group) <Expression>
   lexpr      <- literal / unary / chain / group
 
   control    <- if / while / try
@@ -27,9 +27,9 @@ grammar Hummingbird
   type       <- [A-Z] [A-Za-z0-9_]*
 
   chain      <- name (indexer / property / arguments)*
-  binary     <- lexpr _ binaryop _ expr
+  binary     <- lexpr _ binaryop _ expr <Binary>
   unary      <- unaryoperator expr
-  group      <- "(" _ expr _ ")"
+  group      <- "(" _ expr _ ")" <Group>
 
   indexer    <- "[" expr "]"
   property   <- "." name
@@ -40,8 +40,8 @@ grammar Hummingbird
   _          <- space?
   allspace   <- [ \n\r\t]* <Skip>
 
-  literal <-  integer
-  integer <- "0" / ("-"? [1-9] [0-9]*)
+  literal <- integer <Literal>
+  integer <- ("0" / ("-"? [1-9] [0-9]*)) <Integer>
 
   binaryop       <- add / sub / mul / div / mod
   unaryoperator  <- not
