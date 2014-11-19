@@ -16,7 +16,7 @@ grammar Hummingbird
   lexpr      <- literal / unary / chain / group
 
   control    <- if / while / for / try / return
-  if         <- "if" (space expr)? _ block <If>
+  if         <- "if" space condition:expr _ block <If>
   for        <- "for" space statement? _ ";" _ statement? _ ";" _ statement? _ block <For>
   while      <- "while" _ expr _ block
   try        <- "try" _ block _ "catch" space name _ block
@@ -33,7 +33,7 @@ grammar Hummingbird
   arg        <- name _ typifier:(":" _ type)?
   ret        <- "->" space type
 
-  chain      <- name (indexer / property / call)*
+  chain      <- name (indexer / property / call)* <Chain>
   binary     <- lexpr _ binaryop _ expr <Binary>
   unary      <- unaryoperator expr
   group      <- "(" _ expr _ ")" <Group>
