@@ -33,14 +33,14 @@ grammar Hummingbird
   arg        <- name _ typifier:(":" _ type)?
   ret        <- "->" space type
 
-  chain      <- name (indexer / property / call)* <Chain>
+  chain      <- name tail:(indexer / property / call)* <Chain>
   binary     <- lexpr _ binaryop _ expr <Binary>
   unary      <- unaryoperator expr
   group      <- "(" _ expr _ ")" <Group>
 
   indexer    <- "[" expr "]"
   property   <- "." name
-  call       <- "(" _ (expr _ ("," _ expr _)* )? _ ")"
+  call       <- "(" _ args:(head:expr _ tail:("," _ expr _)* )? _ ")" <Call>
 
   terminator <- _ comment? "\n" allspace <Skip>
   space      <- [ \t]+
