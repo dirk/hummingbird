@@ -10,7 +10,7 @@ grammar Hummingbird
   assignment <- lvalue space "=" space rvalue <Assignment>
   lvalue     <- let / var / path
   rvalue     <- expr
-  path       <- name (indexer / property)*
+  path       <- name tail:(indexer / property)*
 
   expr       <- (literal !(_ binaryop) / binary / unary / func / chain / group) <Expression>
   lexpr      <- literal / unary / chain / group
