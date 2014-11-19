@@ -2,7 +2,7 @@
 grammar Hummingbird
   root           <- statements:statement_list <Root>
 
-  block          <- "{" allspace statement_list "}"
+  block          <- "{" allspace statement_list "}" <Block>
 
   statement_list <- head:statement tail:(terminator statement)* allspace
   statement      <- assignment / control / expr / comment
@@ -16,11 +16,11 @@ grammar Hummingbird
   lexpr      <- literal / unary / chain / group
 
   control    <- if / while / for / try / return
-  if         <- "if" (space expr)? _ block
-  for        <- "for" space statement? _ ";" _ statement? _ ";" _ statement? _ block
+  if         <- "if" (space expr)? _ block <If>
+  for        <- "for" space statement? _ ";" _ statement? _ ";" _ statement? _ block <For>
   while      <- "while" _ expr _ block
   try        <- "try" _ block _ "catch" space name _ block
-  return     <- "return" (space expr)?
+  return     <- "return" (space expr)? <Return>
 
   let        <- declarator:"let" space name typifier:(":" space type)?
   var        <- declarator:"var" space name typifier:(":" space type)?
@@ -30,7 +30,7 @@ grammar Hummingbird
 
   func       <- "func" _ args _ ret? _ block
   args       <- "(" _ (arg _ ("," _ arg _)* )? _ ")"
-  arg        <- name _ (":" _ type)?
+  arg        <- name _ typifier:(":" _ type)?
   ret        <- "->" space type
 
   chain      <- name (indexer / property / call)*
