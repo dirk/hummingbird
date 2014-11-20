@@ -28,3 +28,8 @@ let fibonacciIterative = func (n: Integer) -> Integer {
   return current
 
 }
+
+var i = 0
+while i < 10 {
+  i += 1
+}

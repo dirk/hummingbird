@@ -18,7 +18,7 @@ grammar Hummingbird
   control    <- if / while / for / try / return
   if         <- "if" space condition:expr _ block <If>
   for        <- "for" space init:statement? _ ";" _ cond:statement? _ ";" _ after:statement? _ block <For>
-  while      <- "while" _ expr _ block
+  while      <- "while" _ expr _ block <While>
   try        <- "try" _ block _ "catch" space name _ block
   return     <- "return" (space expr)? <Return>
 
