@@ -28,7 +28,7 @@ grammar Hummingbird
   name       <- [A-Za-z] [A-Za-z0-9_]*
   type       <- [A-Z] [A-Za-z0-9_]*
 
-  func       <- "func" _ args _ ret? _ block
+  func       <- "func" _ args _ ret:ret? _ block
   args       <- "(" _ (arg _ ("," _ arg _)* )? _ ")"
   arg        <- name _ typifier:(":" _ type)?
   ret        <- "->" space type
