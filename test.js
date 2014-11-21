@@ -13,3 +13,5 @@ var tree = parser.parse(code)
 
 var ts = new TypeSystem()
 ts.walk(tree)
+
+console.log(tree.compile())
