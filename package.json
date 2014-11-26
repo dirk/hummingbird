@@ -9,6 +9,7 @@
     "expect.js": "~0.3.1"
   },
   "scripts": {
-    "build-parser": "node_modules/canopy/bin/canopy lib/grammar.peg"
+    "build-parser": "node_modules/canopy/bin/canopy lib/grammar.peg",
+    "test": "node_modules/.bin/vows"
   }
 }
