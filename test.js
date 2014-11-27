@@ -10,8 +10,9 @@ var input = "let a: Type = (2 + 3) + 4"
 var tree = parser.parse(code)
 // if (tree) tree.print();
 
-
 var ts = new TypeSystem()
 ts.walk(tree)
 
-console.log(tree.compile())
+tree.print()
+
+// console.log(tree.compile())
