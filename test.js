@@ -13,6 +13,9 @@ var tree = parser.parse(code)
 var ts = new TypeSystem()
 ts.walk(tree)
 
-tree.print()
+// tree.print()
 
-// console.log(tree.compile())
+// Load the JavaScript compilation target
+require('./lib/targets/javascript')
+
+console.log(tree.compile())
