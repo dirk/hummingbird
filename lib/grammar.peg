@@ -52,7 +52,7 @@ grammar Hummingbird
   literal <- integer <Literal>
   integer <- ("0" / ("-"? [1-9] [0-9]*)) <Integer>
 
-  binaryop       <- addeq /
+  binaryop       <- addeq / mineq / timeq / diveq
                     add / sub / mul / div / mod / eq / or / lt
 
   add            <- "+"
@@ -65,6 +65,9 @@ grammar Hummingbird
   lt             <- "<"
 
   addeq          <- "+="
+  mineq          <- "-="
+  timeq          <- "*="
+  diveq          <- "/="
 
   unaryoperator  <- not
   not            <- "!"
