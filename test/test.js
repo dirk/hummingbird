@@ -28,6 +28,28 @@ vows.describe('Hummingbird').addBatch({
           expect(decl.type).to.eql('var')
           expect(decl.lvalue.type).to.be.a(types.Number)
         }
+      },
+      'with a valid explicit type': {
+        topic: 'var foo: Integer = 1',
+        'should parse': function (topic) {
+          parseAndWalk(topic)
+        }
+      },
+      'with an invalid explicit type': {
+        topic: 'var foo: Integer = func () -> Integer { return 1 }',
+        'should fail to parse': function (topic) {
+          var tree = false
+          try {
+            tree = parseAndWalk(topic)
+            // tree.print()
+          } catch (err) {
+            // Caught an error successfully
+            expect(err.name).to.eql('TypeError')
+            expect(err.message).to.contain('Unequal types in declaration')
+            return
+          }
+          expect(tree).to.be(false)
+        }
       }
     }
   }
