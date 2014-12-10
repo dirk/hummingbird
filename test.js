@@ -9,7 +9,7 @@ var code  = fs.readFileSync('./examples/fibonacci.hb').toString()
 var input = "let a = (2 + 3) + 4"
 
 try {
-  var tree = grammar2.parse(code)  
+  var tree = grammar2.parse(code)
 } catch (e) {
   var stdout = process.stdout
   stdout.write(e.name+': '+e.message+"\n")
