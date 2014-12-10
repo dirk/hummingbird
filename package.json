@@ -6,10 +6,12 @@
     "canopy": "~0.2.0",
     "lodash": "~2.4.1",
     "vows": "~0.8.1",
-    "expect.js": "~0.3.1"
+    "expect.js": "~0.3.1",
+    "pegjs": "~0.8.0"
   },
   "scripts": {
-    "build-parser": "node_modules/canopy/bin/canopy lib/grammar.peg",
+    "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
+    "grammar2": "node_modules/.bin/pegjs lib/grammar2.pegjs",
     "test": "node_modules/.bin/vows"
   }
 }

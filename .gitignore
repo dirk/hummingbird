@@ -1,3 +1,6 @@
 node_modules
 .DS_Store
 lib/grammar.js
+lib/grammar2.js
+.srclib-cache
+
