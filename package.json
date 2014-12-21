@@ -12,6 +12,6 @@
   "scripts": {
     "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
     "grammar2": "node_modules/.bin/pegjs lib/grammar2.pegjs",
-    "test": "node_modules/.bin/vows"
+    "test": "node_modules/.bin/vows --spec test/test-*"
   }
 }

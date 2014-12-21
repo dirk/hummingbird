@@ -1,18 +1,9 @@
 
-var vows       = require('vows'),
-    expect     = require('expect.js'),
-    Parser     = require('../lib/parser'),
-    parser     = new Parser(),
-    types      = require('../lib/types'),
-    TypeSystem = require('../lib/typesystem').TypeSystem,
-    AST        = require('../lib/ast')
-
-var parseAndWalk = function (source) {
-  var tree = parser.parse(source)
-  var typeSystem = new TypeSystem()
-  typeSystem.walk(tree)
-  return tree
-}
+var vows         = require('vows'),
+    expect       = require('expect.js'),
+    types        = require('../lib/types'),
+    AST          = require('../lib/ast'),
+    parseAndWalk = require('./helper').parseAndWalk
 
 vows.describe('Hummingbird').addBatch({
   'Parser': {
