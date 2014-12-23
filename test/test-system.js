@@ -1,18 +1,18 @@
 
 // Full-system tests of Hummingbird parser and compiler.
 
-var vows         = require('vows'),
+var fs           = require('fs'),
+    vows         = require('vows'),
     expect       = require('expect.js'),
     AST          = require('../lib/ast'),
     types        = require('../lib/types'),
-    parseAndWalk = require('./helper').parseAndWalk,
-    fs           = require('fs')
+    parseAndWalk = require('./helper').parseAndWalk
 
-programs = {
+var programs = {
   forLoop: fs.readFileSync(__dirname+'/system/for-loop.hb').toString()
 }
 
-var runCompiledCode = function (tree) {
+function runCompiledCode (tree) {
   // Wrap the compiled code in an immediately-called function
   return eval("(function(){\n"+tree.compile()+"\n})()")
 }
