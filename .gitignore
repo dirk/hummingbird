@@ -4,3 +4,6 @@ lib/grammar.js
 lib/grammar2.js
 .srclib-cache
 
+# Ignore Vim swap files
+*.swp
+
