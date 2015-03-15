@@ -1,11 +1,11 @@
 # Given n number in the fibonacci sequence, calculate it
 let fibonacciRecursive = func (n: Integer) -> Integer {
-  
+
   # If the number is 1 or 0, we've hit the bottom of the trough
   if n == 1 || n == 0 {
     return n
   }
-  
+
   # Recurse down
   return fibonacciRecursive(n - 1) + fibonacciRecursive(n - 2)
 }

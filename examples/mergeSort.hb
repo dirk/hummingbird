@@ -10,18 +10,18 @@ let mergeSort = func (arr: Array<Any>, low: Integer, high: Integer) {
   merge(arr, low, mid, high)
 }
 
-let merge = func (arr: Array<Any>, 
-                  low: Integer, 
-                  mid: Integer, 
-                  high: Integer, 
+let merge = func (arr: Array<Any>,
+                  low: Integer,
+                  mid: Integer,
+                  high: Integer,
                   compare: (Any, Any) -> Boolean
                   ) -> {
-  
+
   // Copy array
   var clone: Array<Any> = arr.slice(0)
 
-  var left: Integer = low, 
-      right: Integer = mid + 1, 
+  var left: Integer = low,
+      right: Integer = mid + 1,
       currentIndex: Integer = 0
 
   while left < mid && right < high {
