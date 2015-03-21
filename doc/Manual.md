@@ -24,7 +24,7 @@ var b: String = "explicit string"
 // Attempting to use a variable in a function body without a new
 // `var` definition or explicit closing will raise a
 // compilation error.
-var c = func () -> String with a, b {
+var c = func () -> String with (a, b) {
   return a + " and " + b
 }
 ```
