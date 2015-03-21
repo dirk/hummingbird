@@ -1,30 +1,30 @@
 
-var fs     = require('fs'),
-    Parser = require('./lib/parser'),
-    parser = new Parser(),
-    grammar2 = require('./lib/grammar2'),
-    TypeSystem = require('./lib/typesystem').TypeSystem
+var fs          = require('fs'),
+    Parser      = require('./lib/parser'),
+    parser      = new Parser(),
+    grammar2    = require('./lib/grammar2'),
+    TypeSystem  = require('./lib/typesystem').TypeSystem,
+    reportError = require('./lib/util').reportError
 
 var code  = fs.readFileSync('./examples/fibonacci.hb').toString()
-var input = "let a = (2 + 3) + 4"
+// var input = "let a = (2 + 3) + 4"
+// var input = "var foo: (String) -> Number = func (a: Integer) -> Integer {\nreturn 1\n}\nfoo(1)\n"
+// var input = "var f = func (a: Number = 2) -> Number { return a }"
+var input = "for var i = 0; i < 2; i += 1 { }"
 
 try {
-  var tree = grammar2.parse(code)
-} catch (e) {
-  var stdout = process.stdout
-  stdout.write(e.name+': '+e.message+"\n")
-  if (e.name == 'SyntaxError') {
-    stdout.write('  Line '+e.line+' Column '+e.column+"\n")
-  }
+  parser.file = 'input.hb'
+  var tree = parser.parse(input)
+
+  var ts = new TypeSystem()
+  ts.walk(tree)
+} catch (err) {
+  reportError(err)
   process.exit()
 }
 
 // var inspect = require('util').inspect
 // console.log(inspect(tree, {depth: null}))
-// tree.print()
-
-var ts = new TypeSystem()
-ts.walk(tree)
 
 // tree.print()
 
@@ -32,3 +32,4 @@ ts.walk(tree)
 require('./lib/targets/javascript')
 
 console.log(tree.compile())
+
