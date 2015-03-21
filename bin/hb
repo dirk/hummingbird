@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+var path         = require('path'),
+    libDirectory = path.join(path.dirname(__filename), '..', 'lib')
+
+var command = require(path.join(libDirectory, 'command'))
+command.run()
+
