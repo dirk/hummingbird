@@ -1,3 +1,3 @@
 # Hummingbird
 
-For now refer to the [manual](Manual.md).
+For now refer to the [manual](doc/Manual.md).
