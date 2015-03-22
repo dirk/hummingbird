@@ -9,7 +9,8 @@ var fs           = require('fs'),
     parseAndWalk = require('./helper').parseAndWalk
 
 var programs = {
-  forLoop: fs.readFileSync(__dirname+'/system/for-loop.hb').toString()
+  forLoop: fs.readFileSync(__dirname+'/system/for-loop.hb').toString(),
+  whileTrue: fs.readFileSync(__dirname+'/system/while-true.hb').toString()
 }
 
 function runCompiledCode (tree) {
@@ -28,6 +29,18 @@ vows.describe('Hummingbird').addBatch({
         topic: function (tree) { return runCompiledCode(tree) },
         'should produce the right result': function (result) {
           expect(result).to.eql(10)
+        }
+      }
+    },
+    'given a while-true program': {
+      topic: parseAndWalk(programs.whileTrue),
+      'should parse': function (tree) {
+        expect(tree).to.be.ok()
+      },
+      'when executed': {
+        topic: function (tree) { return runCompiledCode(tree) },
+        'should produce the right result': function (result) {
+          expect(result).to.eql(5)
         }
       }
     }
