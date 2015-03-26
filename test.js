@@ -10,7 +10,8 @@ var code  = fs.readFileSync('./examples/fibonacci.hb').toString()
 // var input = "let a = (2 + 3) + 4"
 // var input = "var foo: (String) -> Number = func (a: Integer) -> Integer {\nreturn 1\n}\nfoo(1)\n"
 // var input = "var f = func (a: Number = 2) -> Number { return a }"
-var input = "for var i = 0; i < 2; i += 1 { }"
+// var input = "for var i = 0; i + 2; i += 1 { }"
+var input = fs.readFileSync('./examples/multi.hb').toString()
 
 try {
   parser.file = 'input.hb'
