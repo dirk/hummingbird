@@ -18,31 +18,28 @@ function runCompiledCode (tree) {
   return eval("(function(){\n"+tree.compile()+"\n})()")
 }
 
-vows.describe('Hummingbird').addBatch({
-  'System': {
-    'given a for loop program': {
-      topic: parseAndWalk(programs.forLoop, 'for-loop.hb'),
-      'should parse': function (tree) {
-        expect(tree).to.be.ok()
-      },
-      'when executed': {
-        topic: function (tree) { return runCompiledCode(tree) },
-        'should produce the right result': function (result) {
-          expect(result).to.eql(10)
-        }
-      }
-    },
-    'given a while-true program': {
-      topic: parseAndWalk(programs.whileTrue, 'while-true.hb'),
-      'should parse': function (tree) {
-        expect(tree).to.be.ok()
-      },
-      'when executed': {
-        topic: function (tree) { return runCompiledCode(tree) },
-        'should produce the right result': function (result) {
-          expect(result).to.eql(5)
-        }
-      }
-    }
-  }
-}).export(module)
+describe('System', function () {
+  describe('given a for loop program', function () {
+    var tree = null
+    it('should parse', function () {
+      tree = parseAndWalk(programs.forLoop)
+      expect(tree).to.be.ok()
+    })
+    it('should produce the right result when executed', function () {
+      var result = runCompiledCode(tree)
+      expect(result).to.eql(10)
+    })
+  })
+  xdescribe('given a while-true program', function () {
+    var tree = null
+    it('should parse', function () {
+      tree = parseAndWalk(programs.whileTrue)
+      expect(tree).to.be.ok()
+    })
+    it('should produce the correct result when executed', function () {
+      var result = runCompiledCode(tree)
+      expect(result).to.eql(5)
+    })
+  })
+})
+>>>>>>> Switch to Mocha

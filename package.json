@@ -10,6 +10,9 @@
     "pegjs": "~0.8.0",
     "optimist": "~0.6.1"
   },
+  "devDependencies": {
+    "mocha": "~2.2.1"
+  },
   "scripts": {
     "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
     "grammar2": "node_modules/.bin/pegjs --cache lib/grammar2.pegjs",
