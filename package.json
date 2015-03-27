@@ -18,7 +18,8 @@
     "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
     "grammar2": "node_modules/.bin/pegjs --cache lib/grammar2.pegjs",
     "test": "node_modules/.bin/mocha",
-    "test-spec": "node_modules/.bin/mocha test/spec"
+    "test-spec": "node_modules/.bin/mocha test/spec",
+    "gen-spec": "node share/gen-spec.js"
   }
 }
 

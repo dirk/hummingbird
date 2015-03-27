@@ -5,7 +5,6 @@ var vows         = require('vows'),
     AST          = require('../lib/ast'),
     parseAndWalk = require('./helper').parseAndWalk
 
-
 describe('Parser', function () {
   describe('given a var declaration', function () {
     it('should parse an implicit type', function () {
