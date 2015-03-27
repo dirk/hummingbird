@@ -2,6 +2,7 @@ node_modules
 .DS_Store
 lib/grammar.js
 lib/grammar2.js
+test/spec
 .srclib-cache
 
 # Ignore Vim swap files

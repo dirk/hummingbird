@@ -11,12 +11,15 @@
     "optimist": "~0.6.1"
   },
   "devDependencies": {
-    "mocha": "~2.2.1"
+    "mocha": "~2.2.1",
+    "esprima": "~2.1.0",
+    "lodash": "~3.6.0"
   },
   "scripts": {
     "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
     "grammar2": "node_modules/.bin/pegjs --cache lib/grammar2.pegjs",
-    "test": "node_modules/.bin/vows --spec test/test-*"
+    "test": "node_modules/.bin/mocha",
+    "test-spec": "node_modules/.bin/mocha test/spec"
   }
 }
 

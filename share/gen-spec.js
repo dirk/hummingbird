@@ -1,47 +1,30 @@
-var fs = require('fs')
+var fs = require('fs'),
+    parser = require('../lib/spec-parser'),
+    parseSpecification = parser.parseSpecification
 
-var openTagRegexp = /<spec name="([0-9A-Za-z-_]+)">/g
+var specSource   = fs.readFileSync(__dirname+'/../doc/specification.md').toString(),
+    runnerSource = fs.readFileSync(__dirname+'/../share/spec-runner.js').toString()
 
-function extractJS (source) {
-  return /``js\s([^(``)]+)```/gi.exec(source)[1]
+var specs = parseSpecification(specSource)
+
+var specDir = __dirname+'/../test/spec'
+
+// Clear out test/spec directory
+function removeExisting () {
+  var files = fs.readdirSync(specDir)
 }
-function extractHB (source) {
-  return /``hb\s([^(``)]+)```/gi.exec(source)[1]
+removeExisting()
+
+
+// Now generate the specs
+for (var i = specs.length - 1; i >= 0; i--) {
+  var spec = specs[i]
+
+  var js = spec.js+"\n",
+      hb = spec.hb+"\n"
+  fs.writeFileSync(specDir+'/source-'+spec.name+'.js', js)
+  fs.writeFileSync(specDir+'/source-'+spec.name+'.hb', hb)
+
+  var runner = runnerSource.replace(/NAME/g, spec.name)
+  fs.writeFileSync(specDir+'/test-'+spec.name+'.js', runner)
 }
-
-function Spec (name, js, hb) {
-  this.name = name
-  this.js   = js
-  this.hb   = hb
-}
-
-var specSource = fs.readFileSync(__dirname+'/../doc/specification.md').toString()
-
-var specs = [],
-    match = null
-
-while ((match = openTagRegexp.exec(specSource)) != null) {
-  var openingIndex = match.index,
-      closingIndex = specSource.indexOf('</spec>', openingIndex)
-  // String source of the spec
-  var source = specSource.slice(openingIndex + match[0].length, closingIndex)
-  source = source.trim()
-  // Pull out the name of the spec
-  var name = match[1]
-  // Extract the two sources from the spec body
-  var jsSource, hbSource;
-  try {
-    jsSource = extractJS(source)
-  } catch(err) {
-    throw new Error('Failed to find JavaScript source in '+name+' spec')
-  }
-  try {
-    hbSource = extractHB(source)
-  } catch(err) {
-    throw new Error('Failed to find Hummingbird source in '+name+' spec')
-  }
-  specs.push(new Spec(name, jsSource.trim(), hbSource.trim()))
-}
-
-console.log(specs)
-
