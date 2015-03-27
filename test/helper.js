@@ -7,7 +7,8 @@ var types      = require('../lib/types'),
 // Load the JavaScript compilation target
 require(__dirname+'/../lib/targets/javascript')
 
-var parseAndWalk = function (source) {
+var parseAndWalk = function (source, filename) {
+  parser.file = filename ? filename : 'unknown'
   var tree       = parser.parse(source),
       typeSystem = new TypeSystem()
   typeSystem.walk(tree)

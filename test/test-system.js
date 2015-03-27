@@ -21,7 +21,7 @@ function runCompiledCode (tree) {
 vows.describe('Hummingbird').addBatch({
   'System': {
     'given a for loop program': {
-      topic: parseAndWalk(programs.forLoop),
+      topic: parseAndWalk(programs.forLoop, 'for-loop.hb'),
       'should parse': function (tree) {
         expect(tree).to.be.ok()
       },
@@ -33,7 +33,7 @@ vows.describe('Hummingbird').addBatch({
       }
     },
     'given a while-true program': {
-      topic: parseAndWalk(programs.whileTrue),
+      topic: parseAndWalk(programs.whileTrue, 'while-true.hb'),
       'should parse': function (tree) {
         expect(tree).to.be.ok()
       },
