@@ -14,9 +14,9 @@ let fibonacciRecursive = func (n: Integer) -> Integer {
 let fibonacciIterative = func (n: Integer) -> Integer {
 
   # Explicity typed variables
-  var current: Int = 0
-  var next: Int = 1
-  var future: Int = 1
+  var current: Integer = 0
+  var next: Integer = 1
+  var future: Integer = 1
 
   # Looping
   for var i = 0; i < n; i += 1 {
