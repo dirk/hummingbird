@@ -17,6 +17,21 @@ sayHello()
 
 For more examples see the [specification](doc/Specification.md) and [manual](doc/Manual.md).
 
+## Getting started
+
+The quickest way to get started is to clone the repository and use that directly. This language is actively being built out, so many features you would expect may be missing.
+
+```bash
+git clone git@github.com:dirk/hummingbird.git
+cd hummingbird
+# Run the command-line tool with no arguments to see the options
+bin/hb
+# To see the parsed and type-checked AST of a file
+bin/hb inspect examples/simple.js
+# To compile and run a file
+bin/hb run examples/simple.js
+```
+
 ## Specification
 
 The Hummingbird [specification](doc/Specification.md) is designed to be both human- and machine-readable. It is organized into sections for each syntactical and semantic feature of the language.
