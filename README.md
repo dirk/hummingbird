@@ -19,3 +19,7 @@ npm run gen-spec
 npm run test-spec
 ```
 
+## License
+
+Released under the Modified BSD License. See [LICENSE](LICENSE) for details.
+

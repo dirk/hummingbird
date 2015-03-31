@@ -4,10 +4,14 @@
   "repository": "https://github.com/dirk/hummingbird",
   "dependencies": {
     "canopy": "~0.2.0",
-    "lodash": "~2.4.1",
-    "vows": "~0.8.1",
     "expect.js": "~0.3.1",
-    "pegjs": "~0.8.0"
+    "pegjs": "~0.8.0",
+    "optimist": "~0.6.1"
+  },
+  "devDependencies": {
+    "mocha": "~2.2.1",
+    "esprima": "~2.1.0",
+    "lodash": "~3.6.0"
   },
   "devDependencies": {
     "mocha": "~2.2.1",
