@@ -15,13 +15,18 @@ function renderCommonmark (source) {
 
 // Read the spec file
 // var spec = fs.readFileSync(__dirname+'/../doc/specification.md').toString()
-var specSource = child_process.execSync('git show spec:doc/Specification.md').toString()
+var specSource = child_process.execSync('git show master:doc/specification.md').toString()
 
 var specs = parser.parseSpecification(specSource)
 // console.log(specs)
 
 var position = 0,
-    parts    = ['<!-- Don\'t edit me! I was generated automagically by bin/compile-spec. -->'];
+    parts    = [
+      '---',
+      'title: Specification',
+      '---',
+      '<!-- Don\'t edit me! I was generated automagically by bin/compile-spec. -->'
+    ];
 
 specs.forEach(function (spec) {
   var before = specSource.substring(position, spec.start)
