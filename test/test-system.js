@@ -31,6 +31,16 @@ describe('System', function () {
     })
   })
 
+  describe('given a string literal', function () {
+    var source = "var a = \"Hello world.\"\nreturn a"
+    it('should parse and produce the correct result', function () {
+      var tree = parseAndWalk(source)
+      expect(tree).to.be.ok()
+      var result = runCompiledCode(tree)
+      expect(result).to.eql('Hello world.')
+    })
+  })
+
   describe('given a class', function () {
     describe('with an invalid let-property', function () {
       var source = "var a = func () -> Integer { return 1 }\n"+
@@ -61,7 +71,7 @@ describe('System', function () {
       })
     })
   })
-  
+
   xdescribe('given a while-true program', function () {
     var tree = null
     it('should parse', function () {
