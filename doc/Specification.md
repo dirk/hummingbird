@@ -4,9 +4,9 @@ Semi-formal specification of the syntax and semantics of the Hummingbird languag
 
 ## Variables
 
-There are two types of variable definitions: `var` and `let`. The former declares a mutable variable in the scope. The latter declares an immutable variable in the scope.
+There are two types of variable definitions: `var` and `let`. The former declares a **mutable** variable in the scope. The latter declares an **immutable** variable in the scope.
 
-Immutability is checked at only the reference level. (It ensures that the variable will always refer to the same thing; however mutating functions of that thing can still occur!) Furthermore this checking happens only at compile time.
+Immutability is checked at only the reference level. (It ensures that the variable will always refer to the same thing; however mutating functions of that thing can still occur!) Furthermore, this checking happens only at compile time.
 
 <spec name="variables">
 ```hb
