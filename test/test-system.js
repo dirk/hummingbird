@@ -30,6 +30,38 @@ describe('System', function () {
       expect(result).to.eql(10)
     })
   })
+
+  describe('given a class', function () {
+    describe('with an invalid let-property', function () {
+      var source = "var a = func () -> Integer { return 1 }\n"+
+                   "class B { var c: () -> Integer = a }\n"
+      it('should fail to parse', function () {
+        expect(function () {
+          parseAndWalk(source)
+        }).to.throwException(/non-literal default for property/)
+      })
+    })
+
+    describe('with a valid definition', function () {
+      var source = "class A {\n"+
+                   "  var b: Integer = 1\n"+
+                   "  init () { this.b = this.b + 1 }\n"+
+                   "  func c () -> Integer { return this.b + 1 }\n"+
+                   "}\n"+
+                   "var a = new A()\n"+
+                   "return a.c()\n"
+      var tree = null
+      it('should parse', function () {
+        tree = parseAndWalk(source)
+        expect(tree).to.be.ok()
+      })
+      it('should product the correct result', function () {
+        var result = runCompiledCode(tree)
+        expect(result).to.eql(3)
+      })
+    })
+  })
+  
   xdescribe('given a while-true program', function () {
     var tree = null
     it('should parse', function () {
