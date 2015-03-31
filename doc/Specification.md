@@ -9,13 +9,16 @@ There are two types of variable definitions: `var` and `let`. The former declare
 Immutability is checked at only the reference level. (It ensures that the variable will always refer to the same thing; however mutating functions of that thing can still occur!) Furthermore, this checking happens only at compile time.
 
 <spec name="variables">
+
 ```hb
 var a: Integer = 1
 let b: Integer = 2
 ```
+
 ```js
 var a = 1;
 var b = 2;
 ```
+
 </spec>
 
