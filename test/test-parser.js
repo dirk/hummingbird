@@ -1,6 +1,5 @@
 
-var vows         = require('vows'),
-    expect       = require('expect.js'),
+var expect       = require('expect.js'),
     types        = require('../lib/types'),
     AST          = require('../lib/ast'),
     parseAndWalk = require('./helper').parseAndWalk

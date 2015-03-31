@@ -2,7 +2,6 @@
 // Full-system tests of Hummingbird parser and compiler.
 
 var fs           = require('fs'),
-    vows         = require('vows'),
     expect       = require('expect.js'),
     AST          = require('../lib/ast'),
     types        = require('../lib/types'),
