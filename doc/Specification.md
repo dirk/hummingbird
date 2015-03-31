@@ -22,3 +22,18 @@ var b = 2;
 
 </spec>
 
+## Functions
+
+Hummingbird provides first-class, anonymous functions.
+
+<spec name="functions">
+
+```hb
+var a = func (x: String) -> String { }
+```
+
+```js
+var a = function (x) { };
+```
+
+</spec>
