@@ -34,6 +34,15 @@ bin/hb inspect examples/simple.js
 bin/hb run examples/simple.js
 ```
 
+### Contributing
+
+To contribute just [fork][fork] the repository, commit your changes on a branch on your fork, and [create a pull request][pull]!
+
+If you're planning to introduce significant changes/features, then we highly suggest creating an issue with the "Proposal" label ahead-of-time so that everyone can contribute to a discussion before starting to commit development time. We really don't want to have to needlessly turn down pull requests!
+
+[fork]: https://github.com/dirk/hummingbird/fork
+[pull]: https://github.com/dirk/hummingbird/compare
+
 ## Specification
 
 The Hummingbird [specification](doc/Specification.md) is designed to be both human- and machine-readable. It is organized into sections for each syntactical and semantic feature of the language.
