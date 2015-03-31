@@ -1,3 +1,5 @@
+[![Build Status][travis-image]][travis-url]
+
 # Hummingbird
 
 Hummingbird is a language inspired by JavaScript, ML, and Swift. It features/will feature a usable type system with ML-inspired type inference, JavaScript code generation, and a concise syntax designed for readability.
@@ -48,4 +50,7 @@ npm run test-spec
 ## License
 
 Released under the Modified BSD License. See [LICENSE](LICENSE) for details.
+
+[travis-image]: https://img.shields.io/travis/dirk/hummingbird/master.svg?style=flat-square
+[travis-url]: https://travis-ci.org/dirk/hummingbird
 
