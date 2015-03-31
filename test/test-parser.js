@@ -15,7 +15,8 @@ describe('Parser', function () {
       // Check that it parsed as a var-assignment with a type of Number
       expect(decl).to.be.an(AST.Assignment)
       expect(decl.type).to.eql('var')
-      expect(decl.lvalue.type).to.be.a(types.Number)
+      expect(decl.lvalue.type).to.be.a(types.Instance)
+      expect(decl.lvalue.type.type).to.be.a(types.Number)
     })
 
     it('should parse an explicit type', function () {
