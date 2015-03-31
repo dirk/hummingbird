@@ -1,0 +1,16 @@
+{% capture full_title %}
+  {% if page.title %}
+    {{ page.title }} - Hummingbird
+  {% else %}
+    Hummingbird
+  {% endif %}
+{% endcapture %}
+<html>
+  <head>
+    <title>{{ full_title | strip_newlines }}</title>
+  </head>
+  <body>
+    {{ content }}
+  </body>
+</html>
+

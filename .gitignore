@@ -2,6 +2,13 @@ node_modules
 .DS_Store
 .srclib-cache
 
+# gh-pages branch-specific files
+lib/
+test/
+
+# Jekyll-specific files
+_site
+
 # Ignore Vim swap files
 *.swp
 
