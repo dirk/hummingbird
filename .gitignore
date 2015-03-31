@@ -1,0 +1,7 @@
+node_modules
+.DS_Store
+.srclib-cache
+
+# Ignore Vim swap files
+*.swp
+
