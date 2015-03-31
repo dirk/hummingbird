@@ -34,7 +34,6 @@ describe('Parser', function () {
         expect(err.name).to.eql('TypeError')
         expect(err.message).to.contain('Unequal types in declaration')
         return
->>>>>>> Switch to Mocha
       }
       expect(tree).to.be(false)
     })
