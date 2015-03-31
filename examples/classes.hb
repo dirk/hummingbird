@@ -1,7 +1,7 @@
 
 class Foo {
-  var bar: Integer
-  # let baz: Integer
+  var bar: Integer = 0
+  let baz: Integer = 2
 
   init () {
     this.bar = 1
