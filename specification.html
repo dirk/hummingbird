@@ -1,0 +1,16 @@
+<!-- Don't edit me! I was generated automagically by bin/compile-spec. -->
+<h1>Specification</h1>
+<p>Semi-formal specification of the syntax and semantics of the Hummingbird language.</p>
+<h2>Variables</h2>
+<p>There are two types of variable definitions: <code>var</code> and <code>let</code>. The former declares a <strong>mutable</strong> variable in the scope. The latter declares an <strong>immutable</strong> variable in the scope.</p>
+<p>Immutability is checked at only the reference level. (It ensures that the variable will always refer to the same thing; however mutating properties of that thing can still occur!) Furthermore, this checking happens only at compile time.</p>
+
+<div class="spec js"><code><pre>var a = 1;
+var b = 2;</pre></code>
+<div class="spec hb"><code><pre>var a: Integer = 1
+let b: Integer = 2</pre></code>
+<h2>Functions</h2>
+<p>Hummingbird provides first-class, anonymous functions.</p>
+
+<div class="spec js"><code><pre>var a = function (x) { };</pre></code>
+<div class="spec hb"><code><pre>var a = func (x: String) -> String { }</pre></code>
