@@ -16,7 +16,8 @@
   "devDependencies": {
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
-    "lodash": "~3.6.0"
+    "lodash": "~3.6.0",
+    "xregexp": "~2.0.0"
   },
   "scripts": {
     "grammar":  "node_modules/.bin/canopy lib/grammar.peg",
