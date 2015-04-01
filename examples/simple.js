@@ -13,3 +13,6 @@ var c = func () {
 }
 console.log(c())
 
+var d = func () { return }
+console.log(d)
+
