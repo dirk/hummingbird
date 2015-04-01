@@ -1,14 +1,13 @@
 
 # http://jekyllrb.com/docs/configuration/#front-matter-defaults
 defaults:
-- 
+-
   scope:
     path: "" # Empty string targets all files in the project
   values:
     layout: "default"
-
+baseurl: /hummingbird
 exclude:
 - bin
 - lib
 - node_modules
-
