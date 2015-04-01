@@ -57,10 +57,11 @@ p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px
 
 /* Pages */
 
-.Page { width: 800px; padding-left: 80px; padding-right: 20px; }
+.page { width: 800px; padding-left: 80px; padding-right: 20px; }
 
 /* Specification Doc */
 
+.specification { width: 800px; padding-left: 80px; padding-right: 20px; }
 .spec-pair { border-radius: 4px; border: 1px solid #882FCB; display: flex; display: -webkit-flex; display: -moz-flex; overflow: hidden; }
 .spec-pair > .spec { display: inline-block; width: 100%; margin: 0; line-height: 1.4; background: white; }
 .spec code { padding: 20px; }

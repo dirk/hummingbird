@@ -25,7 +25,7 @@ var position = 0,
       '---',
       'title: Specification',
       '---',
-      '<div class="Specification">',
+      '<div class="specification">',
       '<!-- Don\'t edit me! I was generated automagically by bin/compile-spec. -->'
     ];
 
