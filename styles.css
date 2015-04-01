@@ -1,5 +1,6 @@
 /* Config and Variables  */
 /* main_color: #882FCB; */
+/* light_color: #F7F1FB; */
 
 
 /* Eric Meyer's Reset CSS v2.0 - http://cssreset.com */
@@ -33,3 +34,13 @@ a { text-decoration: none; color: inherit; }
 .navigation-list {  }
 .navigation-listItem { display: inline-block; vertical-align: middle; margin-right: 40px; font-weight: 500; }
 .navigation-listItem--active, .navigation-listItem:hover { color: #882FCB; }
+
+code { font-family: "source-code-pro", "Menlo", monospace; font-size: 13px; }
+p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px; margin: 2px; font-size: 15px; }
+
+.Specification { width: 800px; padding-left: 80px; padding-right: 20px; }
+.spec-pair { border-radius: 4px; border: 1px solid #882FCB; display: flex; display: -webkit-flex; display: -moz-flex; overflow: hidden; }
+.spec-pair > .spec { display: inline-block; width: 100%; margin: 0; line-height: 1.4; background: white; }
+.spec code { padding: 20px; }
+.spec:first-child { border-right: 1px solid #882FCB; }
+.spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; }
