@@ -4,6 +4,12 @@ console.log(a)
 var b = "Hello world!"
 console.log(b)
   
-var c = func () { return 2 }
+var c = func () {
+  if 1 {
+    return 2
+  } else {
+    return
+  }
+}
 console.log(c())
 
