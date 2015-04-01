@@ -67,3 +67,13 @@ p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px
 .spec code { padding: 20px; }
 .spec:first-child { border-right: 1px solid #882FCB; }
 .spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; }
+
+/* Footer */
+.footer {
+  padding: 2rem; margin: 8rem 0 0.5rem; border-top: 1px solid #eee;
+  font-size: 1.1rem; font-weight: 300; letter-spacing: 0.05rem; color: #999;
+}
+.footer-right { float: right; }
+.footer a { color: #444; }
+.footer a:hover { text-decoration: underline; }
+
