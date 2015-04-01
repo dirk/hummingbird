@@ -6,7 +6,8 @@ defaults:
     path: "" # Empty string targets all files in the project
   values:
     layout: "default"
-baseurl: /hummingbird
+# baseurl: /hummingbird
+baseurl: ""
 exclude:
 - bin
 - lib
