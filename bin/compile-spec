@@ -25,26 +25,29 @@ var position = 0,
       '---',
       'title: Specification',
       '---',
+      '<div class="Specification">',
       '<!-- Don\'t edit me! I was generated automagically by bin/compile-spec. -->'
     ];
 
 specs.forEach(function (spec) {
   var before = specSource.substring(position, spec.start)
   parts.push(renderCommonmark(before))
-  
+
   // Add the spec pieces
-  var js = '<div class="spec js"><code><pre>'+spec.js+'</pre></code>'
-  var hb = '<div class="spec hb"><code><pre>'+spec.hb+'</pre></code>'
-  parts.push(js)
+  var hb = '<div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">'+spec.hb+'</code></pre></div>'
+  var js = '<div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">'+spec.js+'</code></pre></div>'
+  parts.push('<div class="spec-pair">')
   parts.push(hb)
+  parts.push(js)
+  parts.push('</div>')
 
   position = spec.end
 })
 // Add anything after the last spec
 var after = specSource.substring(position, specSource.length)
 parts.push(renderCommonmark(after))
+parts.push('</div>')
 
 // console.log(parts.join("\n"))
 
 fs.writeFileSync(__dirname+'/../specification.html', parts.join("\n"))
-
