@@ -1,15 +1,22 @@
-/* Config and Variables  */
-/* main_color: #882FCB; */
-/* light_color: #F7F1FB; */
-
+/* 
+COLORS:
+main_color:  #882FCB;
+light_color: #F7F1FB;
+*/
 
 /* Eric Meyer's Reset CSS v2.0 - http://cssreset.com */
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{border:0;font-size:100%;font:inherit;vertical-align:baseline;margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section{display:block}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:none}table{border-collapse:collapse;border-spacing:0}
 
 /* Main */
 
-html { font-family: "franklin-gothic-urw", "Helvetica Neue", "Helvetica"; width: 960px; margin: 0 auto; box-sizing: border-box; }
+html {
+  box-sizing: border-box;
+  font-family: "franklin-gothic-urw", "Helvetica Neue", "Helvetica";
+  font-size: 62.5%;
+}
 * { box-sizing: inherit; }
+
+.wrap { width: 96rem; margin: 0 auto; }
 
 /* Typography */
 
@@ -41,9 +48,9 @@ em { font-style: italic; }
 .navigation-logotype h1 { font-size: 24px; margin-bottom: 5px; }
 .navigation-logotype h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999999; font-weight: 300; margin: 0; }
 
-.navigation-list { padding: 0; }
-.navigation-listItem { display: inline-block; vertical-align: middle; margin: 0 40px 0 0; font-weight: 500; }
-.navigation-listItem--active, .navigation-listItem:hover { color: #882FCB; }
+.navigation-list { padding: 0; font-size: 1.8rem; }
+.navigation-list-item { display: inline-block; vertical-align: middle; margin: 0 40px 0 0; font-weight: 500; }
+.navigation-list-item.is-active, .navigation-list-item:hover { color: #882FCB; }
 
 code { font-family: "source-code-pro", "Menlo", monospace; font-size: 13px; }
 p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px; margin: 2px; font-size: 15px; }
