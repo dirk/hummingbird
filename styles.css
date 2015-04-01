@@ -13,12 +13,17 @@ html { font-family: "franklin-gothic-urw", "Helvetica Neue", "Helvetica"; width:
 
 /* Typography */
 
-h1 {}
-h2 {}
-h3 {}
-h4 {}
-h5 {}
-h6 {}
+h1 { font-size: 36px; }
+h2 { font-size: 28px; }
+h3 { font-size: 24px; color: #999999; }
+h4 { font-size: 22px; }
+h5 { font-size: 18px; }
+h6 { font-size: 17px; }
+p { font-size: 18px; color: #444444; line-height: 1.3; }
+
+h1, h2, h3, h4, h5, h6, p, .spec-pair { margin-bottom: 30px; }
+h1, h2, h3, h4, h5, h6 { font-weight: 500; }
+
 a { text-decoration: none; color: inherit; }
 
 /* Navigation Bar */
@@ -29,7 +34,7 @@ a { text-decoration: none; color: inherit; }
 
 .navigation-logo {  }
 .navigation-logotype h1 { font-size: 24px; margin-bottom: 5px; }
-.navigation-logotype h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999999; font-weight: 300; }
+.navigation-logotype h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999999; font-weight: 300; margin: 0; }
 
 .navigation-list {  }
 .navigation-listItem { display: inline-block; vertical-align: middle; margin-right: 40px; font-weight: 500; }
