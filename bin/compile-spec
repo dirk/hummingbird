@@ -25,7 +25,7 @@ var position = 0,
       '---',
       'title: Specification',
       '---',
-      '<div class="specification">',
+      '<div class="specification page">',
       '<!-- Don\'t edit me! I was generated automagically by bin/compile-spec. -->'
     ];
 
@@ -46,7 +46,7 @@ specs.forEach(function (spec) {
 // Add anything after the last spec
 var after = specSource.substring(position, specSource.length)
 parts.push(renderCommonmark(after))
-parts.push('</div>')
+parts.push("</div>\n")
 
 // console.log(parts.join("\n"))
 
