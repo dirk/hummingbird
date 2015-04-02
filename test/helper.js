@@ -2,7 +2,13 @@
 // to have code coverage must require this helper file to get it!
 require('blanket')({
   "pattern": [""],
-  "data-cover-never": ["node_modules", "test"],
+  "data-cover-never": [
+    "lib/grammar.js",
+    "lib/parser.js",
+    "lib/util.js",
+    "node_modules",
+    "test"
+  ]
 })
 
 var types      = require('../lib/types'),
