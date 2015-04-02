@@ -2,7 +2,6 @@
 var fs          = require('fs'),
     Parser      = require('../lib/parser'),
     parser      = new Parser(),
-    grammar2    = require('../lib/grammar2'),
     TypeSystem  = require('../lib/typesystem').TypeSystem,
     reportError = require('../lib/util').reportError
 
