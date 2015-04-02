@@ -8,3 +8,4 @@ test/spec
 # Ignore Vim swap files
 *.swp
 
+_site/*
