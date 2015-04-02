@@ -5,7 +5,17 @@ title: Try It
 
 <div class="spec-pair">
   <div class="spec" spec-type="Hummingbird">
-    <textarea class="try-source" rows="15" spellcheck="false">console.log("Hello world.")</textarea>
+    <textarea class="try-source" rows="20" spellcheck="false">class Welcome {
+  var message: String
+  init () {
+    this.message = "Hello world!"
+  }
+  func sayHello () {
+    console.log(this.message)
+  }
+}
+var welcomer = new Welcome()
+welcomer.sayHello()</textarea>
   </div>
   <div class="spec" spec-type="JavaScript">
     <pre><code class="try-output"></code></pre>
