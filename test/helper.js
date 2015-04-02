@@ -3,9 +3,9 @@
 require('blanket')({
   "pattern": [""],
   "data-cover-never": [
-    "lib/grammar.js",
-    "lib/parser.js",
-    "lib/util.js",
+    "lib/grammar",
+    "lib/parser",
+    "lib/util",
     "node_modules",
     "test"
   ]
