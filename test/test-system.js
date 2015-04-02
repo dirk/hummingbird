@@ -71,6 +71,45 @@ describe('System', function () {
     })
   })
 
+  describe('given an else-if', function () {
+    var preamble = "var a = 1\n"
+    function checkTree (tree) {
+      expect(tree).to.be.ok()
+      var root = tree
+      expect(root.statements.length).to.eql(2)
+      // The if condition is second
+      var i = root.statements[1]
+      expect(i).to.be.an(AST.If)
+      expect(i.elseIfs).to.be.ok()
+      expect(i.elseIfs.length).to.eql(1)
+      expect(i.els).to.be(null)
+      // Check the single else-if
+      var ei = i.elseIfs[0]
+      expect(ei).to.be.an(AST.If)
+      expect(ei.elseIfs).to.be(null)
+      expect(ei.els).to.be(null)
+    }
+    it('should parse the first formulation', function () {
+      var source = preamble+
+                   "if a { }\n"+
+                   "else if a { }\n"
+      var tree = parseAndWalk(source)
+      checkTree(tree)
+    })
+    it('should parse the second formulation', function () {
+      var source = preamble+
+                   "if a {\n"+
+                   "} else if a { }\n"
+      expect(parseAndWalk(source)).to.be.ok()
+    })
+    it('should parse the third formulation', function () {
+      var source = preamble+
+                   "if a { } else\n"+
+                   "if a { }\n"
+      expect(parseAndWalk(source)).to.be.ok()
+    })
+  })
+
   xdescribe('given a while-true program', function () {
     var tree = null
     it('should parse', function () {
