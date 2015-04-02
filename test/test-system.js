@@ -71,6 +71,30 @@ describe('System', function () {
     })
   })
 
+  describe('given a function', function () {
+    function testParsingAndResult (source, expectedResult) {
+      var tree = null
+      it('should parse', function () {
+        tree = parseAndWalk(source)
+        expect(tree).to.be.ok()
+      })
+      it('should produced the expected result', function () {
+        var result = runCompiledCode(tree)
+        expect(result).to.eql(expectedResult)
+      })
+    }
+    describe('with an inferred return', function () {
+      var source = "var a = func () { return 1 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 1)
+    })
+    describe('with an explicit return', function () {
+      var source = "var a = func () -> Integer { return 2 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 2)
+    })
+  })
+
   xdescribe('given a while-true program', function () {
     var tree = null
     it('should parse', function () {
