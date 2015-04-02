@@ -30,13 +30,22 @@ p, li { font-size: 18px; color: #444444; line-height: 1.4; }
 ul {list-style-type: circle; padding-left: 20px;}
 li { margin-bottom: 30px; }
 
-h1, h2, h3, h4, h5, h6, p, .spec-pair { margin-bottom: 30px; }
+h1, h2, h3, h4, h5, h6, p, .spec-pair, code.hljs { margin-bottom: 30px; }
 h1, h2, h3, h4, h5, h6 { font-weight: 500; }
 
 a { text-decoration: none; color: inherit; }
 
 strong { font-weight: 500; }
 em { font-style: italic; }
+
+/* Code */
+
+
+code { font-family: "source-code-pro", "Menlo", monospace; font-size: 1.3rem; white-space: pre; }
+code.hljs { padding: 20px; border-radius: 4px; border: 1px solid #882FCB; line-height: 1.6; }
+h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px; margin: 2px; font-size: 15px; }
+
+
 
 /* Components */
 .button { color: #882fcb; border: 1px solid; background: #f7f1fb; border-radius: 4px; padding: 8px 16px; font-size: 1.6rem; }
@@ -57,21 +66,20 @@ em { font-style: italic; }
 .navigation-list-item { display: inline-block; vertical-align: middle; margin: 0 40px 0 0; font-weight: 500; }
 .navigation-list-item.is-active, .navigation-list-item:hover { color: #882FCB; }
 
-code { font-family: "source-code-pro", "Menlo", monospace; font-size: 13px; }
-p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px; margin: 2px; font-size: 15px; }
-
 /* Pages */
 
 .page { width: 800px; padding-left: 80px; padding-right: 20px; }
+
 
 /* Specification Doc */
 
 .specification { width: 800px; padding-left: 80px; padding-right: 20px; }
 .spec-pair { border-radius: 4px; border: 1px solid #882FCB; display: flex; display: -webkit-flex; display: -moz-flex; overflow: hidden; }
 .spec-pair > .spec { display: inline-block; width: 100%; margin: 0; line-height: 1.4; background: white; }
-.spec code { padding: 20px; }
 .spec:first-child { border-right: 1px solid #882FCB; }
-.spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.8rem; }
+.spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.4rem; }
+.spec code { margin: 0; border: none; }
+
 
 /* Footer */
 .footer {
