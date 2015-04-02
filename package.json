@@ -12,7 +12,8 @@
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
     "lodash": "~3.6.0",
-    "source-map": "~0.4.2"
+    "source-map": "~0.4.2",
+    "inline-source-map-comment": "~1.0.5"
   },
   "devDependencies": {
     "mocha": "~2.2.1",
