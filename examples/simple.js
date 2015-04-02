@@ -9,4 +9,16 @@ if b {
 } else if a {
   console.log("2")
 }
+  
+var c = func () {
+  if 1 {
+    return 2
+  } else {
+    return
+  }
+}
+console.log(c())
+
+var d = func () { return }
+console.log(d)
 

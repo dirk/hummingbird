@@ -82,12 +82,12 @@ describe('System', function () {
       expect(i).to.be.an(AST.If)
       expect(i.elseIfs).to.be.ok()
       expect(i.elseIfs.length).to.eql(1)
-      expect(i.els).to.be(null)
+      expect(i.elseBlock).to.be(null)
       // Check the single else-if
       var ei = i.elseIfs[0]
       expect(ei).to.be.an(AST.If)
       expect(ei.elseIfs).to.be(null)
-      expect(ei.els).to.be(null)
+      expect(ei.elseBlock).to.be(null)
     }
     it('should parse the first formulation', function () {
       var source = preamble+
@@ -107,6 +107,30 @@ describe('System', function () {
                    "if a { } else\n"+
                    "if a { }\n"
       expect(parseAndWalk(source)).to.be.ok()
+    })
+  })
+
+  describe('given a function', function () {
+    function testParsingAndResult (source, expectedResult) {
+      var tree = null
+      it('should parse', function () {
+        tree = parseAndWalk(source)
+        expect(tree).to.be.ok()
+      })
+      it('should produced the expected result', function () {
+        var result = runCompiledCode(tree)
+        expect(result).to.eql(expectedResult)
+      })
+    }
+    describe('with an inferred return', function () {
+      var source = "var a = func () { return 1 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 1)
+    })
+    describe('with an explicit return', function () {
+      var source = "var a = func () -> Integer { return 2 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 2)
     })
   })
 
