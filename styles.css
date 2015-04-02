@@ -1,4 +1,4 @@
-/* 
+/*
 COLORS:
 main_color:  #882FCB;
 light_color: #F7F1FB;
@@ -38,6 +38,11 @@ a { text-decoration: none; color: inherit; }
 strong { font-weight: 500; }
 em { font-style: italic; }
 
+/* Components */
+.button { color: #882fcb; border: 1px solid; background: #f7f1fb; border-radius: 4px; padding: 8px 16px; font-size: 1.6rem; }
+.button:hover { color: white; border: 1px solid; background: #882fcb; }
+.button:active { margin-bottom: -1px; }
+
 /* Navigation Bar */
 
 .navigation { padding: 20px; border-bottom: 1px solid #eee; margin-bottom: 40px; }
@@ -66,7 +71,7 @@ p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px
 .spec-pair > .spec { display: inline-block; width: 100%; margin: 0; line-height: 1.4; background: white; }
 .spec code { padding: 20px; }
 .spec:first-child { border-right: 1px solid #882FCB; }
-.spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; }
+.spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.8rem; }
 
 /* Footer */
 .footer {
@@ -76,4 +81,3 @@ p code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px
 .footer-right { float: right; }
 .footer a { color: #444; }
 .footer a:hover { text-decoration: underline; }
-
