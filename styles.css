@@ -40,11 +40,9 @@ em { font-style: italic; }
 
 /* Code */
 
-
 code { font-family: "source-code-pro", "Menlo", monospace; font-size: 1.3rem; white-space: pre; }
 code.hljs { padding: 20px; border-radius: 4px; border: 1px solid #882FCB; line-height: 1.6; }
 h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; color: white; padding: 1px 6px; border-radius: 2px; margin: 2px; font-size: 15px; }
-
 
 
 /* Components */
@@ -79,6 +77,14 @@ h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; colo
 .spec:first-child { border-right: 1px solid #882FCB; }
 .spec:before { content: attr(spec-type); display: block; text-align: left; height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.4rem; }
 .spec code { margin: 0; border: none; }
+
+
+/* Try it demo */
+.try-source {
+  width: 100%; padding: 2rem; border: none; outline: none;
+  font-family: "source-code-pro", "Menlo", monospace; font-size: 1.3rem; white-space: pre;
+}
+.try-output.is-invalid { color: #c82829; }
 
 
 /* Footer */
