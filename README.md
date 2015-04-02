@@ -17,7 +17,7 @@ func sayHello () -> Boolean {
 sayHello()
 ```
 
-For more examples see the [specification](doc/Specification.md) and [manual](doc/Manual.md).
+For more examples see the [specification](doc/specification.md) and [manual](doc/Manual.md).
 
 ## Getting started
 
@@ -45,7 +45,7 @@ If you're planning to introduce significant changes/features, then we highly sug
 
 ## Specification
 
-The Hummingbird [specification](doc/Specification.md) is designed to be both human- and machine-readable. It is organized into sections for each syntactical and semantic feature of the language.
+The Hummingbird [specification](doc/specification.md) is designed to be both human- and machine-readable. It is organized into sections for each syntactical and semantic feature of the language.
 
 Each feature has a `<spec name="..."></spec>` block containing the Hummingbird example source and the expected JavaScript output. These can then be parsed and a full suite of unit tests generated in `test/spec/`.
 
