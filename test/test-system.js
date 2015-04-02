@@ -69,6 +69,25 @@ describe('System', function () {
         expect(result).to.eql(3)
       })
     })
+
+    describe('with an init declaration', function () {
+      function checkTree (tree) {
+        expect(tree).to.be.ok()
+        expect(tree.statements.length).to.eql(1)
+        var klass = tree.statements[0]
+        expect(klass.name).to.eql('A')
+        expect(klass.type.getTypeOfProperty('b')).to.be.ok()
+        expect(klass.type.initializers.length).to.eql(1)
+      }
+      it('should parse the first formulation', function () {
+        var source = "class A { var b: Integer; init() { } }"
+        checkTree(parseAndWalk(source))
+      })
+      it('should parse the second formulation', function () {
+        var source = "class A { var b: Integer; init () { } }"
+        checkTree(parseAndWalk(source))
+      })
+    })
   })
 
   describe('given an else-if', function () {

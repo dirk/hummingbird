@@ -11,12 +11,14 @@
   "devDependencies": {
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
-    "lodash": "~3.6.0"
+    "lodash": "~3.6.0",
+    "source-map": "~0.4.2"
   },
   "devDependencies": {
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
     "lodash": "~3.6.0",
+    "source-map": "~0.4.2",
     "xregexp": "~2.0.0",
     "blanket": "~1.1.6",
     "mocha-lcov-reporter": "~0.0.2",
