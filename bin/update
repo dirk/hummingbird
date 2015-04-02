@@ -1,4 +1,26 @@
-#!/usr/bin/env sh
+#!/usr/bin/env node
 
-git checkout spec -- lib/spec-parser.js
+var child_process = require('child_process'),
+    commonmark    = require('commonmark'),
+    fs            = require('fs')
+
+var reader = new commonmark.Parser(),
+    writer = new commonmark.HtmlRenderer()
+
+function renderCommonmark (source) {
+  var parsed = reader.parse(source)
+  return writer.render(parsed)
+}
+
+child_process.execSync('git checkout master -- lib/spec-parser.js')
+
+var manual = child_process.execSync('git show master:doc/manual.md').toString()
+
+var out = "---\n"+
+          "title: Manual\n"+
+          "---\n";
+out += renderCommonmark(manual)
+out += "\n"
+// Write out the rendered manual to HTML
+fs.writeFileSync(__dirname+'/../manual.html', out)
 

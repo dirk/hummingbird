@@ -1,0 +1,129 @@
+---
+title: Manual
+---
+<h1>Manual</h1>
+<p>This is a step-by-step overview of the Hummingbird language. It covers—with examples—the various aspects of the language.</p>
+<h2>Basic Concepts</h2>
+<p>Hummingbird has a few core goals that guide the design and development of the language.</p>
+<ul>
+<li><strong>Usable type system</strong>: The type system in Hummingbird is designed to make life easier for programmers. Typed, static compilation provides a set of assurances not available in dynamic languages.</li>
+<li><strong>Adaptable targeting</strong>: Initially Hummingbird will target just Node.js and browser JavaScript execution environments. However, the intrinsic features of these targets should be exposed as a rich runtime API library rather than a core part of the language.</li>
+<li><strong>Concise, structured syntax</strong>: Taking the lessons of JavaScript, CoffeeScript, and Swift to heart, Hummingbird's syntax aims to establish a pleasant balance between explicit code structure and minimizing unnecessary punctuation.</li>
+</ul>
+<h2>Variables and Scope</h2>
+<p>Non-strict scoping rules can be the cause of a great deal of confusion and bugs, especially for inexperienced programmers. Hummingbird takes a fairly strict approach to variable scoping. The most notable aspect of this strictness is explicit closing of variables in closures, and also strict binding of the scope of the instance in <em>all</em> closures in a class (no more buggy usages of <code>this</code>).</p>
+<pre><code class="language-js">// Defining variables with explicit and inferred types
+var a = &quot;inferred string&quot;
+var b: String = &quot;explicit string&quot;
+
+// Mandatory explicit closing of outer variables into the function.
+// Attempting to use a variable in a function body without a new
+// `var` definition or explicit closing will raise a
+// compilation error.
+var c = func () -&gt; String with (a, b) {
+  return a + &quot; and &quot; + b
+}
+</code></pre>
+<h2>Functions</h2>
+<p>Hummingbird currently provides only anonymous functions. The named function syntax in JavaScript (eg. <code>function myFunction() {...}</code>) is not available.</p>
+<p>There are three critical parts to every function declaration: parameters, return type, and closure. The latter two are optional.</p>
+<pre><code class="language-js">// Defining a function with no parameters, no return type, and no closure
+var a = func () { }
+
+// A function with parameters and return type
+var b = func (c: String) -&gt; String { return &quot;Hello #{c}!&quot; }
+
+// Function with all three parts
+var d = func (e: String) -&gt; String with (b) { return b(e) }
+d(&quot;world&quot;) == &quot;Hello world!&quot;
+
+// Void function with closure
+var f = func () with (b) { return b(&quot;world&quot;) }
+f(&quot;world&quot;) == &quot;Hello world!&quot;
+
+// Function with default parameters
+var g = func(h: String = &quot;world&quot;) -&gt; String with (b) { return b(h) }
+g(&quot;earth&quot;) == &quot;Hello earth!&quot;
+g() == &quot;Hello world!&quot;
+</code></pre>
+<h2>Classes</h2>
+<p>Classes are composed of three things: properties, initializers, and methods.</p>
+<h3>Initializers</h3>
+<p>Under the hood initializers are just special methods. Hummingbird does a little bit of work during compilation to make initialization easier for you: it sets default values for properties, resolves superclass initializers to make them available to you, and dispatches the actual initialization to the correct initializer method (the necessary heavy lifting for constructor overloading).</p>
+<pre><code class="language-js">class A {
+  var b: String
+  var c: Any
+
+  init() {
+    this.b = &quot;Hello world!&quot;
+  }
+  init(otherC: String) {
+    // Calling other initializers from within an initializer is allowed to make
+    // building higher-level initializing methods on top of lower-level ones
+    // possible.
+    init()
+    this.c = this.b + ' ' + otherC
+  }
+}
+
+class B extends A {
+  var d: String
+
+  init(this.d) {
+    super.initializer(&quot;#{this.d}&quot;)
+  }
+  // Looking above, you can see that Hummingbird also allows you to easily
+  // auto-assign properties via initializer arguments. At compile time the
+  // `this.d` is translated into a hidden parameter with type `String` and an
+  // assignment of that parameter to `this.d` is inserted at the top of the
+  // initializer body. In effect it generates the following:
+  //
+  //   init(_d: String) {
+  //     this.d = _d
+  //     super.initializer(&quot;#{this.d}&quot;)
+  //   }
+}
+
+var e = B(&quot;Hello programmer.&quot;)
+e.b == &quot;Hello world!&quot;
+e.c == &quot;Hello world! Hello programmer&quot;
+e.d == &quot;Hello programmer.&quot;
+</code></pre>
+<h4>Use of <code>initializer</code> rather than <code>constructor</code></h4>
+<p>We hold the view that there is a semantic distinction to be made between construction and initialization of an instance of a class.</p>
+<ul>
+<li>
+<p><strong>Construction</strong> deals with the actual allocation and low-level setup of an instance. In a lower-level language like C++ this would involve laying out the memory for the class to hold variable slots, pointers to the class record, and so forth. In high-level languages like JavaScript or Ruby this involves creating the basic object and the pointer to the class/prototype.</p>
+</li>
+<li>
+<p><strong>Initialization</strong> involves the operations performed to setup the class after the construction of the class has occurred. These depend on the instance actually existing in memory so that program can work with that memory.</p>
+</li>
+</ul>
+<p>Construction happens in the language runtime—out of view from the code <em>you</em> write—whereas the code you write does actually influence the initialization of the class instance once it has been constructed.</p>
+<h2>Control Flow</h2>
+<p>Hummingbird supports the basic traditional control flow structures. Although a &quot;for-in&quot; style structure was considered, it was decided against for its propensity for introducing bugs and complexities in implementation.</p>
+<pre><code class="language-js">// Conditionals
+if true {
+  // Something
+} else {
+  // Another something
+}
+
+// Looping
+for var i = 1; i &lt;= 42; i++ {
+  // Iterated something
+}
+while true {
+  // Infinity!
+}
+
+// Exception handling
+try {
+  // Something that throws an error
+} catch err {
+  // Log our `err`!
+} finally {
+  // Clean up after ourselves
+}
+</code></pre>
+
