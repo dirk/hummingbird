@@ -3,6 +3,7 @@ node_modules
 lib/grammar.js
 lib/grammar2.js
 test/spec
+dist
 .srclib-cache
 coverage.html
 
