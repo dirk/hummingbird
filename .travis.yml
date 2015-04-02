@@ -5,4 +5,6 @@ before_script:
   - "npm run grammar2"
   - "npm run gen-spec"
 script: "npm run test && npm run test-spec"
+after_script:
+  - "npm run report-coverage"
 

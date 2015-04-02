@@ -1,3 +1,9 @@
+// Initialize blanket test coverage library; every test suite that we want
+// to have code coverage must require this helper file to get it!
+require('blanket')({
+  "pattern": [""],
+  "data-cover-never": ["node_modules", "test"],
+})
 
 var types      = require('../lib/types'),
     Parser     = require('../lib/parser'),
