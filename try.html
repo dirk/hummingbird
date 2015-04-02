@@ -5,10 +5,13 @@ title: Try It
 
 <div class="spec-pair">
   <div class="spec" spec-type="Hummingbird">
-    <textarea class="try-source" rows="20" spellcheck="false">class Welcome {
+    <textarea class="try-source" rows="25" spellcheck="false">class Welcome {
   var message: String
   init () {
     this.message = "Hello world!"
+  }
+  init (message: String) {
+    this.message = message
   }
   func sayHello () {
     console.log(this.message)
