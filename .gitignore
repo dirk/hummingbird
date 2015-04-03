@@ -4,6 +4,8 @@ lib/grammar.js
 lib/grammar2.js
 test/spec
 .srclib-cache
+_site
+coverage.html
 
 # Ignore Vim swap files
 *.swp
