@@ -1,12 +1,30 @@
 ---
 title: Home
 ---
-<div class="Home page">
-  <p>Hummingbird has a few core goals that guide the design and development of the language.</p>
-
-  <ul>
-    <li><strong>Usable type system</strong>: The type system in Hummingbird is designed to make life easier for programmers. Typed, static compilation provides a set of assurances not available in dynamic languages.</li>
-    <li><strong>Adaptable targeting</strong>: Initially Hummingbird will target just Node.js and browser JavaScript execution environments. However, the intrinsic features of these targets should be exposed as a rich runtime API library rather than a core part of the language.</li>
-    <li><strong>Concise, structured syntax</strong>: Taking the lessons of JavaScript, CoffeeScript, and Swift to heart, Hummingbird's syntax aims to establish a pleasant balance between explicit code structure and minimizing unnecessary punctuation.</li>
-  </ul>
+<div class="page home">
+  <div class="home-intro">
+    <p class="home-intro-lead">Hummingbird is an experimental language inspired by JavaScript, ML, and Swift.</p>
+    <p>It features a friendly, usable type-system; concise, structured syntax; and currently compiles to JavaScript in Node.js and the browser.</p>
+  </div>
+  <div class="home-preview">
+    <div class="home-preview-heading">
+      hello_world.hb
+      <a class="button home-preview-button" href="try.html">Try Hummingbird</a>
+    </div>
+    <pre><code class="lang-typescript">class Welcome {
+  var message: String
+  init () {
+    this.message = "Hello world!"
+  }
+  init (message: String) {
+    this.message = message
+  }
+  func sayHello () {
+    console.log(this.message)
+  }
+}
+var welcomer = new Welcome()
+welcomer.sayHello()</code></pre>
+  </div>
 </div>
+

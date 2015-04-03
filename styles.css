@@ -52,25 +52,39 @@ h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; colo
 
 /* Navigation Bar */
 
-.navigation { padding: 20px; border-bottom: 1px solid #eee; margin-bottom: 40px; }
+.navigation { padding: 2rem; border-bottom: 1px solid #eee; margin-bottom: 4rem; }
 
-.navigation > * { display: inline-block; vertical-align: middle; margin-right: 40px; }
+.navigation > * { display: inline-block; vertical-align: middle; margin-right: 4rem; }
 
 .navigation-logo {  }
 .navigation-logotype h1 { font-size: 24px; margin-bottom: 5px; }
 .navigation-logotype h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999999; font-weight: 300; margin: 0; }
 
-.navigation-list { padding: 0; font-size: 1.8rem; }
+.navigation-list { margin-right: 6rem; padding: 0; font-size: 1.8rem; }
 .navigation-list-item { display: inline-block; vertical-align: middle; margin: 0 40px 0 0; font-weight: 500; }
 .navigation-list-item.is-active, .navigation-list-item:hover { color: #882FCB; }
 
+.navigation-button { margin-right: 0; }
+
 /* Pages */
 
-.page { width: 800px; padding-left: 80px; padding-right: 20px; }
+.page { /*width: 840px;*/ padding-left: 60px; padding-right: 60px; }
 
 
-/* Specification Doc */
+/* Home page */
+.home::after { display: block; content: ' '; clear: both; }
+.home-intro { width: 52%; float: left; }
+.home-intro p { font-size: 1.7rem; }
+.home-intro-lead { font-size: 2.4rem !important; }
+.home-preview { width: 40%; float: right; border-radius: 4px; border: 1px solid #882FCB; overflow: hidden; }
+.home-preview-button {
+  padding: 0.4rem 0.8rem; margin: 0.4rem 2rem 0 0; float: right;
+  font-size: 1.4rem; line-height: 1.4;
+}
+.home-preview code { margin-bottom: 0; font-size: 1.2rem; line-height: 1.5; border: none; border-radius: 0; }
+.home-preview-heading { height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.4rem; }
 
+/* Specification page (generated HTML) */
 .specification { width: 800px; padding-left: 80px; padding-right: 20px; }
 .spec-pair { border-radius: 4px; border: 1px solid #882FCB; display: flex; display: -webkit-flex; display: -moz-flex; overflow: hidden; }
 .spec-pair > .spec { display: inline-block; width: 100%; margin: 0; line-height: 1.4; background: white; }
