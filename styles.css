@@ -78,11 +78,15 @@ h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; colo
 .home-intro-lead { font-size: 2.4rem !important; }
 .home-preview { width: 40%; float: right; border-radius: 4px; border: 1px solid #882FCB; overflow: hidden; }
 .home-preview-button {
-  padding: 0.4rem 0.8rem; margin: 0.4rem 2rem 0 0; float: right;
+  background-color: white;
+  float: right;
+  margin: 0.5rem 0.5rem 0 0;
+  padding: 0.4rem 0.8rem;
+  border-radius: 2px;
   font-size: 1.4rem; line-height: 1.4;
 }
 .home-preview code { margin-bottom: 0; font-size: 1.2rem; line-height: 1.5; border: none; border-radius: 0; }
-.home-preview-heading { height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.4rem; }
+.home-preview-heading { height: 40px; line-height: 40px; color: #882FCB; border-bottom: 1px solid; padding-left: 20px; background: #F7F1FB; font-size: 1.4rem;}
 
 /* Specification page (generated HTML) */
 .specification { width: 800px; padding-left: 80px; padding-right: 20px; }
