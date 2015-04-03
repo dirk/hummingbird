@@ -69,6 +69,24 @@ describe('System', function () {
         expect(result).to.eql(3)
       })
     })
+
+    describe('with a let-property in its definition', function () {
+      var source = "class A {\n"+
+                   "  let b: Integer = 0\n"+
+                   "  init () { }\n"+
+                   "}\n"+
+                   "var a = new A()\n"
+      it('should parse the basic definition', function () {
+        var tree = parseAndWalk(source)
+        expect(tree).to.be.ok()
+      })
+      it('should error when trying to write to that property', function () {
+        var extendedSource = source+"a.b = 1"
+        expect(function () {
+          parseAndWalk(extendedSource)
+        }).to.throwException(/assign to read-only property/)
+      })
+    })
   })
 
   xdescribe('given a while-true program', function () {
