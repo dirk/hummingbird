@@ -9,12 +9,10 @@ There are two types of variable definitions: `var` and `let`. The former declare
 Immutability is checked at only the reference level. (It ensures that the variable will always refer to the same thing; however mutating properties of that thing can still occur!) Furthermore, this checking happens only at compile time.
 
 <spec name="variables">
-
 ```hb
 var a: Integer = 1
 let b: Integer = 2
 ```
-
 ```js
 var a = 1;
 var b = 2;
@@ -26,14 +24,39 @@ var b = 2;
 Hummingbird provides first-class, anonymous functions.
 
 <spec name="functions">
-
 ```hb
 var a = func (x: String) -> String { }
 ```
-
 ```js
 var a = function (x) { };
 ```
+</spec>
 
+### Dynamic dispatch
+
+Run-time dynamic dispatching is provided through the `multi` statement.
+
+<spec name="multi">
+```hb
+multi a (b: Integer, c: Integer) -> Integer
+func a (b, c) when (b == 0 || c == 0) { return 1 }
+func a (b, c) { return b * c }
+```
+```js
+function a (b, c) {
+  switch (false) {
+  case !(b == 0 || c == 0):
+    return a_1(b, c);
+  default:
+    return a_2(b, c);
+  }
+  function a_1 (b, c) {
+    return 1;
+  }
+  function a_2 (b, c) {
+    return b * c;
+  }
+}
+```
 </spec>
 
