@@ -32,6 +32,21 @@ var a = function (x) { };
 ```
 </spec>
 
+### Inferred return types
+
+In many cases Hummingbird can infer the return type of a function based off of its arguments and body.
+
+<spec name="inferred-returns">
+```hb
+var a = func (x: Integer) { return x }
+```
+```js
+var a = function (x) {
+  return x;
+};
+```
+</spec>
+
 ### Dynamic dispatch
 
 Run-time dynamic dispatching is provided through the `multi` statement.

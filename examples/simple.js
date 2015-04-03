@@ -12,9 +12,9 @@ if b {
   
 var c = func () {
   if 1 {
-    return 2
+    return 1
   } else {
-    return
+    return 0
   }
 }
 console.log(c())
