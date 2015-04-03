@@ -75,3 +75,25 @@ function a (b, c) {
 ```
 </spec>
 
+# Control flow
+
+The expected suite of control flow statements, such as if, for, and while, are provided.
+
+## While
+
+<spec name="while">
+```hb
+var a: Integer = 1
+while a < 10 {
+  a = a + 1
+}
+# a will equal 10 here
+```
+```js
+var a = 1;
+while (a < 10) {
+  a = a + 1;
+}
+```
+</spec>
+
