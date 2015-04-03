@@ -22,6 +22,15 @@ var b = 2;</code></pre></div>
 <div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">var a = func (x: String) -> String { }</code></pre></div>
 <div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">var a = function (x) { };</code></pre></div>
 </div>
+<h3>Inferred return types</h3>
+<p>In many cases Hummingbird can infer the return type of a function based off of its arguments and body.</p>
+
+<div class="spec-pair">
+<div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">var a = func (x: Integer) { return x }</code></pre></div>
+<div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">var a = function (x) {
+  return x;
+};</code></pre></div>
+</div>
 <h3>Dynamic dispatch</h3>
 <p>Run-time dynamic dispatching is provided through the <code>multi</code> statement.</p>
 
@@ -42,6 +51,21 @@ func a (b, c) { return b * c }</code></pre></div>
   function a_2 (b, c) {
     return b * c;
   }
+}</code></pre></div>
+</div>
+<h1>Control flow</h1>
+<p>The expected suite of control flow statements, such as if, for, and while, are provided.</p>
+<h2>While</h2>
+
+<div class="spec-pair">
+<div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">var a: Integer = 1
+while a < 10 {
+  a = a + 1
+}
+# a will equal 10 here</code></pre></div>
+<div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">var a = 1;
+while (a < 10) {
+  a = a + 1;
 }</code></pre></div>
 </div>
 
