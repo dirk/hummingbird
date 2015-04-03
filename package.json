@@ -31,7 +31,8 @@
     "test-spec": "node_modules/.bin/mocha test/spec",
     "gen-spec": "node share/gen-spec.js",
     "coverage": "node_modules/.bin/mocha -R html-cov test test/spec > coverage.html",
-    "report-coverage": "node_modules/.bin/mocha -R mocha-lcov-reporter test test/spec | ./node_modules/.bin/coveralls"
+    "report-coverage": "node_modules/.bin/mocha -R mocha-lcov-reporter test test/spec | ./node_modules/.bin/coveralls",
+    "browser": "node_modules/.bin/browserify lib/browser.js --outfile dist/browser.js --standalone hummingbird"
   }
 }
 
