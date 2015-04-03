@@ -3,6 +3,7 @@
 require('blanket')({
   "pattern": [""],
   "data-cover-never": [
+    "lib/ast",
     "lib/grammar",
     "lib/parser",
     "lib/util",

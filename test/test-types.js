@@ -4,7 +4,7 @@ var helper = require('./helper'),
 
 var types = require('../lib/types')
 
-describe('Type-system', function () {
+describe('Types', function () {
   var rootObject = new types.Object('fake')
   rootObject.supertype = null
   rootObject.isRoot    = true
