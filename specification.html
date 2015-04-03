@@ -22,5 +22,27 @@ var b = 2;</code></pre></div>
 <div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">var a = func (x: String) -> String { }</code></pre></div>
 <div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">var a = function (x) { };</code></pre></div>
 </div>
+<h3>Dynamic dispatch</h3>
+<p>Run-time dynamic dispatching is provided through the <code>multi</code> statement.</p>
+
+<div class="spec-pair">
+<div class="spec hb" spec-type="Hummingbird"><pre><code class="lang-typescript">multi a (b: Integer, c: Integer) -> Integer
+func a (b, c) when (b == 0 || c == 0) { return 1 }
+func a (b, c) { return b * c }</code></pre></div>
+<div class="spec js" spec-type="JavaScript"><pre><code class="lang-js">function a (b, c) {
+  switch (false) {
+  case !(b == 0 || c == 0):
+    return a_1(b, c);
+  default:
+    return a_2(b, c);
+  }
+  function a_1 (b, c) {
+    return 1;
+  }
+  function a_2 (b, c) {
+    return b * c;
+  }
+}</code></pre></div>
+</div>
 
 </div>
