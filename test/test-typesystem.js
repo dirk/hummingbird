@@ -49,3 +49,26 @@ describe('Type-system', function () {
   })
 })
 
+describe('Scope', function () {
+  var scope  = new Scope(),
+      Number = new types.Number('fake')
+  it('should set a variable', function () {
+    scope.setLocal('Number', Number)
+  })
+  it('should fail when re-setting a variable', function () {
+    expect(function () {
+      scope.setLocal('Number', Number)
+    }).to.throwException(/Can't redefine local/)
+  })
+  it('should fail when finding a missing local', function () {
+    expect(function () {
+      scope.getLocal('Missing')
+    }).to.throwException(/Local not found/)
+  })
+  it('should fail when finding a missing variable', function () {
+    expect(function () {
+      scope.get('Missing')
+    }).to.throwException(/Not found/)
+  })
+})
+
