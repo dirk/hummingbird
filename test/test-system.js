@@ -40,6 +40,17 @@ describe('System', function () {
     })
   })
 
+  describe('given a multi definition', function () {
+    describe('without a return type', function () {
+      it('should fail to parse', function () {
+        var source = "multi a (b: Integer, c: Integer)\n"
+        expect(function () {
+          parseAndWalk(source)
+        }).to.throwException(/Missing multi return type/)
+      })
+    })
+  })
+
   describe('given a class', function () {
     describe('with an invalid let-property', function () {
       var source = "var a = func () -> Integer { return 1 }\n"+
