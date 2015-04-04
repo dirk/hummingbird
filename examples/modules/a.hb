@@ -2,5 +2,5 @@
 import "b"
 
 var message = "Hello world!"
-# b.sayMessage(message)
+b.sayMessage(message)
 

@@ -1,5 +1,5 @@
 
-func sayMessage (message: String) {
+let sayMessage = func (message: String) {
   console.log(message)
 }
 
