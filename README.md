@@ -1,4 +1,5 @@
 [![Build Status][travis-image]][travis-url]
+[![Coverage Status][coveralls-image]][coveralls-url]
 
 # Hummingbird
 
@@ -62,4 +63,6 @@ Released under the Modified BSD License. See [LICENSE](LICENSE) for details.
 
 [travis-image]: https://img.shields.io/travis/dirk/hummingbird/master.svg?style=flat-square
 [travis-url]: https://travis-ci.org/dirk/hummingbird
+[coveralls-image]: https://img.shields.io/coveralls/dirk/hummingbird/master.svg?style=flat-square
+[coveralls-url]: https://coveralls.io/r/dirk/hummingbird
 

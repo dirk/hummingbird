@@ -87,6 +87,88 @@ describe('System', function () {
         }).to.throwException(/assign to read-only property/)
       })
     })
+
+    describe('with an init declaration', function () {
+      function checkTree (tree) {
+        expect(tree).to.be.ok()
+        expect(tree.statements.length).to.eql(1)
+        var klass = tree.statements[0]
+        expect(klass.name).to.eql('A')
+        expect(klass.type.getTypeOfProperty('b')).to.be.ok()
+        expect(klass.type.initializers.length).to.eql(1)
+      }
+      it('should parse the first formulation', function () {
+        var source = "class A { var b: Integer; init() { } }"
+        checkTree(parseAndWalk(source))
+      })
+      it('should parse the second formulation', function () {
+        var source = "class A { var b: Integer; init () { } }"
+        checkTree(parseAndWalk(source))
+      })
+    })
+  })
+
+  describe('given an else-if', function () {
+    var preamble = "var a = 1\n"
+    function checkTree (tree) {
+      expect(tree).to.be.ok()
+      var root = tree
+      expect(root.statements.length).to.eql(2)
+      // The if condition is second
+      var i = root.statements[1]
+      expect(i).to.be.an(AST.If)
+      expect(i.elseIfs).to.be.ok()
+      expect(i.elseIfs.length).to.eql(1)
+      expect(i.elseBlock).to.be(null)
+      // Check the single else-if
+      var ei = i.elseIfs[0]
+      expect(ei).to.be.an(AST.If)
+      expect(ei.elseIfs).to.be(null)
+      expect(ei.elseBlock).to.be(null)
+    }
+    it('should parse the first formulation', function () {
+      var source = preamble+
+                   "if a { }\n"+
+                   "else if a { }\n"
+      var tree = parseAndWalk(source)
+      checkTree(tree)
+    })
+    it('should parse the second formulation', function () {
+      var source = preamble+
+                   "if a {\n"+
+                   "} else if a { }\n"
+      expect(parseAndWalk(source)).to.be.ok()
+    })
+    it('should parse the third formulation', function () {
+      var source = preamble+
+                   "if a { } else\n"+
+                   "if a { }\n"
+      expect(parseAndWalk(source)).to.be.ok()
+    })
+  })
+
+  describe('given a function', function () {
+    function testParsingAndResult (source, expectedResult) {
+      var tree = null
+      it('should parse', function () {
+        tree = parseAndWalk(source)
+        expect(tree).to.be.ok()
+      })
+      it('should produced the expected result', function () {
+        var result = runCompiledCode(tree)
+        expect(result).to.eql(expectedResult)
+      })
+    }
+    describe('with an inferred return', function () {
+      var source = "var a = func () { return 1 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 1)
+    })
+    describe('with an explicit return', function () {
+      var source = "var a = func () -> Integer { return 2 }\n"+
+                   "return a()"
+      testParsingAndResult(source, 2)
+    })
   })
 
   xdescribe('given a while-true program', function () {

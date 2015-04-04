@@ -3,6 +3,7 @@ node_modules
 lib/grammar.js
 lib/grammar2.js
 test/spec
+dist
 .srclib-cache
 _site
 coverage.html
@@ -10,3 +11,4 @@ coverage.html
 # Ignore Vim swap files
 *.swp
 
+_site/*
