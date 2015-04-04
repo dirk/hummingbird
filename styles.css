@@ -46,8 +46,8 @@ h1 > code, h2 > code, h3 > code, h4 > code, p > code { background: #882FCB; colo
 
 
 /* Components */
-.button { color: #882fcb; border: 1px solid; background: #f7f1fb; border-radius: 4px; padding: 8px 16px; font-size: 1.6rem; }
-.button:hover { color: white; border: 1px solid; background: #882fcb; }
+.button { color: #882fcb; border: 1px solid #882fcb; background: #f7f1fb; border-radius: 4px; padding: 8px 16px; font-size: 1.6rem; }
+.button:hover { color: white; background: #882fcb; }
 .button:active { margin-bottom: -1px; }
 
 /* Navigation Bar */
