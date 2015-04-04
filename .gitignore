@@ -5,6 +5,7 @@ lib/grammar2.js
 test/spec
 dist
 .srclib-cache
+_site
 coverage.html
 
 # Ignore Vim swap files
