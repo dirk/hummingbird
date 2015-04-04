@@ -174,6 +174,24 @@ describe('System', function () {
                    "return a()"
       testParsingAndResult(source, 2)
     })
+    describe('with more than one inferred return type', function () {
+      var source = "var a = func () {\n"+
+                   "  if 1 { return 1 } else { return \"1\" }\n"+
+                   "}\n"
+      it('should fail to parse', function () {
+        expect(function () {
+          parseAndWalk(source)
+        }).to.throwException(/Too many return types/)
+      })
+    })
+    describe('with mismatched return types', function () {
+      var source = "var a = func () -> String { return 1 }\n"
+      it('should fail to parse', function () {
+        expect(function () {
+          parseAndWalk(source)
+        }).to.throwException(/Type returned by function does not match declared return type/)
+      })
+    })
   })
 
   xdescribe('given a while-true program', function () {
