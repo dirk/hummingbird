@@ -55,18 +55,30 @@ describe('System', function () {
       var source = "class A {\n"+
                    "  var b: Integer = 1\n"+
                    "  init () { this.b = this.b + 1 }\n"+
-                   "  func c () -> Integer { return this.b + 1 }\n"+
+                   "  func c (d: Integer) -> Integer { return this.b + d }\n"+
                    "}\n"+
-                   "var a = new A()\n"+
-                   "return a.c()\n"
-      var tree = null
+                   "var a = new A()\n"
       it('should parse', function () {
-        tree = parseAndWalk(source)
+        var tree = parseAndWalk(source)
         expect(tree).to.be.ok()
       })
-      it('should product the correct result', function () {
-        var result = runCompiledCode(tree)
+      it('should produce an expected result', function () {
+        var extended = source+"return a.c(1)\n",
+            tree     = parseAndWalk(extended),
+            result   = runCompiledCode(tree)
         expect(result).to.eql(3)
+      })
+      it('should fail on parsing mismatched argument lengths', function () {
+        var extended = source+"a.c(1, 2)\n"
+        expect(function () {
+          parseAndWalk(extended)
+        }).to.throwException(/Wrong number of arguments/)
+      })
+      it('should fail on parsing mismatched argument types', function () {
+        var extended = source+"a.c(\"1\")\n"
+        expect(function () {
+          parseAndWalk(extended)
+        }).to.throwException(/Argument mismatch/)
       })
     })
 
