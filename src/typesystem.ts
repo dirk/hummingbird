@@ -44,7 +44,8 @@ class TypeSystem {
   visitExport:            (node: AST.Export,     scope: scope.Scope, parentNode: AST.Node) => void
   visitClass:             (node: AST.Class,      scope: scope.Scope) => void
   visitClassDefinition:   (node: AST.Block,      scope: scope.Scope, klass: types.Object) => void
-  visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object) => void
+  visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object, searchInParent: Function) => void
+  visitClassMulti:        (node: AST.Multi,      scope: scope.Scope, klass: types.Object) => void
   visitFor:               (node: AST.For,        scope: scope.Scope) => void
   visitIf:                (node: AST.If,         scope: scope.Scope) => void
   visitWhile:             (node: AST.While,      scope: scope.Scope) => void
@@ -361,6 +362,9 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
         klass.addInitializer(initType)
         stmt.type = initType
         break
+   // case AST.Multi:
+   //   self.visitClassMulti(stmt, scope, klass)
+   //   break
       default:
         throw new TypeError("Don't know how to visit '"+stmt.constructor.name+"' in class definition")
         break
@@ -368,13 +372,39 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
   })
 }
 
-TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
+TypeSystem.prototype.visitClassFunction = function (node, scope, klass, searchInParent) {
   var self         = this,
       functionName = node.name
   // Check that it's a function statement (ie. has a name)
   if (!functionName) {
     throw new TypeError('Missing function name', node)
   }
+  
+  if (false) {
+    // Now look up the parent `multi` in the containing block
+    var multiNode = searchInParent(function (stmt) {
+      if (stmt.constructor === AST.Multi && stmt.name === functionName) {
+        return true
+      }
+      return false
+    })
+    var multiType = multiNode.type
+    // Add this implementation to its list of functions and set the parent of
+    // the function so that it knows not to codegen itself
+    multiType.addFunctionNode(node)
+    node.setParentMultiType(multiNode.type)
+
+    // Fill out any missing types
+    for (var i = 0; i < node.args.length; i++) {
+      var arg = node.args[i]
+      // Type is specified so we don't need to worry about it
+      if (arg.type) { continue }
+      // Set the argument's type to the multi argument's type
+      arg.type = multiNode.args[i].type
+    }
+    throw new TypeError('Compilation of multi functions in classes not yet implemented')
+  }
+
   // Run the generic visitor to figure out argument and return types
   this.visitFunction(node, scope, function (functionType, functionScope) {
     assertInstanceOf(functionScope, ClosingScope, "Function's scope must be a ClosingScope")
@@ -391,6 +421,9 @@ TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
   klass.setTypeOfProperty(functionName, functionType)
 }
 
+TypeSystem.prototype.visitClassMulti = function (node, thisScope, klass) {
+  this.visitMulti(node, thisScope)
+}
 
 TypeSystem.prototype.visitFor = function (node: AST.For, scope) {
   this.visitStatement(node.init, scope)

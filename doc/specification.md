@@ -75,6 +75,39 @@ function a (b, c) {
 ```
 </spec>
 
+### Dynamic dispatch in a class
+
+Run-time dynamic dispatching is provided through the `multi` statement.
+
+<spec name="multi-class">
+```hb
+class Wrapper {
+  multi a (b: Integer, c: Integer) -> Integer
+  func a (b, c) when (b == 0 || c == 0) { return 1 }
+  func a (b, c) { return b * c }
+}
+```
+```js
+function Wrapper () {
+}
+
+Wrapper.prototype.a = function (b, c) {
+  switch (false) {
+  case !(b == 0 || c == 0):
+    return a_1(b, c);
+  default:
+    return a_2(b, c);
+  }
+  function a_1 (b, c) {
+    return 1;
+  }
+  function a_2 (b, c) {
+    return b * c;
+  }
+}
+```
+</spec>
+
 # Control flow
 
 The expected suite of control flow statements, such as if, for, and while, are provided.
@@ -96,4 +129,3 @@ while (a < 10) {
 }
 ```
 </spec>
-
