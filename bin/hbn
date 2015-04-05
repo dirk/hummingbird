@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+
+var path         = require('path'),
+    libDirectory = path.join(path.dirname(__filename), '..', 'lib')
+
+require(path.join(libDirectory, 'command-native'))
+
