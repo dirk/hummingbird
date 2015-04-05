@@ -1,4 +1,4 @@
 
-var a = "Hello world!\n"
+var a = "Hello world!"
 console.log(a)
 
