@@ -8,6 +8,9 @@ dist
 _site
 coverage.html
 
+# Compiler-generated files
+out*
+
 # Ignore Vim swap files
 *.swp
 
