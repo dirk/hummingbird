@@ -10,6 +10,9 @@
 class A {
   var b: String
   let c: Integer = 1
-  init () { return }
+  init () {
+    # this.b = "Hello world!"
+  }
 }
+console.log("Hello world!")
 
