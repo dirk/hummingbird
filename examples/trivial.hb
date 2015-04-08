@@ -13,8 +13,12 @@ class A {
   init () {
     this.b = "Hello Hummingbird!"
   }
+  func d () {
+    return "Foo bar."
+  }
 }
 console.log("Foo bar.")
-let d = new A()
-console.log(d.b)
+let e = new A()
+console.log(e.b)
+console.log(e.d())
 
