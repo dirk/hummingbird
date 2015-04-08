@@ -8,7 +8,7 @@
     "pegjs": "~0.8.0",
     "optimist": "~0.6.1",
     "xregexp": "~2.0.0",
-    "llvm2": "0.1.1",
+    "llvm2": "0.1.2",
     "source-map": "~0.4.2",
     "inline-source-map-comment": "~1.0.5"
   },
