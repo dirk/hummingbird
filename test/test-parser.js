@@ -1,7 +1,7 @@
 
 var expect       = require('expect.js'),
-    types        = require('../lib/types'),
-    AST          = require('../lib/ast'),
+    types        = require('../src/types'),
+    AST          = require('../src/ast'),
     parseAndWalk = require('./helper').parseAndWalk
 
 describe('Parser', function () {

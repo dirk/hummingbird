@@ -1,9 +1,9 @@
 
 var fs          = require('fs'),
-    Parser      = require('../lib/parser'),
+    Parser      = require('../src/parser'),
     parser      = new Parser(),
-    TypeSystem  = require('../lib/typesystem').TypeSystem,
-    reportError = require('../lib/util').reportError
+    TypeSystem  = require('../src/typesystem').TypeSystem,
+    reportError = require('../src/util').reportError
 
 var input = fs.readFileSync(__dirname + '/../examples/multi.hb').toString()
 
@@ -18,7 +18,7 @@ try {
   process.exit()
 }
 
-require('../lib/targets/javascript')
+require('../src/targets/javascript')
 
 console.log(tree.compile())
 

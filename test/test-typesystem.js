@@ -2,10 +2,10 @@
 var helper = require('./helper'),
     expect = require('expect.js')
 
-var AST          = require('../lib/ast'),
-    types        = require('../lib/types'),
-    TypeSystem   = require('../lib/typesystem').TypeSystem,
-    scope        = require('../lib/typesystem/scope'),
+var AST          = require('../src/ast'),
+    types        = require('../src/types'),
+    TypeSystem   = require('../src/typesystem').TypeSystem,
+    scope        = require('../src/typesystem/scope'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope
 

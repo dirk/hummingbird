@@ -1,5 +1,5 @@
 var fs = require('fs'),
-    parser = require('../lib/spec-parser'),
+    parser = require('../src/spec-parser'),
     parseSpecification = parser.parseSpecification
 
 var specSource   = fs.readFileSync(__dirname+'/../doc/specification.md').toString(),

@@ -2,7 +2,7 @@
 var helper = require('./helper'),
     expect = require('expect.js')
 
-var types = require('../lib/types')
+var types = require('../src/types')
 
 describe('Types', function () {
   var rootObject = new types.Object('fake')
