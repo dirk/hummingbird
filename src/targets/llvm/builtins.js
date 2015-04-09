@@ -24,12 +24,8 @@ function compile (ctx, mainEntry, root) {
   
   // External linkages for GC ------------------------------------------------
   var sizeTType = Int32Type
-
-  var gcMallocType = new LLVM.FunctionType(Int8PtrType, [sizeTType], false)
-  ctx.extern.GC_malloc = ctx.module.addFunction('GC_malloc', gcMallocType)
-
-  var gcInitType = new LLVM.FunctionType(VoidType, [], false)
-  ctx.extern.GC_INIT = ctx.module.addFunction('GC_init', gcInitType)
+  ctx.extern.GC_malloc = NativeFunction.addExternalFunction(ctx, 'GC_malloc', Int8PtrType, [sizeTType])
+  ctx.extern.GC_init   = NativeFunction.addExternalFunction(ctx, 'GC_init', VoidType, [])
 
 
   // Builtin functions -------------------------------------------------------
@@ -40,7 +36,7 @@ function compile (ctx, mainEntry, root) {
       logType         = consoleType.getTypeOfProperty('log')
 
   // Create the NativeFunction for logging strings
-  var log = new NativeFunction('TBuiltinConsole_Mlog', [rootScope.getLocal('String')], rootScope.getLocal('Void'))
+  var log = new NativeFunction('TBuiltinConsole_mlog', [rootScope.getLocal('String')], rootScope.getLocal('Void'))
   log.computeType()
   logType.setNativeFunction(log)
   /*

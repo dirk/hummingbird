@@ -107,7 +107,7 @@ AST.Root.prototype.buildMain = function (ctx, mainFunc, mainEntry) {
   // Setup the entry into the function
   ctx.builder.positionAtEnd(mainEntry)
   // Initialize the GC
-  ctx.builder.buildCall(ctx.extern.GC_INIT, [], '')
+  ctx.builder.buildCall(ctx.extern.GC_init, [], '')
 
   // Compile ourselves now that setup is done
   compileBlock(ctx, this, mainFunc)
@@ -570,7 +570,7 @@ AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject)
   for (var i = 0; i < initializers.length; i++) {
     var init         = initializers[0],
         initType     = init.type,
-        internalName = nativeObject.internalName+'_I'+i
+        internalName = nativeObject.internalName+'_i'+i
     // Make a copy of the initializer args and prepend an argument for the
     // instance of the type being initialized (ie. `this`)
     var initArgs = _.clone(initType.args)
@@ -598,7 +598,7 @@ AST.Class.prototype.compileInstanceMethods = function (ctx, blockCtx, nativeObje
     if (type.isInstanceMethod !== true) {
       throw new ICE('Encountered non-instance-method in class definition')
     }
-    var internalName = nativeObject.internalName+'_M'+stmt.name,
+    var internalName = nativeObject.internalName+'_m'+stmt.name,
         args         = _.clone(type.args)
     // Add the instance as the first argument
     args.unshift(new types.Instance(nativeObject.type))

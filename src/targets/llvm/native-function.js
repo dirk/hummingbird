@@ -49,5 +49,19 @@ types.Function.prototype.hasNativeFunction = function () {
   return (this.nativeFunction ? true : false)
 }
 
+function computeType (ret, args, varArgs) {
+  var args = args.map(nativeTypeForType),
+      ret  = nativeTypeForType(ret)
+  varArgs  = (varArgs ? true : false)
+  return new LLVM.FunctionType(ret, args, varArgs)
+}
+
+NativeFunction.addExternalFunction = function (ctx, name, ret, args, varArgs) {
+  var type = computeType(ret, args, varArgs)
+  // Add the linkage to the module
+  var externalFn = ctx.module.addFunction(name, type)
+  return externalFn
+}
+
 module.exports = NativeFunction
 

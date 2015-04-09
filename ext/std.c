@@ -6,7 +6,7 @@
 @Gconsole = global %TBuiltinConsole* null
 */
 
-void TBuiltinConsole_Mlog (void *s) {
+void TBuiltinConsole_mlog (void *s) {
   puts(s);
 }
 
@@ -16,6 +16,6 @@ typedef struct BuiltinConsole {
 
 extern TBuiltinConsole *Gconsole;
 TBuiltinConsole *Gconsole = &(TBuiltinConsole){
-  .log = &TBuiltinConsole_Mlog
+  .log = &TBuiltinConsole_mlog
 };
 
