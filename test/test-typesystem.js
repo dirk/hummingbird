@@ -2,10 +2,12 @@
 var helper = require('./helper'),
     expect = require('expect.js')
 
-var AST        = require('../lib/ast'),
-    types      = require('../lib/types'),
-    TypeSystem = require('../lib/typesystem').TypeSystem,
-    Scope      = require('../lib/typesystem/scope')
+var AST          = require('../lib/ast'),
+    types        = require('../lib/types'),
+    TypeSystem   = require('../lib/typesystem').TypeSystem,
+    scope        = require('../lib/typesystem/scope'),
+    Scope        = scope.Scope,
+    ClosingScope = scope.ClosingScope
 
 describe('Type-system', function () {
   var rootObject = new types.Object('fake')
