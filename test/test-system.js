@@ -51,6 +51,27 @@ describe('System', function () {
     })
   })
 
+  describe('given boolean literals', function () {
+    var source = "var a = true\nvar b = false"
+    it('should parse and walk', function () {
+      var tree = parseAndWalk(source)
+      expect(tree.statements.length).to.eql(2)
+      var truthyNode = tree.statements[0],
+          falseyNode = tree.statements[1]
+      expect(truthyNode.rvalue.value).to.eql('true')
+      expect(falseyNode.rvalue.value).to.eql('false')
+      // Check the node's computed types
+      function checkBooleanNodeType (node) {
+        var instanceType = node.lvalue.type
+        expect(instanceType).to.be.a(types.Instance)
+        var type = instanceType.type
+        expect(type).to.be.a(types.Boolean)
+      }
+      checkBooleanNodeType(truthyNode)
+      checkBooleanNodeType(falseyNode)
+    })
+  })
+
   describe('given a class', function () {
     describe('with an invalid let-property', function () {
       var source = "var a = func () -> Integer { return 1 }\n"+

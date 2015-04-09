@@ -11,14 +11,10 @@ if b {
 }
   
 var c = func () {
-  if 1 {
-    return 1
-  } else {
-    return 0
-  }
+  return 1
 }
 console.log(c())
 
-var d = func () { return }
+var d = true
 console.log(d)
 
