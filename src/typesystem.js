@@ -15,6 +15,9 @@ function TypeSystem () {
   this.root = new Scope()
   this.root.isRoot = true
   this.bootstrap()
+  // File and compiler will be null when not actively walking a tree
+  this.file     = null
+  this.compiler = null
 }
 // Add the bootstrap methods to the TypeSystem
 require('./typesystem/bootstrap')(TypeSystem)
@@ -34,8 +37,10 @@ function assertInstanceOf(value, type, msg) {
 
 // AST typing -----------------------------------------------------------------
 
-TypeSystem.prototype.walk = function (rootNode) {
+TypeSystem.prototype.walk = function (rootNode, file, compiler) {
   assertInstanceOf(rootNode, AST.Root, "Node must be root")
+  this.file     = file     ? file     : null
+  this.compiler = compiler ? compiler : null
 
   var topLevelScope = new Scope(this.root)
   // Save this top-level scope on the root
@@ -45,6 +50,9 @@ TypeSystem.prototype.walk = function (rootNode) {
   rootNode.statements.forEach(function (stmt) {
     self.visitStatement(stmt, topLevelScope, rootNode)
   })
+  // Reset the compiler property now that we're done walking
+  this.file     = null
+  this.compiler = null
 }
 
 TypeSystem.prototype.visitBlock = function (node, scope) {
@@ -122,10 +130,79 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
     case AST.Class:
       this.visitClass(node, scope)
       break
+    case AST.Import:
+      this.visitImport(node, scope, parentNode)
+      break
+    case AST.Export:
+      this.visitExport(node, scope, parentNode)
+      break
     default:
       throw new TypeError("Don't know how to visit: "+node.constructor.name, node)
       break
   }
+}
+
+
+TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
+  assertInstanceOf(node.name,  AST.Literal, "Import expects Literal as name")
+  assertInstanceOf(parentNode, AST.Root,    "Import can only be a child of a Root")
+  if (node.name.typeName !== 'String') {
+    throw new TypeError('Import requires a String as module name', node)
+  }
+  if (!this.compiler) {
+    throw new Error('Type-system not provided with current Compiler instance')
+  }
+  if (!this.file) {
+    throw new Error('Type-system not provided with current File instance')
+  }
+  // Add ourselves to the root's list of imports it contains
+  parentNode.imports.push(node)
+
+  var moduleName = node.name.value
+  // Preserve current file to restore after visiting the imported file
+  var currentFile = this.file
+  // Now ask the compiler to import the file
+  var importedFile = this.compiler.importFileByName(moduleName)
+  node.file = importedFile
+  // Restore the current file and push the imported file as a dependency of it
+  this.file = currentFile
+  this.file.dependencies.push(importedFile)
+  // Then build a module object for it
+  var module = new types.Object(this.rootObject)
+  module.name = 'Module'
+  var exportedNames = Object.keys(importedFile.exports)
+  for (var i = exportedNames.length - 1; i >= 0; i--) {
+    var name = exportedNames[i],
+        type = importedFile.exports[name]
+    // Add the exported name-type pair to the module and set it as a
+    // read-only property
+    module.setTypeOfProperty(name, type)
+    module.setFlagsOfProperty(name, 'r')
+  }
+  // Now create a faux instance of this module and add it to the scope
+  scope.setLocal(moduleName, new types.Instance(module))
+}
+
+
+TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
+  // Make sure our parent node is the root
+  assertInstanceOf(parentNode, AST.Root, "Import can only be a child of a Root")
+  // Add ourselves to the root node's list of export nodes
+  parentNode.exports.push(node)
+
+  var name = node.name
+  // Make sure we're in the top-level scope
+  if (scope.parent !== this.root) {
+    throw new TypeError('Exporting from non-root scope', node)
+  }
+  // Look up the type for the name in the root
+  var type = scope.getLocal(name)
+  // Need to unbox an instance if we encounter one
+  if (type instanceof types.Instance) {
+    type = type.type
+  }
+  // TODO: Check that the name is a constant binding (rather than variable)
+  this.file.exports[name] = type
 }
 
 

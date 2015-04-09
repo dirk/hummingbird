@@ -5,7 +5,8 @@ var stderr                 = process.stderr,
 
 var TypeSystem  = require('./typesystem').TypeSystem,
     Parser      = require('./parser'),
-    reportError = require('./util').reportError
+    reportError = require('./util').reportError,
+    Compiler    = require('./compiler')
 
 // Parse command-line arguments
 var optimist = require('optimist')
@@ -14,6 +15,8 @@ var argv = optimist
     .boolean('m')
     .alias('m', 'map')
     .boolean('v')
+    .boolean('s')
+    .alias('s', 'single')
     // .demand(1)
     .argv
 
@@ -37,6 +40,7 @@ function showHelp () {
   help += "Options:\n"
   help += "  -m, --map                 Include source maps in output\n"
   help += "  -v                        Verbose"
+  help += "  -s, --single              Don't include imports (uses RequireJS)\n"
   console.error(help)
 }
 
@@ -93,34 +97,54 @@ function fileFromArgs (args, idx) {
   return file
 }
 
+
+var compileOpts = {
+  isEntry: true
+}
+var targetOpts = {}
+
+function compileFile (args) {
+  var filePath      = fileFromArgs(args, 0),
+      // Get the directory of the file for the import-path
+      fileDirectory = path.dirname(filePath)
+  var compiler = new Compiler()
+  compiler.importPath.push(fileDirectory)
+  var file = compiler.compile(filePath, compileOpts)
+  return file
+}
+
 var commands = {
   inspect: function (args) {
-    var file = fileFromArgs(args, 0),
-        tree = treeForFile(file)
-    // Print the resulting prettified AST
-    tree.print()
+    var file = compileFile(args)
+    file.tree.print()
     process.exit(0)
   },// inspect
   compile: function (args) {
-    var file = fileFromArgs(args, 0),
-        tree = treeForFile(file)
+    var file = compileFile(args)
+    // If there's no imports and exports then set it to single mode
+    if (file.tree.imports.length === 0) {
+      targetOpts.single = true
+    }
     // Load the JavaScript compile target and print the compiled source
     require('./targets/javascript')
-    process.stdout.write(tree.compile())
+    process.stdout.write(file.tree.compile(targetOpts))
     // Check whether we should also print the source-map
-    var includeMap = argv.m
+    var includeMap = argv.map
     if (includeMap) {
-      process.stdout.write(inlineSourceMapComment(tree.sourceMap))
+      process.stdout.write(inlineSourceMapComment(file.tree.sourceMap))
       process.stdout.write("\n")
     }
   },
   run: function (args) {
-    var file = fileFromArgs(args, 0),
-        tree = treeForFile(file)
+    var file = compileFile(args)
+    // Load the JavaScript compile target
+    require('./targets/javascript')
     // Load the vm module and JavaScript target compiler
     var vm = require('vm')
-    require('./targets/javascript')
-    var compiledSource = tree.compile()
+    // Compile the whole file into a bundle to run
+    var compiledSource = file.tree.compile()
+    // Expose "require(...)" to the script
+    global.require = require;
     // Run the compiled source in the VM
     vm.runInThisContext(compiledSource)
   },
@@ -136,6 +160,11 @@ function run () {
 
   if (!command) {
     return stderr.write("Unrecognized command '"+commandArg+"'\n")
+  }
+  // Check if there was a "--single" option to force single-file target
+  // compilation mode
+  if (argv.single === true) {
+    targetOpts.single = true
   }
   command(otherArgs)
 }

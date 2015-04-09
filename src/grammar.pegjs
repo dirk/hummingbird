@@ -20,11 +20,15 @@
   // with this in its parse block to add position metadata.
   function pos (node) {
     // console.log(options.file+': L'+line()+' C'+column())
-    node.setPosition(options.file, line(), column())
+    if (node.setPosition) {
+      node.setPosition(options.file, line(), column())
+    }
     return node
   }
 
   // Forward declarations that will be overwritten parser-extension.js
+  p.parseImport = function (name) { return [name] }
+  p.parseExport = function (name) { return [name] }
   p.parseDeclaration = function (lvalue, rvalue) { return [lvalue, rvalue] }
   p.parseClass = function (name, block) { return [name, block] }
   p.parseInit = function (args, block) { return [args, block] }
@@ -67,12 +71,19 @@ block = "{" __ s:statements __ "}" { return pos(p.parseBlock(s)) }
 
 statement = s:innerstmt terminator { return s }
 
-innerstmt = decl
+innerstmt = modstmt
+          / decl
           / ctrl
           / assg
           / multistmt
           / funcstmt
           / expr
+
+modstmt = importstmt
+        / exportstmt
+
+importstmt = "import" whitespace s:string { return pos(p.parseImport(s)) }
+exportstmt = "export" whitespace n:name   { return pos(p.parseExport(n)) }
 
 ctrl = ifctrl
      / whilectrl

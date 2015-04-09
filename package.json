@@ -3,12 +3,12 @@
   "version": "0.0.1",
   "repository": "https://github.com/dirk/hummingbird",
   "dependencies": {
-    "canopy": "~0.2.0",
-    "expect.js": "~0.3.1",
     "pegjs": "~0.8.0",
     "optimist": "~0.6.1",
     "xregexp": "~2.0.0",
     "llvm2": "0.2.2",
+    "requirejs": "~2.1.17",
+    "lodash": "~3.6.0",
     "source-map": "~0.4.2",
     "inline-source-map-comment": "~1.0.5",
     "winston": "~1.0.0"
@@ -16,7 +16,8 @@
   "devDependencies": {
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
-    "lodash": "~3.6.0",
+    "expect.js": "~0.3.1",
+    "esprima": "~2.1.0",
     "blanket": "~1.1.6",
     "mocha-lcov-reporter": "~0.0.2",
     "coveralls": "~2.11.2"
