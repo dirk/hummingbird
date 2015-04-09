@@ -1,7 +1,9 @@
 var LLVM  = require('../../../../llvm2'),
     types = require('../../types')
 
-var Int64Type = LLVM.Types.Int64Type
+var Int64Type   = LLVM.Types.Int64Type,
+    Int8Type    = LLVM.Types.Int8Type,
+    Int8PtrType = LLVM.Types.pointerType(Int8Type)
 
 function isLastInstructionTerminator (bb) {
   var lastInstr = LLVM.Library.LLVMGetLastInstruction(bb)

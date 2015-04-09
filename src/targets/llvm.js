@@ -744,11 +744,11 @@ AST.If.prototype.compile = function (ctx, blockCtx) {
     // just jump to the else block.
     nextCond = (nextCond ? nextCond : postElseIfsBlock)
     // Compile down the condition
-    // ctx.builder.positionAtEnd(cond)
+    ctx.builder.positionAtEnd(cond)
     truthyVal = compileTruthyTest(ctx, blockCtx, elseIf.cond)
-    // ctx.builder.buildCondBr(truthyVal, then, nextCond)
+    ctx.builder.buildCondBr(truthyVal, then, nextCond)
     // Then compile down the `then`
-    // this.compileConditionBlock(ctx, parentFn, elseIf.block, then, nextCond)
+    this.compileConditionBlock(ctx, parentFn, elseIf.block, then, nextCond)
   }
 
   // Build the else-block if present

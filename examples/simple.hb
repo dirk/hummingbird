@@ -1,5 +1,5 @@
 var a = 1
-console.log(a)
+# console.log(a)
 
 var b = "Hello world!"
 console.log(b)
@@ -10,15 +10,15 @@ if b {
   console.log("2")
 }
   
-var c = func () {
-  if 1 {
-    return 1
-  } else {
-    return 0
-  }
-}
-console.log(c())
+# var c = func () {
+#   if 1 {
+#     return 1
+#   } else {
+#     return 0
+#   }
+# }
+# console.log(c())
 
-var d = func () { return }
-console.log(d)
+# var d = func () { return }
+# console.log(d)
 
