@@ -12,7 +12,8 @@ var _            = require('lodash'),
     ICE          = Errors.InternalCompilerError,
     // Target information and setup
     target       = require('./llvm/target'),
-    util         = require('./llvm/util')
+    util         = require('./llvm/util'),
+    BinaryOps    = require('./llvm/binary-ops')
 
 var isLastInstructionTerminator = util.isLastInstructionTerminator,
     compileTruthyTest           = util.compileTruthyTest,
@@ -90,6 +91,7 @@ AST.Root.prototype.emitToFile = function (outFile, opts) {
 
   // Add the builtins
   Builtins.compile(ctx, mainEntry, this)
+  BinaryOps.initialize(ctx)
   // Compile ourselves in the main entry function
   this.buildMain(ctx, mainFunc, mainEntry)
 
@@ -764,5 +766,28 @@ AST.If.prototype.compileConditionBlock = function (ctx, parentFn, blockNode, blo
   if (!lastInstrTerm && contBlockPtr !== null) {
     ctx.builder.buildBr(contBlockPtr)
   }
+}
+
+AST.Binary.prototype.compileToValue = function (ctx, blockCtx) {
+  var lexpr = this.lexpr,
+      rexpr = this.rexpr
+  // Check (and unbox) the types
+  var lexprType = lexpr.type,
+      rexprType = rexpr.type
+  assertInstanceOf(lexprType, types.Instance)
+  assertInstanceOf(rexprType, types.Instance)
+  lexprType = lexprType.type
+  rexprType = rexprType.type
+  // Find the binary-op NativeFunction
+  var builder = BinaryOps.getBuilder(this.op, lexprType, rexprType)
+  assertInstanceOf(builder, Function)
+  // Compile the two sides down to a value that we can use
+  var lexprValue = lexpr.compileToValue(ctx, blockCtx),
+      rexprValue = rexpr.compileToValue(ctx, blockCtx)
+  // Build the call to the function
+  // Call the builder function that we got from BinaryOps
+  return builder(ctx, lexprValue, rexprValue)
+  // return ctx.builder.buildCall(fn, [lexprValue, rexprValue], 'op'+this.op)
+  throw new ICE('Unreachable')
 }
 

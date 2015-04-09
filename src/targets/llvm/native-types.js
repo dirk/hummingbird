@@ -8,6 +8,9 @@ var VoidType    = LLVM.Types.VoidType,
 // Computes the equivalent native type for a given Hummingbird type
 function nativeTypeForType (type) {
   switch (type.constructor) {
+    case Buffer:
+      // Already a pointer to a native type!
+      return type
     case types.Void:
       return VoidType
     case types.String:
