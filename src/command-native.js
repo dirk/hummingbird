@@ -93,5 +93,9 @@ execSync('llc -filetype=obj '+bitFile)
 var gc = '-lgc'
 if (!Opts.gc) { gc = '' }
 // Then compile the object file to a native binary
-execSync('clang -o '+binFile+' '+gc+' '+objFile)
+// execSync('clang -o '+binFile+' '+gc+' -Wl,lib/std.o '+objFile)
+
+var stdFile    = 'lib/std.o',
+    linkerObjs = [objFile, stdFile]
+execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o -macosx_version_min 10.9 -o '+binFile)
 

@@ -142,6 +142,10 @@ GlobalSlots.prototype.buildSet = function (ctx, name, value) {
   // Save the global pointer
   this.slots[name] = global
 }
+GlobalSlots.prototype.buildDefine = function (ctx, name, type) {
+  var global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, 'G'+name)
+  this.slots[name] = global
+}
 GlobalSlots.prototype.buildGet = function (ctx, name) {
   if (!this.slots[name]) { throw new Error('Global not found: '+name) }
   var global = this.slots[name],

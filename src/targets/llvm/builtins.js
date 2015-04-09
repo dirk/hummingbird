@@ -41,6 +41,9 @@ function compile (ctx, mainEntry, root) {
 
   // Create the NativeFunction for logging strings
   var log = new NativeFunction('TBuiltinConsole_Mlog', [rootScope.getLocal('String')], rootScope.getLocal('Void'))
+  log.computeType()
+  logType.setNativeFunction(log)
+  /*
   log.defineBody(ctx, function (entry) {
     var builder = ctx.builder
     // Get the string parameter and fetch the `puts` C library function
@@ -49,25 +52,26 @@ function compile (ctx, mainEntry, root) {
     builder.buildCall(puts, [str], '')
     builder.buildRetVoid()
   })
-  logType.setNativeFunction(log)
   // Reposition the builder now that we're done
   ctx.builder.positionAtEnd(mainEntry)
+  */
 
   var consoleObject = new NativeObject(consoleInstance.type)
   // Update the console type to point to its generated struct type
   consoleInstance.type.setNativeObject(consoleObject)
   // Must define the object before we can instantiate
   consoleObject.define(ctx)
+  
+  /*
   var consoleValue = consoleObject.build(ctx, 'console'),
       logFnPtr     = consoleObject.buildStructGEPForProperty(ctx, consoleValue, 'log')
   // Store the native log function in the console object instance
   ctx.builder.buildStore(log.fn.ptr, logFnPtr)
-
+  */
 
   // Finally we'll expose the console object in the global slots
-  ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
-
-
+  ctx.globalSlots.buildDefine(ctx, 'console', LLVM.Types.pointerType(consoleObject.structType))
+  // ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
 }
 
 module.exports = {
