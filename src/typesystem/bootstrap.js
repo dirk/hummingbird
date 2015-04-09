@@ -7,7 +7,7 @@ module.exports = function (TypeSystem) {
     var rootObject = new types.Object('fake')
     rootObject.supertype = null
     rootObject.isRoot    = true
-    // Setup the basic intrinsic types (Any, Object, Number, etc.)
+    // Setup the basic intrinsic types (Any, Object, Integer, etc.)
     this.bootstrapIntrinsicTypes(rootObject)
     // Set up our built-ins
     this.bootstrapConsole(rootObject)
@@ -16,15 +16,13 @@ module.exports = function (TypeSystem) {
   }// bootstrap()
 
   TypeSystem.prototype.bootstrapIntrinsicTypes = function (rootObject) {
-    var Number = new types.Number(rootObject)
+    var Integer = new types.Integer(rootObject)
     this.root.setLocal('Any',     new types.Any())
     this.root.setLocal('Object',  new types.Object(rootObject))
     this.root.setLocal('String',  new types.String(rootObject))
-    this.root.setLocal('Number',  Number)
+    this.root.setLocal('Integer', Integer)
     this.root.setLocal('Boolean', new types.Boolean(rootObject))
     this.root.setLocal('Void',    new types.Void(rootObject))
-    // Alias Integer to Number
-    this.root.setLocal('Integer', Number)
   }
 
   TypeSystem.prototype.bootstrapConsole = function (rootObject) {

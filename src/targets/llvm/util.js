@@ -34,7 +34,7 @@ function compileTruthyTest (ctx, blockCtx, expr) {
     var nullStringPtr = LLVM.Library.LLVMConstNull(Int8PtrType)
     // Compare the string pointer to the NULL pointer
     return ctx.builder.buildICmp(LLVM.Library.LLVMIntNE, value, nullStringPtr, '')
-  case types.Number:
+  case types.Integer:
     var zeroInteger = LLVM.Library.LLVMConstInt(Int64Type, 0, true)
     return ctx.builder.buildICmp(LLVM.Library.LLVMIntNE, value, zeroInteger, '')
   default:

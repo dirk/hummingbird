@@ -15,7 +15,7 @@ function nativeTypeForType (type) {
       return VoidType
     case types.String:
       return Int8PtrType
-    case types.Number:
+    case types.Integer:
       return Int64Type
     case types.Function:
       var nativeFunction = type.getNativeFunction()

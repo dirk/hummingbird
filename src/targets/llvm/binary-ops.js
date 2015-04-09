@@ -28,8 +28,8 @@ function getAdditionBuilder (lexprType, rexprType) {
       return ctx.builder.buildCall(stdCoreTypesStringConcat, [lvalue, rvalue], 'concat')
     }
   // TODO: Only compile Integers!
-  case types.Number:
-    assertRexprType(rexprType, types.Number)
+  case types.Integer:
+    assertRexprType(rexprType, types.Integer)
     return function (ctx, lvalue, rvalue) {
       return ctx.builder.buildAdd(lvalue, rvalue, 'add')
     }

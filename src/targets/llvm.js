@@ -268,7 +268,7 @@ AST.Literal.prototype.compileToValue = function (ctx, blockCtx) {
       var stringValue = this.value
       // Build a constant with our string value and return that
       return ctx.builder.buildGlobalStringPtr(stringValue, '')
-    case types.Number:
+    case types.Integer:
       return LLVM.Library.LLVMConstInt(Int64Type, this.value, '')
     default:
       var name = instance.type.constructor.name

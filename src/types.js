@@ -124,15 +124,15 @@ String.prototype.equals   = function (other) {
 }
 
 
-function Number (supertype) {
+function Integer (supertype) {
   _super(this).call(this, supertype)
   this.intrinsic = true
   this.primitive = true
 }
-inherits(Number, Type)
-Number.prototype.inspect = function () { return 'Number' }
-Number.prototype.equals = function (other) {
-  return (other.constructor === Number)
+inherits(Integer, Type)
+Integer.prototype.inspect = function () { return 'Integer' }
+Integer.prototype.equals = function (other) {
+  return (other.constructor === Integer)
 }
 
 
@@ -234,7 +234,7 @@ module.exports = {
   Void: Void,
   Object: Object,
   String: String,
-  Number: Number,
+  Integer: Integer,
   Boolean: Boolean,
   Unknown: Unknown,
   Function: Function,

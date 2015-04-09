@@ -53,13 +53,13 @@ describe('Type-system', function () {
 
 describe('Scope', function () {
   var scope  = new Scope(),
-      Number = new types.Number('fake')
+      Integer = new types.Integer('fake')
   it('should set a variable', function () {
-    scope.setLocal('Number', Number)
+    scope.setLocal('Integer', Integer)
   })
   it('should fail when re-setting a variable', function () {
     expect(function () {
-      scope.setLocal('Number', Number)
+      scope.setLocal('Integer', Integer)
     }).to.throwException(/Can't redefine local/)
   })
   it('should fail when finding a missing local', function () {

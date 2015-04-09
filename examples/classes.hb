@@ -6,7 +6,7 @@ class Foo {
   init () {
     this.bar = 1
   }
-  init (bar: Number) {
+  init (bar: Integer) {
     this.bar = bar
   }
 
