@@ -199,6 +199,7 @@ TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
   if (type instanceof types.Instance) {
     type = type.type
   }
+  node.type = type
   // TODO: Check that the name is a constant binding (rather than variable)
   this.file.exports[name] = type
 }

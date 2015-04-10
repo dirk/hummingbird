@@ -85,8 +85,13 @@ if (outBase === entryFile) {
 var bitFile = outBase+'.bc',
     objFile = outBase+'.o',
     binFile = 'a.out'
-tree.emitToFile(bitFile, {logger: logger})
-// process.exit(0)
+
+var outputs = []
+tree.emitToFile({logger: logger, outputs: outputs})
+
+function objectFileForBitcodeFile (path) {
+  return path.replace(/\.bc$/, '.o')
+}
 
 function execSync (cmd) {
   var execSync = child_process.execSync
@@ -95,7 +100,10 @@ function execSync (cmd) {
 }
 
 // Compile using the LLVM bitcode-to-assembly/object compiler
-execSync('llc -filetype=obj '+bitFile)
+outputs.forEach(function (of) {
+  execSync('llc -filetype=obj '+of)
+})
+// process.exit(0)
 
 var gc = '-lgc'
 if (!Opts.gc) { gc = '' }
@@ -103,6 +111,12 @@ if (!Opts.gc) { gc = '' }
 // execSync('clang -o '+binFile+' '+gc+' -Wl,lib/std.o '+objFile)
 
 var stdFile    = 'lib/std.o',
-    linkerObjs = [objFile, stdFile]
+    linkerObjs = []
+
+outputs.map(objectFileForBitcodeFile).forEach(function (obj) {
+  linkerObjs.push(obj)
+})
+linkerObjs.push(stdFile)
+
 execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o -macosx_version_min 10.9 -o '+binFile)
 

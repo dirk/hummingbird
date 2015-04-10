@@ -79,7 +79,7 @@ AST.Node.prototype.compileToValue = function () {
   throw new Error('Compilation to value not yet implemented for: '+this.constructor.name)
 }
 
-AST.Root.prototype.emitToFile = function (outFile, opts) {
+AST.Root.prototype.emitToFile = function (opts) {
   var ctx = new Context()
   ctx.module       = new LLVM.Module('test')
   ctx.builder      = new LLVM.Builder()
@@ -93,6 +93,11 @@ AST.Root.prototype.emitToFile = function (outFile, opts) {
   ctx.castValuePointers   = false
   ctx.noCastValuePointers = !ctx.castValuePointers
   ctx.logger              = (opts.logger ? opts.logger : (new BasicLogger()))
+  // List of output bitcode files built
+  ctx.outputs = (opts.outputs ? opts.outputs : [])
+  // Add ourselves to that list
+  var outFile = bitcodeFileForSourceFile(this.file.path)
+  ctx.outputs.push(outFile)
 
   // Setup information about our compilation target
   target.initializeTarget(ctx)
@@ -102,18 +107,33 @@ AST.Root.prototype.emitToFile = function (outFile, opts) {
   if (!rootScope.isRoot) { throw new Error("Couldn't find root scope") }
   ctx.slotsMap[rootScope.id] = ctx.globalSlots
 
-  // Set up the main function
-  var mainType  = new LLVM.FunctionType(VoidType, [], false),
-      mainFunc  = ctx.module.addFunction('main', mainType),
-      mainEntry = mainFunc.appendBasicBlock('entry')
+  var mainType = new LLVM.FunctionType(VoidType, [], false),
+      mainFunc = null
+  if (opts.module) {
+    mainFunc = ctx.module.addFunction(opts.module+'_init', mainType)
+    ctx.moduleName = opts.module
+  } else {
+    // Set up the main function
+    mainFunc = ctx.module.addFunction('main', mainType)
+    ctx.moduleName = false
+  }
+  var mainEntry = mainFunc.appendBasicBlock('entry')
 
   // Add the builtins
   Builtins.compile(ctx, mainEntry, this)
   BinaryOps.initialize(ctx)
+
+  // Setup the entry into the function
+  ctx.builder.positionAtEnd(mainEntry)
+  if (!opts.module) {
+    // Initialize the GC
+    ctx.builder.buildCall(ctx.extern.GC_init, [], '')
+  }
+
   // Compile ourselves in the main entry function
   this.buildMain(ctx, mainFunc, mainEntry)
 
-  ctx.module.dump()
+  // ctx.module.dump()
 
   // Verify the module to make sure that nothing's amiss before we hand it
   // of to the bitcode compiler
@@ -124,11 +144,6 @@ AST.Root.prototype.emitToFile = function (outFile, opts) {
 }
 
 AST.Root.prototype.buildMain = function (ctx, mainFunc, mainEntry) {
-  // Setup the entry into the function
-  ctx.builder.positionAtEnd(mainEntry)
-  // Initialize the GC
-  ctx.builder.buildCall(ctx.extern.GC_init, [], '')
-
   // Compile ourselves now that setup is done
   compileBlock(ctx, this, mainFunc)
 
@@ -388,6 +403,59 @@ function buildPointerCastIfNecessary (ctx, value, desiredType) {
   return value
 }
 
+function bitcodeFileForSourceFile (path) {
+  var outFile = path.replace(/\.hb$/i, '.bc')
+  if (outFile === path) {
+    throw new ICE('Couldn\'t compute path for module output file')
+  }
+  return outFile
+}
+
+AST.Import.prototype.compile = function (ctx, blockCtx) {
+  var moduleRoot = this.file.tree,
+      nativeName = 'M'+this.name,
+      outFile    = bitcodeFileForSourceFile(this.file.path)
+  moduleRoot.emitToFile({
+    module: nativeName,
+    logger: ctx.logger,
+    outputs: ctx.outputs
+  })
+  // Find the external module initializer
+  var initName = nativeName+'_init',
+      initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
+  // And then call it so that the module gets initialized at the correct time
+  ctx.builder.buildCall(initFn, [], '')
+}
+
+AST.Export.prototype.compile = function (ctx, blockCtx) {
+  if (!ctx.moduleName) {
+    throw new ICE('Missing module name')
+  }
+  var path = [ctx.moduleName],
+      name = this.name,
+      type = this.type
+  switch (type.constructor) {
+    case types.Function:
+      path.push('F'+name)
+      var exportName = path.join('_')
+      // Create a global value with that name
+      var value    = blockCtx.slots.buildGet(ctx, this.name),
+          nativeFn = type.getNativeFunction(),
+          nativeTy = TypeOf(nativeFn.fn.ptr),
+          global   = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, nativeTy, exportName)
+      // Set it to externally link and initialize it to null
+      LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
+      var initialNull = LLVM.Library.LLVMConstPointerNull(nativeTy)
+      LLVM.Library.LLVMSetInitializer(global, initialNull)
+      // Set the native function pointer in the global so it will be exposed
+      ctx.builder.buildStore(value, global, '')
+      break
+
+    default:
+      throw new ICE('Cannot export something of type: '+type.inspect())
+  }
+}
+
 AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
   // TODO: Check for modules imported into this context
   var type = this.headType,
@@ -410,17 +478,30 @@ AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
         throw new ICE('Can only handle calls as last item of module path')
       }
       assertInstanceOf(type, types.Function)
-      // Build the path to the external function and assemble its type
-      var name = path.join('_'),
-          args = type.args.map(nativeTypeForType),
-          ret  = nativeTypeForType(type.ret)
-      // Get the external function
-      var externalFn = NativeFunction.addExternalFunction(ctx, name, ret, args)
+      var global = null
+      // Save the module global so that we don't recreate it every time
+      if (item.moduleGlobal) {
+        global = item.moduleGlobal
+      } else {
+        // Build the path to the external function and assemble its type
+        var name = path.join('_'),
+            args = type.args.map(nativeTypeForType),
+            ret  = nativeTypeForType(type.ret)
+        // Get the external function
+        var fnType = new LLVM.FunctionType(ret, args, false),
+            fnPtrType = LLVM.Types.pointerType(fnType.ptr)
+        // Add the global to the module
+        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, fnPtrType, name)
+        // Save it for later use
+        item.moduleGlobal = global
+      }
+      var fnPtr = ctx.builder.buildGEP(global, [Int32Zero], ''),
+          fn    = ctx.builder.buildLoad(fnPtr, '')
       // Compile all the args into values
       var argValues = item.args.map(function (arg) {
         return arg.compileToValue(ctx, blockCtx)
       })
-      return ctx.builder.buildCall(externalFn, argValues, '')
+      return ctx.builder.buildCall(fn, argValues, '')
     }
   }
   throw new ICE('Unreachable point in compiling a module path')

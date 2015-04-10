@@ -33,6 +33,8 @@ function nativeTypeForType (type) {
         return unboxedNativeType
       }
       return LLVM.Types.pointerType(unboxedNativeType)
+    /* case types.Module:
+      return VoidType */
     default:
       throw new Error("Can't compute native type for Hummingbird type: "+type.constructor.name)
   }
