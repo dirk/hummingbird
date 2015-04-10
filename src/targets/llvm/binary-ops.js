@@ -20,19 +20,26 @@ function assertRexprType (rexprType, type) {
   throw new ICE('Invalid type of right side of binary op (expected: '+e+', got: '+g+')')
 }
 
+function buildCallBuilder (fn, name) {
+  return function (ctx, lvalue, rvalue) {
+    return ctx.builder.buildCall(fn, [lvalue, rvalue], name)
+  }
+}
+function buildOpBuilder (opName, name) {
+  return function (ctx, lvalue, rvalue) {
+    return ctx.builder[opName](lvalue, rvalue, name)
+  }
+}
+
 function getAdditionBuilder (lexprType, rexprType) {
   switch (lexprType.constructor) {
   case types.String:
     assertRexprType(rexprType, types.String)
-    return function (ctx, lvalue, rvalue) {
-      return ctx.builder.buildCall(stdCoreTypesStringConcat, [lvalue, rvalue], 'concat')
-    }
+    return buildCallBuilder(stdCoreTypesStringConcat, 'concat')
   // TODO: Only compile Integers!
   case types.Integer:
     assertRexprType(rexprType, types.Integer)
-    return function (ctx, lvalue, rvalue) {
-      return ctx.builder.buildAdd(lvalue, rvalue, 'add')
-    }
+    return buildOpBuilder('buildAdd', 'add')
   default:
     var l = lexprType.inspect(),
         o = op,
