@@ -179,8 +179,9 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
     module.setTypeOfProperty(name, type)
     module.setFlagsOfProperty(name, 'r')
   }
+  scope.setLocal(moduleName, module)
   // Now create a faux instance of this module and add it to the scope
-  scope.setLocal(moduleName, new types.Instance(module))
+  // scope.setLocal(moduleName, new types.Instance(module))
 }
 
 
@@ -791,7 +792,8 @@ var know = function (node, type) {
 TypeSystem.prototype.visitChain = function (node, scope) {
   var self = this
   var type = know(node, scope.get(node.name))
-  node.tail.forEach(function (item) {
+  for (var i = 0; i < node.tail.length; i++) {
+    var item = node.tail[i]
     if (item instanceof AST.Call) {
       // Make sure we're trying to call an instance
       assertInstanceOf(type, types.Instance, 'Unexpected non-Instanced Function')
@@ -806,9 +808,9 @@ TypeSystem.prototype.visitChain = function (node, scope) {
         throw new TypeError('Wrong number of arguments: expected '+t+', got '+i)
       }
       // Then type-check each individual arguments
-      for (var i = itemArgs.length - 1; i >= 0; i--) {
+      for (var argIdx = itemArgs.length - 1; argIdx >= 0; argIdx--) {
         // Visit each argument item
-        var itemArg = itemArgs[i]
+        var itemArg = itemArgs[argIdx]
         self.visitExpression(itemArg, scope)
         // Get the Instance type of the passing argument node
         var itemArgInstance = itemArg.type
@@ -819,7 +821,7 @@ TypeSystem.prototype.visitChain = function (node, scope) {
         var itemArgType = itemArgInstance.type
         // Then get the type from the function definition to compare to the
         // passed argument
-        var typeArg = typeArgs[i]
+        var typeArg = typeArgs[argIdx]
         if (!typeArg.equals(itemArgType)) {
           var message  = 'Argument mismatch at argument index '+i,
               got      = itemArgType.inspect(),
@@ -834,18 +836,36 @@ TypeSystem.prototype.visitChain = function (node, scope) {
 
     } else
     if (item instanceof AST.Property) {
-      // Can only get properties of Instances right now
-      assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance')
-      var instance     = type,
-          propertyType = instance.getTypeOfProperty(item.name)
-      // Set the type to an Instance of the property
-      type = new types.Instance(propertyType)
+      type = this.getTypeOfTypesProperty(type, item.name)
 
     } else {
       throw new TypeError('Cannot handle Chain item of type: '+item.constructor.name, node)
     }
-  })
+  }
   node.type = type
+}
+
+
+// Utility function for resolving the type of a type's property. Handles
+// either Modules or Instances of a type; for everything else it will
+// throw an error.
+TypeSystem.prototype.getTypeOfTypesProperty = function (type, name) {
+  var returnType = null
+  if (type instanceof types.Module) {
+    // pass
+  } else {
+    assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance: '+type.inspect())
+    var instance = type
+    // Unbox the instance
+    type = instance.type
+  }
+  returnType = type.getTypeOfProperty(name)
+  // If it's another Module then just return that
+  if (returnType instanceof types.Module) {
+    return returnType
+  }
+  // Otherwise box it into an instance
+  return new types.Instance(returnType)
 }
 
 
