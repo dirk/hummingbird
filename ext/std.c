@@ -22,7 +22,7 @@ TBuiltinConsole *Gconsole = &(TBuiltinConsole){
 };
 
 // std.core.types.string.concat(string, string) -> string
-char *Mstd_Mcore_Mtypes_Mstring_cconcat(char *lvalue, char *rvalue) {
+char *Mstd_Mcore_Mtypes_Mstring_Fconcat(char *lvalue, char *rvalue) {
   size_t lvalueLen = strlen(lvalue);
   size_t rvalueLen = strlen(rvalue);
   size_t retLen    = lvalueLen + rvalueLen;

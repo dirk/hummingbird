@@ -1,11 +1,11 @@
 
-var a = "Hello world!"
-console.log(a)
-
-var b = func (s: String) {
-  return s
-}
-console.log(b("Identity!"))
+# var a = "Hello world!"
+# console.log(a)
+# 
+# var b = func (s: String) {
+#   return s
+# }
+# console.log(b("Identity!"))
 
 class A {
   var b: String

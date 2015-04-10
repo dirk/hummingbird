@@ -1,7 +1,7 @@
 var LLVM           = require('../../../../llvm2'),
     types          = require('../../types'),
-    NativeFunction = require('./native-function'),
     errors         = require('../../errors'),
+    NativeFunction = require('./native-function'),
     ICE            = errors.InternalCompilerError
 
 var Int8Type    = LLVM.Types.Int8Type,
@@ -10,7 +10,7 @@ var Int8Type    = LLVM.Types.Int8Type,
 var stdCoreTypesStringConcat = null
 
 function initialize (ctx) {
-  stdCoreTypesStringConcat = NativeFunction.addExternalFunction(ctx, 'Mstd_Mcore_Mtypes_Mstring_cconcat', Int8PtrType, [Int8PtrType, Int8PtrType])
+  stdCoreTypesStringConcat = NativeFunction.addExternalFunction(ctx, 'Mstd_Mcore_Mtypes_Mstring_Fconcat', Int8PtrType, [Int8PtrType, Int8PtrType])
 }
 
 function assertRexprType (rexprType, type) {
