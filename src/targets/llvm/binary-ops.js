@@ -31,30 +31,45 @@ function buildOpBuilder (opName, name) {
   }
 }
 
-function getAdditionBuilder (lexprType, rexprType) {
-  switch (lexprType.constructor) {
+function getAdditionBuilder (lt, rt) {
+  switch (lt.constructor) {
   case types.String:
-    assertRexprType(rexprType, types.String)
+    assertRexprType(rt, types.String)
     return buildCallBuilder(stdCoreTypesStringConcat, 'concat')
   // TODO: Only compile Integers!
   case types.Integer:
-    assertRexprType(rexprType, types.Integer)
+    assertRexprType(rt, types.Integer)
     return buildOpBuilder('buildAdd', 'add')
-  default:
-    var l = lexprType.inspect(),
-        o = op,
-        r = rexprType.inspect()
-    throw new ICE('Binary op not found: '+l+' '+o+' '+r)
+  }
+}
+
+function getSubtractionBuilder (lt, rt) {
+  switch (lt.constructor) {
+  case types.Integer:
+    assertRexprType(rt, types.Integer)
+    return buildOpBuilder('buildSub', 'sub')
   }
 }
 
 function getBuilder (op, lexprType, rexprType) {
-  switch (op) {
+  var ret = (function () {
+    switch (op) {
     case '+':
       return getAdditionBuilder(lexprType, rexprType)
-    default:
-      throw new ICE('Binary op builder not found: '+op)
+    case '-':
+      return getSubtractionBuilder(lexprType, rexprType)
+    // default:
+    //   throw new ICE('Binary op builder not found: '+op)
+    }
+  })()
+  // If a builder was found then return it
+  if (ret) {
+    return ret
   }
+  // Otherwise throw a compilation error
+  var l = lexprType.inspect(),
+      r = rexprType.inspect()
+  throw new ICE('Binary op not found: '+l+' '+op+' '+r)
 }
 
 module.exports = {

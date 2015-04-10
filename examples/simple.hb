@@ -1,5 +1,5 @@
 var a = 1
-var b = a + 1
+var b = a - 1
 # console.log(a)
 
 var c = "Hello "
