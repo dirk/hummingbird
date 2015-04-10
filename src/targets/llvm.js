@@ -62,7 +62,32 @@ var TypeOf            = LLVM.Library.LLVMTypeOf,
       TBuiltinConsole_mlog
 */
 
-function Context () {}
+function Context () {
+  // Externally linked functions
+  this.extern = {}
+  // Globals
+  this.globals = {}
+}
+Context.prototype.addGlobal = function (name, type) {
+  assertInstanceOf(type, Buffer)
+  var global = LLVM.Library.LLVMAddGlobal(this.module.ptr, type, name)
+  this.globals[name] = global
+  return global
+}
+Context.prototype.getGlobal = function (name) {
+  if (!this.hasGlobal(name)) { throw new Error('Global definition not found: '+name) }
+  return this.globals[name]
+}
+Context.prototype.hasGlobal = function (name) {
+  return (this.globals[name] ? true : false)
+}
+Context.prototype.buildGlobalLoad = function (name) {
+  var global = this.globals[name],
+      ptr    = this.builder.buildGEP(global, [Int32Zero], name),
+      val    = this.builder.buildLoad(ptr, name)
+  return val
+}
+
 
 function BlockContext (ctx, parentFn, block, slots) {
   this.ctx   = ctx
@@ -99,25 +124,25 @@ AST.Root.prototype.emitToFile = function (opts) {
   var outFile = bitcodeFileForSourceFile(this.file.path)
   ctx.outputs.push(outFile)
 
-  // Setup information about our compilation target
-  target.initializeTarget(ctx)
-
-  // Add the root scope to the slots map
-  var rootScope = this.scope.parent
-  if (!rootScope.isRoot) { throw new Error("Couldn't find root scope") }
-  ctx.slotsMap[rootScope.id] = ctx.globalSlots
-
   var mainType = new LLVM.FunctionType(VoidType, [], false),
       mainFunc = null
   if (opts.module) {
     mainFunc = ctx.module.addFunction(opts.module+'_init', mainType)
     ctx.moduleName = opts.module
+    // Also setup information about our compilation target
+    target.initializeTarget(ctx)
+
   } else {
     // Set up the main function
     mainFunc = ctx.module.addFunction('main', mainType)
     ctx.moduleName = false
   }
   var mainEntry = mainFunc.appendBasicBlock('entry')
+
+  // Add the root scope to the slots map
+  var rootScope = this.scope.parent
+  if (!rootScope.isRoot) { throw new Error("Couldn't find root scope") }
+  ctx.slotsMap[rootScope.id] = ctx.globalSlots
 
   // Add the builtins
   Builtins.compile(ctx, mainEntry, this)
@@ -478,25 +503,22 @@ AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
         throw new ICE('Can only handle calls as last item of module path')
       }
       assertInstanceOf(type, types.Function)
-      var global = null
+      var global = null,
+          name   = path.join('_')
       // Save the module global so that we don't recreate it every time
-      if (item.moduleGlobal) {
-        global = item.moduleGlobal
+      if (ctx.hasGlobal(name)) {
+        global = ctx.getGlobal(name)
       } else {
         // Build the path to the external function and assemble its type
-        var name = path.join('_'),
-            args = type.args.map(nativeTypeForType),
+        var args = type.args.map(nativeTypeForType),
             ret  = nativeTypeForType(type.ret)
         // Get the external function
         var fnType = new LLVM.FunctionType(ret, args, false),
             fnPtrType = LLVM.Types.pointerType(fnType.ptr)
         // Add the global to the module
-        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, fnPtrType, name)
-        // Save it for later use
-        item.moduleGlobal = global
+        global = ctx.addGlobal(name, fnPtrType)
       }
-      var fnPtr = ctx.builder.buildGEP(global, [Int32Zero], ''),
-          fn    = ctx.builder.buildLoad(fnPtr, '')
+      var fn = ctx.buildGlobalLoad(name)
       // Compile all the args into values
       var argValues = item.args.map(function (arg) {
         return arg.compileToValue(ctx, blockCtx)

@@ -15,9 +15,7 @@ var putsType = new LLVM.FunctionType(Int32Type, [Int8PtrType], false)
 // root: AST.Root node
 function compile (ctx, mainEntry, root) {
   // Setup our external "linkages"
-  ctx.extern = {
-    puts: ctx.module.addFunction('puts', putsType)
-  }
+  ctx.extern.puts = ctx.module.addFunction('puts', putsType)
 
   var topLevelScope = root.scope,
       rootScope     = topLevelScope.parent
