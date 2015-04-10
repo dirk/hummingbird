@@ -83,8 +83,8 @@ Context.prototype.hasGlobal = function (name) {
 }
 Context.prototype.buildGlobalLoad = function (name) {
   var global = this.globals[name],
-      ptr    = this.builder.buildGEP(global, [Int32Zero], name),
-      val    = this.builder.buildLoad(ptr, name)
+      // ptr = this.builder.buildGEP(global, [Int32Zero], name),
+      val    = this.builder.buildLoad(global, name)
   return val
 }
 
@@ -129,13 +129,13 @@ AST.Root.prototype.emitToFile = function (opts) {
   if (opts.module) {
     mainFunc = ctx.module.addFunction(opts.module+'_init', mainType)
     ctx.moduleName = opts.module
-    // Also setup information about our compilation target
-    target.initializeTarget(ctx)
 
   } else {
     // Set up the main function
     mainFunc = ctx.module.addFunction('main', mainType)
     ctx.moduleName = false
+    // Also setup information about our compilation target
+    target.initializeTarget(ctx)
   }
   var mainEntry = mainFunc.appendBasicBlock('entry')
 
