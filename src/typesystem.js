@@ -144,11 +144,8 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
 
 
 TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
-  assertInstanceOf(node.name,  AST.Literal, "Import expects Literal as name")
-  assertInstanceOf(parentNode, AST.Root,    "Import can only be a child of a Root")
-  if (node.name.typeName !== 'String') {
-    throw new TypeError('Import requires a String as module name', node)
-  }
+  assertInstanceOf(node.name,  String,   "Import expects String as path")
+  assertInstanceOf(parentNode, AST.Root, "Import can only be a child of a Root")
   if (!this.compiler) {
     throw new Error('Type-system not provided with current Compiler instance')
   }
@@ -158,7 +155,7 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
   // Add ourselves to the root's list of imports it contains
   parentNode.imports.push(node)
 
-  var moduleName = node.name.value
+  var moduleName = node.name
   // Preserve current file to restore after visiting the imported file
   var currentFile = this.file
   // Now ask the compiler to import the file

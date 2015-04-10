@@ -94,7 +94,7 @@ Var.prototype.toString = Let.prototype.toString
 
 
 function Import (name) {
-  this.name = name
+  this.name = new String(name)
   // Will be set to the File object when it's visited
   this.file = null
 }
