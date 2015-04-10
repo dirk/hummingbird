@@ -2,7 +2,8 @@ var fs            = require('fs'),
     path          = require('path'),
     child_process = require('child_process'),
     TypeSystem    = require('./typesystem').TypeSystem,
-    Parser        = require('./parser')
+    Parser        = require('./parser'),
+    Compiler      = require('./compiler')
 
 // Command-line arguments ----------------------------------------------------
 
@@ -59,11 +60,17 @@ if (argv._.length === 0 || argv._[0] === 'help') {
 var entryFile = argv._[0]
 
 var parser     = new Parser(),
-    typesystem = new TypeSystem()
+    typesystem = new TypeSystem(),
+    compiler   = new Compiler()
 
-var source = fs.readFileSync(entryFile).toString()
-var tree = parser.parse(source)
-typesystem.walk(tree)
+var entryDirectory = path.dirname(entryFile)
+compiler.importPath.push(entryDirectory)
+var file = compiler.compile(entryFile, {}),
+    tree = file.tree
+
+// var source = fs.readFileSync(entryFile).toString()
+// var tree = parser.parse(source)
+// typesystem.walk(tree)
 
 require('./targets/llvm')
 
