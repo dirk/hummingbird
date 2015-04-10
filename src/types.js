@@ -49,7 +49,7 @@ var Flags = {
 // Types ----------------------------------------------------------------------
 
 function Object (supertype) {
-  _super(this).call(this, supertype)
+  Object.super_.call(this, supertype)
   this.intrinsic = true
   this.primitive = false
   // Maps property names (strings) to Types
@@ -86,6 +86,15 @@ Object.prototype.addInitializer = function (initFunction) {
   this.initializers.push(initFunction)
 }
 Object.prototype.inspect = function () { return this.name }
+
+
+// Modules have no supertype
+function Module () {
+  _super(this).call(this, 'fake')
+  this.intrinsic = true
+  this.supertype = null
+}
+inherits(Module, Object)
 
 
 function Any () {
@@ -233,6 +242,7 @@ module.exports = {
   Any: Any,
   Void: Void,
   Object: Object,
+  Module: Module,
   String: String,
   Integer: Integer,
   Boolean: Boolean,

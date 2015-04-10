@@ -168,7 +168,7 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
   this.file = currentFile
   this.file.dependencies.push(importedFile)
   // Then build a module object for it
-  var module = new types.Object(this.rootObject)
+  var module = new types.Module()
   module.name = 'Module'
   var exportedNames = Object.keys(importedFile.exports)
   for (var i = exportedNames.length - 1; i >= 0; i--) {
@@ -710,6 +710,7 @@ TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
     if (!(lastStatement instanceof AST.Return)) {
       // Last statement isn't a return, so let's insert one for them
       var returnStmt = new AST.Return(null)
+      returnStmt.setPosition('(internal)', -1, -1)
       node.block.statements.push(returnStmt)
       this.visitReturn(returnStmt, functionScope, node.block)
       // Update the `isLastStatement` properties

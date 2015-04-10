@@ -40,13 +40,17 @@ function compileStatement (context, stmt, opts) {
   return stmt.compile(context, opts)
 }
 
+var InternalFile = '(internal)'
 // Return a string as a SourceNode with position information copied from the
 // given node.
 function asSourceNode (node, ret) {
   var name = node.constructor.name
-  if (!node._line)   { throw new Error('Missing line for '+name) }
-  if (!node._column) { throw new Error('Missing column for '+name) }
-  if (!node._file)   { throw new Error('Missing file for '+name) }
+  if (node._file === InternalFile) {
+    return ret
+  }
+  if (node._line === undefined)   { throw new Error('Missing line for '+name) }
+  if (node._column === undefined) { throw new Error('Missing column for '+name) }
+  if (node._file === undefined)   { throw new Error('Missing file for '+name) }
   return new SourceNode(node._line, node._column, node._file, ret)
 }
 
