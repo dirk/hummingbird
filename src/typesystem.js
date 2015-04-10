@@ -166,7 +166,7 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
   this.file.dependencies.push(importedFile)
   // Then build a module object for it
   var module = new types.Module()
-  module.name = 'Module'
+  module.name = moduleName
   var exportedNames = Object.keys(importedFile.exports)
   for (var i = exportedNames.length - 1; i >= 0; i--) {
     var name = exportedNames[i],
@@ -787,8 +787,12 @@ var know = function (node, type) {
 }
 
 TypeSystem.prototype.visitChain = function (node, scope) {
-  var self = this
-  var type = know(node, scope.get(node.name))
+  var self = this,
+      headType = know(node, scope.get(node.name))
+  // Save the type of the head
+  node.headType = headType
+  // Start at the head of the chain
+  var type = headType 
   for (var i = 0; i < node.tail.length; i++) {
     var item = node.tail[i]
     if (item instanceof AST.Call) {

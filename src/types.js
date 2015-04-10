@@ -93,6 +93,7 @@ function Module () {
   _super(this).call(this, 'fake')
   this.intrinsic = true
   this.supertype = null
+  this.name      = null
 }
 inherits(Module, Object)
 

@@ -397,6 +397,9 @@ For.prototype.print = function () {
 function Chain (name, tail) {
   this.name = name
   this.tail = tail
+  // Added by the typesystem
+  this.headType = null
+  this.type     = null
 }
 inherits(Chain, Node)
 Chain.prototype.toString = function () {
