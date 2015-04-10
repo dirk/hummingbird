@@ -54,7 +54,7 @@ var TypeOf            = LLVM.Library.LLVMTypeOf,
       A = anonymous function value
       F = named function value
       G = global value (constant)
-  
+
   Example layout of some compilation tags:
     For the `concat` function in `std.core.types.string`:
       Mstd_mcore_mtypes_mstring_fconcat
@@ -154,6 +154,11 @@ function compileBlock (ctx, block, parentFn, preStatementsCb) {
 
     var slotType  = null,
         localType = block.scope.getLocal(name)
+
+    // Not actually going to allocate slots for Modules
+    if (localType instanceof types.Module) {
+      return
+    }
     // In a fair amount of cases the type of a complex value (ie. function
     // or object instance of a type) may not yet have its type built
     // by this early slot-allocation stage. If that's the case then we enqueue
@@ -383,14 +388,55 @@ function buildPointerCastIfNecessary (ctx, value, desiredType) {
   return value
 }
 
+AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
+  // TODO: Check for modules imported into this context
+  var type = this.headType,
+      path = ['M'+type.name]
+  for (var i = 0; i < this.tail.length; i++) {
+    var item = this.tail[i]
+    switch (item.constructor) {
+    case AST.Property:
+      var propertyName = item.name,
+          propertyType = type.getTypeOfProperty(propertyName)
+      if (propertyType instanceof types.Function) {
+        // TODO: Handle calls
+        path.push('F'+propertyName)
+      }
+      type = propertyType
+      break
+    case AST.Call:
+      var isLastItem = (i === (this.tail.length - 1))
+      if (!isLastItem) {
+        throw new ICE('Can only handle calls as last item of module path')
+      }
+      assertInstanceOf(type, types.Function)
+      // Build the path to the external function and assemble its type
+      var name = path.join('_'),
+          args = type.args.map(nativeTypeForType),
+          ret  = nativeTypeForType(type.ret)
+      // Get the external function
+      var externalFn = NativeFunction.addExternalFunction(ctx, name, ret, args)
+      // Compile all the args into values
+      var argValues = item.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+      return ctx.builder.buildCall(externalFn, argValues, '')
+    }
+  }
+  throw new ICE('Unreachable point in compiling a module path')
+}
+
 AST.Chain.prototype.compileToValue = function (ctx, blockCtx) {
+  var headType = this.headType
+  if (headType instanceof types.Module) {
+    return this.compileModulePathToValue(ctx, blockCtx)
+  }
   var slots, itemValue, itemType;
   // Look up the Slots for the scope that the head of our chain belongs to
   var pair  = getTypeAndSlotsForName(ctx, blockCtx, this.name),
   slots     = pair[0]
   itemType  = pair[1]
   itemValue = slots.buildGet(ctx, this.name)
-
   // Handle the tail
   for (var i = 0; i < this.tail.length; i++) {
     var item = this.tail[i]
