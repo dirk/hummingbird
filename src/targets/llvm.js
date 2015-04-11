@@ -106,7 +106,9 @@ AST.Node.prototype.compileToValue = function () {
 
 AST.Root.prototype.emitToFile = function (opts) {
   var ctx = new Context()
-  ctx.module       = new LLVM.Module('test')
+  ctx.isMain       = (opts.module ? true : false)
+  ctx.moduleName   = (opts.module ? opts.module : 'main')
+  ctx.module       = new LLVM.Module(ctx.moduleName)
   ctx.builder      = new LLVM.Builder()
   ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
   ctx.funcs        = {}
@@ -126,14 +128,11 @@ AST.Root.prototype.emitToFile = function (opts) {
 
   var mainType = new LLVM.FunctionType(VoidType, [], false),
       mainFunc = null
-  if (opts.module) {
+  if (ctx.isMain) {
     mainFunc = ctx.module.addFunction(opts.module+'_init', mainType)
-    ctx.moduleName = opts.module
-
   } else {
     // Set up the main function
     mainFunc = ctx.module.addFunction('main', mainType)
-    ctx.moduleName = false
     // Also setup information about our compilation target
     target.initializeTarget(ctx)
   }
@@ -166,6 +165,7 @@ AST.Root.prototype.emitToFile = function (opts) {
   LLVM.Library.LLVMVerifyModule(ctx.module.ptr, LLVM.Library.LLVMAbortProcessAction, errPtr)
 
   ctx.module.writeBitcodeToFile(outFile)
+  ctx.logger.info('Wrote bitcode to file: '+outFile)
 }
 
 AST.Root.prototype.buildMain = function (ctx, mainFunc, mainEntry) {

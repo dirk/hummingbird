@@ -60,12 +60,11 @@ if (argv._.length === 0 || argv._[0] === 'help') {
 var entryFile = argv._[0]
 
 var parser     = new Parser(),
-    typesystem = new TypeSystem(),
     compiler   = new Compiler()
 
 var entryDirectory = path.dirname(entryFile)
 compiler.importPath.push(entryDirectory)
-var file = compiler.compile(entryFile, {}),
+var file = compiler.compile(entryFile, {isEntry: true}),
     tree = file.tree
 
 // var source = fs.readFileSync(entryFile).toString()

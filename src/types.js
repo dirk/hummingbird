@@ -89,13 +89,26 @@ Object.prototype.inspect = function () { return this.name }
 
 
 // Modules have no supertype
-function Module () {
+function Module (name) {
   _super(this).call(this, 'fake')
   this.intrinsic = true
   this.supertype = null
-  this.name      = null
+  this.name      = (name ? name : null)
+  // Parent module (if present)
+  this.parent    = null
 }
 inherits(Module, Object)
+Module.prototype.setParent = function (parent) {
+  if (!(parent instanceof Module)) {
+    throw new TypeError('Expected parent to be a Module')
+  }
+  this.parent = parent
+}
+Module.prototype.addChild = function (child) {
+  var childName = child.name
+  this.setTypeOfProperty(childName, child)
+}
+Module.prototype.inspect = function () { return '.'+this.name }
 
 
 function Any () {
