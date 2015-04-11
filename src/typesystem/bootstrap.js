@@ -7,10 +7,13 @@ module.exports = function (TypeSystem) {
     var rootObject = new types.Object('fake')
     rootObject.supertype = null
     rootObject.isRoot    = true
+
     // Setup the basic intrinsic types (Any, Object, Integer, etc.)
     this.bootstrapIntrinsicTypes(rootObject)
     // Set up our built-ins
+    this.bootstrapStd()
     this.bootstrapConsole(rootObject)
+
     // Expose rootObject to later functions
     this.rootObject = rootObject
   }// bootstrap()
@@ -37,6 +40,19 @@ module.exports = function (TypeSystem) {
     // Create a faux instance of the console and add it to the root scope
     var consoleInstance = new types.Instance(consoleType)
     this.root.setLocal('console', consoleInstance)
+  }
+
+  TypeSystem.prototype.bootstrapStd = function () {
+    var std = new types.Module('std')
+    this.root.setLocal('std', std)
+    
+    var core = new types.Module('core')
+    core.setParent(std)
+    std.addChild(core)
+
+    var typs = new types.Module('types')
+    typs.setParent(core)
+    core.addChild(typs)
   }
 
 }// module.exports
