@@ -18,11 +18,24 @@ function NativeFunction (name, args, ret) {
 }
 NativeFunction.prototype.computeType = function () {
   var args  = this.args.map(nativeTypeForType)
-  var ret   = nativeTypeForType(this.ret)
+  if (this.ret instanceof types.Instance) {
+    throw new ICE('Expected return type to be plain type; got instance')
+  }
+  var ret = null
+  // Bit of a hack, but we need to wrap the return as an pointer
+  // (ie. instance), however if the return is Void then we just
+  // use the plain Void type.
+  if (this.ret instanceof types.Void) {
+    ret = nativeTypeForType(this.ret)
+  } else {
+    ret = nativeTypeForType(new types.Instance(this.ret))
+  }
   this.type = new LLVM.FunctionType(ret, args, false)
 }
 NativeFunction.prototype.defineBody = function (ctx, cb) {
-  this.computeType()
+  if (!this.type) {
+    this.computeType()
+  }
   this.fn = ctx.module.addFunction(this.name, this.type)
   // Get the previous entry so we can restore it
   var builderPtr    = ctx.builder.ptr,

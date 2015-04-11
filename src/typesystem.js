@@ -387,7 +387,7 @@ TypeSystem.prototype.visitReturn = function (node, scope, parentNode) {
     }
     // The expression should return an instance, we'll have to unbox that
     assertInstanceOf(exprType, types.Instance, 'Expected Instance as argument to Return')
-    parentNode.returnType = exprType ? exprType.type : null
+    parentNode.returnType = exprType.type
   }
 }
 
@@ -692,11 +692,12 @@ TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
     throw new TypeError('Too many return types (have '+t+')', node)
   }
   // Final return type
-  var returnType;
+  var returnType, isReturningVoid = false;
   if (reducedTypes.length > 0) {
     returnType = reducedTypes[0]
   } else {
-    returnType = this.root.getLocal('Void')
+    isReturningVoid = true
+    returnType      = this.root.getLocal('Void')
   }
   // Update the type definition (if there we 0 then it will be null which is
   // Void in the type-system)
@@ -704,9 +705,9 @@ TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
 
   // If we know we're returning Void then check for a missing final return
   // and insert it to help the user out.
-  if (type.ret instanceof types.Void) {
+  if (isReturningVoid) {
     var lastStatement = node.block.statements[node.block.statements.length - 1]
-    if (!(lastStatement instanceof AST.Return)) {
+    if (lastStatement && !(lastStatement instanceof AST.Return)) {
       // Last statement isn't a return, so let's insert one for them
       var returnStmt = new AST.Return(null)
       returnStmt.setPosition('(internal)', -1, -1)
