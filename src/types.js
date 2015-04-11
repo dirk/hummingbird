@@ -108,6 +108,10 @@ Module.prototype.addChild = function (child) {
   var childName = child.name
   this.setTypeOfProperty(childName, child)
 }
+Module.prototype.getNativeName = function () {
+  // TODO: Incorporate parents
+  return 'M'+this.name
+}
 Module.prototype.inspect = function () { return '.'+this.name }
 
 

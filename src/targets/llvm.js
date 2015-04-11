@@ -105,10 +105,13 @@ AST.Node.prototype.compileToValue = function () {
 }
 
 AST.Root.prototype.emitToFile = function (opts) {
+  if (opts.module) {
+    assertInstanceOf(opts.module, types.Module)
+  }
   var ctx = new Context()
   ctx.isMain       = (opts.module ? true : false)
-  ctx.moduleName   = (opts.module ? opts.module : 'main')
-  ctx.module       = new LLVM.Module(ctx.moduleName)
+  ctx.targetModule = (opts.module ? opts.module : null)
+  ctx.module       = new LLVM.Module(ctx.targetModule ? ctx.targetModule.getNativeName() : 'main')
   ctx.builder      = new LLVM.Builder()
   ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
   ctx.funcs        = {}
@@ -129,7 +132,8 @@ AST.Root.prototype.emitToFile = function (opts) {
   var mainType = new LLVM.FunctionType(VoidType, [], false),
       mainFunc = null
   if (ctx.isMain) {
-    mainFunc = ctx.module.addFunction(opts.module+'_init', mainType)
+    var initName = ctx.targetModule.getNativeName()+'_init'
+    mainFunc = ctx.module.addFunction(initName, mainType)
   } else {
     // Set up the main function
     mainFunc = ctx.module.addFunction('main', mainType)
@@ -438,10 +442,10 @@ function bitcodeFileForSourceFile (path) {
 
 AST.Import.prototype.compile = function (ctx, blockCtx) {
   var moduleRoot = this.file.tree,
-      nativeName = 'M'+this.name,
+      nativeName = this.file.module.getNativeName(),
       outFile    = bitcodeFileForSourceFile(this.file.path)
   moduleRoot.emitToFile({
-    module: nativeName,
+    module: this.file.module,
     logger: ctx.logger,
     outputs: ctx.outputs
   })
@@ -453,10 +457,10 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
 }
 
 AST.Export.prototype.compile = function (ctx, blockCtx) {
-  if (!ctx.moduleName) {
-    throw new ICE('Missing module name')
+  if (!ctx.targetModule) {
+    throw new ICE('Missing target module')
   }
-  var path = [ctx.moduleName],
+  var path = [ctx.targetModule.getNativeName()],
       name = this.name,
       type = this.type
   switch (type.constructor) {
