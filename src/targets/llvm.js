@@ -686,7 +686,8 @@ var nativeFunctionCounter = 1
 
 AST.Function.prototype.compileToValue = function (ctx, block) {
   var self     = this,
-      name     = "A"+(nativeFunctionCounter++),
+      prefix   = (ctx.targetModule ? ctx.targetModule.getNativeName()+'_' : ''),
+      name     = prefix+'A'+(nativeFunctionCounter++),
       instance = this.type,
       type     = instance.type
   // Unbox the instance
