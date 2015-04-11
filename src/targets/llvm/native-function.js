@@ -35,6 +35,9 @@ NativeFunction.prototype.defineBody = function (ctx, cb) {
   // Restore the previous entry point
   ctx.builder.positionAtEnd(previousEntry)
 }
+NativeFunction.prototype.getPtr = function () {
+  return this.fn.ptr
+}
 
 types.Function.prototype.setNativeFunction = function (nf) {
   this.nativeFunction = nf

@@ -405,7 +405,7 @@ AST.Chain.prototype.compileInstanceMethodCall = function (ctx, blockCtx, receive
   args.unshift(receiver)
   var nativeFunction = instanceMethod.getNativeFunction()
   // Build the actual call to the instance method
-  var returnValue = ctx.builder.buildCall(nativeFunction.fn.ptr, args, ''),
+  var returnValue = ctx.builder.buildCall(nativeFunction.getPtr(), args, ''),
       returnType  = new types.Instance(instanceMethod.ret)
   return [returnType, returnValue]
 }
@@ -466,7 +466,7 @@ AST.Export.prototype.compile = function (ctx, blockCtx) {
       // Create a global value with that name
       var value    = blockCtx.slots.buildGet(ctx, this.name),
           nativeFn = type.getNativeFunction(),
-          nativeTy = TypeOf(nativeFn.fn.ptr),
+          nativeTy = TypeOf(nativeFn.getPtr()),
           global   = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, nativeTy, exportName)
       // Set it to externally link and initialize it to null
       LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
@@ -632,7 +632,7 @@ function genericCompileFunction (ctx, nativeFn, node) {
       if (hasThisArg) {
         argOffset = 1
         // `this` will be the first argument
-        var thisValue = GetParam(nativeFn.fn.ptr, 0)
+        var thisValue = GetParam(nativeFn.getPtr(), 0)
         // Store `this` in the slots
         slots.buildSet(ctx, 'this', thisValue)
       }
@@ -641,7 +641,7 @@ function genericCompileFunction (ctx, nativeFn, node) {
       for (var i = 0; i < args.length; i++) {
         var arg      = args[i],
             argName  = arg.name,
-            argValue = GetParam(nativeFn.fn.ptr, i + argOffset)
+            argValue = GetParam(nativeFn.getPtr(), i + argOffset)
         // Store the argument value in the slot
         slots.buildSet(ctx, argName, argValue)
       }
@@ -694,7 +694,7 @@ AST.Function.prototype.compileToValue = function (ctx, block) {
   // Save the native function on the type
   type.setNativeFunction(fn)
   // Get the raw function as a value
-  var compiledFn = fn.fn.ptr
+  var compiledFn = fn.getPtr()
   return compiledFn
 }
 
@@ -836,7 +836,7 @@ AST.New.prototype.compileToValue = function (ctx, blockCtx) {
   // var objPtr = ctx.builder.buildAlloca(nativeObject.structType, nativeObject.type.name)
 
   // Call the initializer function on the object
-  var initFn = init.fn.ptr
+  var initFn = init.getPtr()
   argValues.unshift(objPtr)
   ctx.builder.buildCall(initFn, argValues, '')
   // Return the pointer to the actual object
