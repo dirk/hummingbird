@@ -624,9 +624,36 @@ AST.Return.prototype.compile = function (ctx, blockCtx) {
   }
 }
 
+// Recursively predefine types that need definition before compilation can
+// begin properly. Right now this only deals with on anonymous functions.
+// TODO: Make this properly recurse.
+function predefineTypes (ctx, block) {
+  block.statements.forEach(function (stmt) {
+    switch (stmt.constructor) {
+      case AST.Assignment:
+        if (stmt.type !== 'var' && stmt.type !== 'let') {
+          return
+        }
+        if (stmt.rvalue instanceof AST.Function) {
+          var rvalueInstanceType = stmt.rvalue.type,
+              rvalueType         = rvalueInstanceType.type
+          // If the native function hasn't been typed
+          if (!rvalueType.hasNativeFunction()) {
+            var fn = stmt.rvalue.getAnonymousNativeFunction(ctx)
+            fn.computeType()
+          }
+        }
+        break
+    }
+  })
+}
+
 function genericCompileFunction (ctx, nativeFn, node) {
   var hasThisArg = (node instanceof AST.Init),
       block      = node.block
+  // Predefine to be safe
+  predefineTypes(ctx, block)
+
   nativeFn.defineBody(ctx, function (entry) {
     // Actual LLVM function that we're compiling for
     var fnPtr = nativeFn.fn
@@ -684,20 +711,35 @@ function genericCompileFunction (ctx, nativeFn, node) {
 
 var nativeFunctionCounter = 1
 
-AST.Function.prototype.compileToValue = function (ctx, block) {
-  var self     = this,
-      prefix   = (ctx.targetModule ? ctx.targetModule.getNativeName()+'_' : ''),
-      name     = prefix+'A'+(nativeFunctionCounter++),
-      instance = this.type,
-      type     = instance.type
-  // Unbox the instance
-  var args = type.args,
-      ret  = type.ret
-  // Setup the native function
-  var fn = new NativeFunction(name, args, ret)
+AST.Function.prototype.getAnonymousNativeFunction = function (ctx) {
+  if (this.name) {
+    throw new ICE('Trying to set up named function as anonymous native function')
+  }
+  assertInstanceOf(this.type, types.Instance)
+
+  var instance = this.type,
+      type     = instance.type,
+      fn       = null
+  // Check if the native function has already been set up
+  if (type.hasNativeFunction()) {
+    fn = type.getNativeFunction()
+  } else {
+    var prefix = (ctx.targetModule ? ctx.targetModule.getNativeName()+'_' : ''),
+        name   = prefix+'A'+(nativeFunctionCounter++),
+        args   = type.args,
+        ret    = type.ret
+    // Setup the native function
+    fn = new NativeFunction(name, args, ret)
+    // Save the native function on the type
+    type.setNativeFunction(fn)
+  }
+  return fn
+}
+
+AST.Function.prototype.compileToValue = function (ctx, blockCtx) {
+  var self = this,
+      fn   = this.getAnonymousNativeFunction(ctx)
   genericCompileFunction(ctx, fn, this)
-  // Save the native function on the type
-  type.setNativeFunction(fn)
   // Get the raw function as a value
   var compiledFn = fn.getPtr()
   return compiledFn
