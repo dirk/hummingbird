@@ -136,6 +136,12 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
     case AST.Export:
       this.visitExport(node, scope, parentNode)
       break
+    case AST.Property:
+      this.visitProperty(node, scope, parentNode)
+      break
+    case AST.Call:
+      this.visitCall(node, scope)
+      break
     default:
       throw new TypeError("Don't know how to visit: "+node.constructor.name, node)
       break
@@ -276,7 +282,6 @@ TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
         stmt.type = initType
         break
       default:
-        console.log(stmt)
         throw new TypeError("Don't know how to visit '"+stmt.constructor.name+"' in class definition")
         break
     }
@@ -401,7 +406,7 @@ TypeSystem.prototype.visitPath = function (node, scope) {
   // Now revise that type according to the path
   path.path.forEach(function (item) {
     switch (item.constructor) {
-      case AST.Property:
+      case AST.Identifier:
         if (!(lvalueType instanceof types.Instance)) {
           throw new TypeError('Cannot get property of non-Instance', item)
         }
@@ -535,8 +540,17 @@ TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
     case AST.New:
       this.visitNew(node, scope)
       break
+    case AST.Identifier:
+      this.visitIdentifier(node, scope)
+      break
+    case AST.Property:
+      this.visitProperty(node, scope)
+      break
+    case AST.Call:
+      this.visitCall(node, scope)
+      break
     default:
-      throw new Error("Can't walk: "+node.constructor.name)
+      throw new Error("Can't visit expression: "+node.constructor.name)
   }
 }
 
@@ -788,13 +802,89 @@ var know = function (node, type) {
   return type
 }
 
+function parentTypeLooup (node, scope, name) {
+  if (node.parent === null) {
+    return scope.get(name)
+  } else {
+    return node.parent.startingType
+  }
+}
+
+TypeSystem.prototype.visitIdentifier = function (node, scope) {
+  if (node.parent) {
+    // throw new TypeError("Identifier cannot have a parent", node)
+    node.type = this.getTypeOfTypesProperty(node.parent.baseType, node.name)
+  } else {
+    node.type = scope.get(node.name)
+  }
+}
+
+TypeSystem.prototype.visitProperty = function (node, scope, parentNode) {
+  this.visitExpression(node.base, scope)
+  node.baseType = node.base.type
+
+  var property = node.property
+  // Set the parent on the child property and visit it
+  property.parent = node
+
+  if (typeof property === 'string') {
+    throw new Error('Unreachable')
+    // If it's just basic string then look up the property on ourselves
+    var propertyType = this.getTypeOfTypesProperty(node.baseType, property)
+    node.type = propertyType
+
+  } else {
+    // Otherwise visit the property as a full expression
+    this.visitExpression(property, scope)
+    // Update from the child's type
+    node.type = property.type
+  }
+}
+
+TypeSystem.prototype.visitCall = function (node, scope) {
+  // Make our base identifier point to our parent so it will resolve correctly
+  // when we visit it
+  node.base.parent = node.parent
+  this.visitExpression(node.base, scope)
+  node.baseType = node.base.type
+
+  assertInstanceOf(node.baseType, types.Instance, 'Expected Instance for base type of Call')
+  var functionType = node.baseType.type
+  assertInstanceOf(functionType, types.Function, 'Expected Function for unboxed type')
+
+  var args     = node.args,
+      typeArgs = functionType.args
+  // Basic length check
+  if (args.length !== typeArgs.length) {
+    throw new TypeError("Argument length mismatch, expected: "+typeArgs.length+", got: "+args.length)
+  }
+  // Item-wise compare the arguments (given) with the parameters (expected)
+  for (var i = 0; i < typeArgs.length; i++) {
+    var arg = args[i]
+    this.visitExpression(arg, scope)
+    // Get the type of the argument (from the caller) and the parameter (from
+    // the function's definition).
+    var argTy = arg.type,
+        parTy = typeArgs[i]
+    assertInstanceOf(argTy, types.Instance, "Expected Instance as function argument, got: "+argTy.inspect)
+    // Unbox the instance
+    argTy = argTy.type
+    if (!parTy.equals(argTy)) {
+      var e = parTy.inspect(),
+          g = argTy.inspect()
+      throw new TypeError("Argument type mismatch at parameter "+(i+1)+", expected: "+e+", got: "+g)
+    }
+  }
+  node.type = new types.Instance(functionType.ret)
+}
+
 TypeSystem.prototype.visitChain = function (node, scope) {
   var self = this,
       headType = know(node, scope.get(node.name))
   // Save the type of the head
   node.headType = headType
   // Start at the head of the chain
-  var type = headType 
+  var type = headType
   for (var i = 0; i < node.tail.length; i++) {
     var item = node.tail[i]
     if (item instanceof AST.Call) {

@@ -46,12 +46,16 @@
   p.parseChain = function (name, tail) { return [name, tail] }
   p.parseAssignment = function (path, op, expr) { return [path, op, expr] }
   p.parseReturn = function (expr) { return [expr] }
-  p.parseCall = function (expr) { return [expr] }
+  p.parseCall = function (base, call) { return [base, call] }
+  p.parseCallArgs = function (args) { return args }
+  p.parseProperty = function (base, property) { return [base, property] }
+  p.parseIndexer = function (base, indexer) { return [base, indexer] }
+
   p.parsePath = function (name, path) { return [name, path] }
+  p.parsePathProperty = function (name) { return [name] }
   p.parseNameType = function (name) { return [name] }
   p.parseFunctionType = function (args, ret) { return [args, ret] }
   p.parseMutli = function (name, args, ret) { return [name, args, ret] }
-  p.parseProperty = function (name) { return [name] }
 
   if (typeof require !== 'undefined') {
     require('./parser-extension')(p)
@@ -120,9 +124,9 @@ assgop = "="
        / "+="
 
 // Path assignment of existing variables and their indexes/properties
-path = n:name path:(indexer / property)* { return p.parsePath(n, path) }
+path = n:name path:(indexer / pathproperty)* { return p.parsePath(n, path) }
 indexer = "[" _ expr _ "]"
-property = "." n:name { return pos(p.parseProperty(n)) }
+pathproperty = "." n:name { return pos(p.parsePathProperty(n)) }
 
 multistmt = "multi" whitespace n:name _ a:args _ r:ret? { return pos(p.parseMutli(n, a, r)) }
 
@@ -132,20 +136,27 @@ expr = binaryexpr
 binaryexpr = le:unaryexpr _ op:binaryop _ re:binaryexpr { return pos(p.parseBinary(le, op, re)) }
            / unaryexpr
 
+unaryexpr = "!" m:memberexpr { return m }
+          / memberexpr
 
-unaryexpr = "!" e:groupexpr { return e }
-          / groupexpr
+memberexpr = b:basicexpr c:callexpr     { return pos(p.parseCall(b, c)) }
+           / b:basicexpr e:propertyexpr { return pos(p.parseProperty(b, e)) }
+           / b:basicexpr i:indexerexpr  { return pos(p.parseIndexer(b, i)) }
+           / b:basicexpr                { return b }
 
-groupexpr = "(" e:expr ")" { return e }
-          / basicexpr
+callexpr      = "(" _ args:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseCallArgs(args ? transformArgs(args) : [])) }
+propertyexpr = "." m:memberexpr { return m }
+indexerexpr  = indexer
 
-basicexpr = funcexpr
+basicexpr = "(" e:expr ")" { return e }
+          / funcexpr
           / newexpr
+          / identifierexpr
           / literalexpr
-          / chainexpr
 
-chainexpr = n:name t:(indexer / property / call)* { return pos(p.parseChain(n, t)) }
-call = "(" _ args:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseCall(args ? transformArgs(args) : [])) }
+identifierexpr = n:name { return pos(p.parseIdentifier(n)) }
+
+// chainexpr = n:name t:(indexer / property / call)* { return pos(p.parseChain(n, t)) }
 
 newexpr = "new" whitespace n:name _ "(" _ a:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseNew(n, a ? transformArgs(a) : [])) }
 

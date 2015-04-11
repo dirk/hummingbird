@@ -75,7 +75,10 @@ describe('System', function () {
       })
       it('should produce an expected result', function () {
         var extended = source+"return a.c(1)\n",
-            tree     = parseAndWalk(extended),
+            tree     = parseAndWalk(extended)
+              console.log(tree.compile())
+
+          
             result   = runCompiledCode(tree)
         expect(result).to.eql(3)
       })
@@ -83,13 +86,13 @@ describe('System', function () {
         var extended = source+"a.c(1, 2)\n"
         expect(function () {
           parseAndWalk(extended)
-        }).to.throwException(/Wrong number of arguments/)
+        }).to.throwException(/Argument length mismatch/)
       })
       it('should fail on parsing mismatched argument types', function () {
         var extended = source+"a.c(\"1\")\n"
         expect(function () {
           parseAndWalk(extended)
-        }).to.throwException(/Argument mismatch/)
+        }).to.throwException(/Argument type mismatch/)
       })
     })
 

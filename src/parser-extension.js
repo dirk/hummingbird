@@ -98,16 +98,24 @@ module.exports = function (p) {
     return new AST.Return(expr)
   }
 
-  p.parseCall = function (expr) {
-    return new AST.Call(expr)
+  p.parseCall = function (base, call) {
+    return new AST.Call(base, call)
   }
 
-  p.parseProperty = function (name) {
-    return new AST.Property(name)
+  p.parseProperty = function (base, property) {
+    return new AST.Property(base, property)
+  }
+
+  p.parseIdentifier = function (name) {
+    return new AST.Identifier(name)
   }
 
   p.parsePath = function (name, path) {
     return new AST.Path(name, path)
+  }
+
+  p.parsePathProperty = function (name) {
+    return new AST.Identifier(name)
   }
 
   p.parseFunctionType = function (args, ret) {

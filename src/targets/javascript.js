@@ -197,8 +197,8 @@ AST.Export.prototype.compile = function (context, opts) {
 
 
 AST.Binary.prototype.compile = function (context, opts) {
-  var lexpr = this.lexpr.compile(context)
-  var rexpr = this.rexpr.compile(context)
+  var lexpr = this.lexpr.compile(context, {omitTerminator: true})
+  var rexpr = this.rexpr.compile(context, {omitTerminator: true})
   var ret   = [lexpr, ' '+this.op+' ', rexpr]
   if (opts && opts.statement === true) { ret.push(";\n") }
   return asSourceNode(this, ret)
@@ -215,11 +215,12 @@ AST.Assignment.prototype.compile = function (context, opts) {
   var term = ";\n",
       ret  = null
   if (opts && opts.omitTerminator === true) { term = '' }
+
   if (this.type === 'var' || this.type === 'let') {
     // TODO: Register name in context scope and check for conflicts.
     var lvalue = this.lvalue.name
     if (this.rvalue !== false) {
-      var rvalue = this.rvalue.compile(context)
+      var rvalue = this.rvalue.compile(context, {omitTerminator: true})
       ret = ['var ', lvalue, ' '+this.op+' ', rvalue, term]
     } else {
       ret = ['var ', lvalue, term]
@@ -229,9 +230,9 @@ AST.Assignment.prototype.compile = function (context, opts) {
     // throw new Error('Compilation of path-assignments not yet implemented')
     var lvalue = this.lvalue.name
     this.lvalue.path.forEach(function (item) {
-      lvalue += item.compile(context)
+      lvalue += '.'+item.compile(context)
     })
-    var rvalue = this.rvalue.compile(context)
+    var rvalue = this.rvalue.compile(context, {omitTerminator: true})
     ret = [lvalue, ' '+this.op+' ', rvalue, term]
   }
   return asSourceNode(this, ret)
@@ -459,12 +460,15 @@ AST.New.prototype.compile = function (context) {
   return asSourceNode(this, ret)
 }
 
+AST.Identifier.prototype.compile = function (context, opts) {
+  return asSourceNode(this, this.name)
+}
 
-AST.Call.prototype.compile = function (context) {
+AST.Call.prototype.compile = function (context, opts) {
   var args = this.args.map(function (arg) {
     return arg.compile(context)
   })
-  var ret = ['(']
+  var ret = [this.base.compile(context), '(']
   var length = args.length, lastIndex = args.length - 1
   for (var i = 0; i < length; i++) {
     ret.push(args[i])
@@ -473,11 +477,20 @@ AST.Call.prototype.compile = function (context) {
     }
   }
   ret.push(')')
+  if (!opts || opts.omitTerminator !== true) { ret.push(";\n") }
   return asSourceNode(this, ret)
 }
 
-AST.Property.prototype.compile = function (context) {
-  return asSourceNode(this, '.'+this.name)
+AST.Property.prototype.compile = function (context, opts) {
+  var term = ";\n"
+  if (opts && opts.omitTerminator === true) { term = '' }
+
+  var property = this.property
+  if (typeof property !== 'string') {
+    property = this.property.compile(context, {omitTerminator: true})
+  }
+  var ret = [this.base.compile(context), '.' , property, term]
+  return asSourceNode(this, ret)
 }
 
 AST.If.prototype.compile = function (context) {
