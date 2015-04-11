@@ -3,7 +3,8 @@ var LLVM  = require('../../../../llvm2'),
 
 var Int64Type   = LLVM.Types.Int64Type,
     Int8Type    = LLVM.Types.Int8Type,
-    Int8PtrType = LLVM.Types.pointerType(Int8Type)
+    Int8PtrType = LLVM.Types.pointerType(Int8Type),
+    IntNE       = LLVM.Library.LLVMIntNE
 
 function isLastInstructionTerminator (bb) {
   var lastInstr = LLVM.Library.LLVMGetLastInstruction(bb)
@@ -35,10 +36,10 @@ function compileTruthyTest (ctx, blockCtx, expr) {
   case types.String:
     var nullStringPtr = LLVM.Library.LLVMConstNull(Int8PtrType)
     // Compare the string pointer to the NULL pointer
-    return ctx.builder.buildICmp(LLVM.Library.LLVMIntNE, value, nullStringPtr, '')
+    return ctx.builder.buildICmp(IntNE, value, nullStringPtr, '')
   case types.Integer:
     var zeroInteger = LLVM.Library.LLVMConstInt(Int64Type, 0, true)
-    return ctx.builder.buildICmp(LLVM.Library.LLVMIntNE, value, zeroInteger, '')
+    return ctx.builder.buildICmp(IntNE, value, zeroInteger, '')
   default:
     throw new ICE('Cannot compile to truthy-testable value: '+type.constructor.name)
   }
