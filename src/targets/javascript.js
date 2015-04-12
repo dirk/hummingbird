@@ -466,7 +466,7 @@ AST.Identifier.prototype.compile = function (context, opts) {
 
 AST.Call.prototype.compile = function (context, opts) {
   var args = this.args.map(function (arg) {
-    return arg.compile(context)
+    return arg.compile(context, {omitTerminator: true})
   })
   var ret = [this.base.compile(context), '(']
   var length = args.length, lastIndex = args.length - 1

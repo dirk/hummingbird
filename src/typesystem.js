@@ -422,6 +422,8 @@ TypeSystem.prototype.visitPath = function (node, scope) {
         if (type.hasPropertyFlag(propertyName, types.Flags.ReadOnly)) {
           throw new TypeError('Trying to assign to read-only property: '+propertyName, node)
         }
+        // Set the type that is going to be returned at this stage on the item
+        item.type = lvalueType
         break
       default:
         throw new TypeError('Cannot handle item in path of type: '+item.constructor.name, node)
