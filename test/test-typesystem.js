@@ -2,10 +2,12 @@
 var helper = require('./helper'),
     expect = require('expect.js')
 
-var AST        = require('../lib/ast'),
-    types      = require('../lib/types'),
-    TypeSystem = require('../lib/typesystem').TypeSystem,
-    Scope      = require('../lib/typesystem/scope')
+var AST          = require('../src/ast'),
+    types        = require('../src/types'),
+    TypeSystem   = require('../src/typesystem').TypeSystem,
+    scope        = require('../src/typesystem/scope'),
+    Scope        = scope.Scope,
+    ClosingScope = scope.ClosingScope
 
 describe('Type-system', function () {
   var rootObject = new types.Object('fake')
@@ -51,13 +53,13 @@ describe('Type-system', function () {
 
 describe('Scope', function () {
   var scope  = new Scope(),
-      Number = new types.Number('fake')
+      Integer = new types.Integer('fake')
   it('should set a variable', function () {
-    scope.setLocal('Number', Number)
+    scope.setLocal('Integer', Integer)
   })
   it('should fail when re-setting a variable', function () {
     expect(function () {
-      scope.setLocal('Number', Number)
+      scope.setLocal('Integer', Integer)
     }).to.throwException(/Can't redefine local/)
   })
   it('should fail when finding a missing local', function () {

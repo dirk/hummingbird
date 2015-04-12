@@ -1,7 +1,8 @@
 var fs   = require('fs'),
     path = require('path')
 
-var TypeSystem = require('./typesystem').TypeSystem,
+var types      = require('./types'),
+    TypeSystem = require('./typesystem').TypeSystem,
     Parser     = require('./parser'),
     AST        = require('./ast')
 
@@ -10,6 +11,9 @@ function File (path, sourceCode, compiler) {
   this.code     = sourceCode
   this.compiler = compiler ? compiler : null
   this.tree     = null
+  // For the main/entry file this will be null, otherwise it will be a
+  // types.Module for the module this file represents.
+  this.module   = null
   // Imported and exported bindings of the file
   this.imports = {}
   this.exports = {}
@@ -33,6 +37,12 @@ Compiler.prototype.compile = function (filePath, opts) {
   var file = new File(filePath, source, this)
   if (opts.isEntry) {
     this.entryFile = file
+  }
+  if (opts.module) {
+    if (opts.isEntry) {
+      throw new Error('File cannot be both an entry point and a module')
+    }
+    file.module = opts.module
   }
   // Tell the file to compile itself
   if (file.tree) {
@@ -59,16 +69,31 @@ Compiler.prototype.walkFile = function (file) {
 }
 
 Compiler.prototype.importFileByName = function (fileName) {
+  var foundFilePath   = null,
+      foundImportPath = null
   // console.log('importFileByName: '+fileName)
   for (var i = 0; i < this.importPath.length; i++) {
     var p = this.importPath[i]
     var filePath = path.join(p, fileName+'.hb')
     if (fs.existsSync(filePath)) {
-      var file = this.compile(filePath)
-      return file
+      foundFilePath   = filePath
+      foundImportPath = p
+      break
     }// if
   }// for
-  throw new Error('File not found: '+fileName)
+  if (!foundFilePath) {
+    throw new Error('File not found: '+fileName)
+  }
+  var relativeName = path.relative(foundImportPath, foundFilePath)
+  // TODO: Actually do some handling with the relative name. Also use the import
+  //       path and all that jazz.
+  var moduleName = relativeName.replace(/\.hb$/i, '')
+  if (/[^A-Za-z0-9_-]/.test(moduleName)) {
+    throw new Error('Cannot handle module name: '+moduleName)
+  }
+  var mod  = new types.Module(moduleName),
+      file = this.compile(foundFilePath, {module: mod})
+  return file
 }
 
 module.exports = Compiler

@@ -52,8 +52,8 @@ module.exports = function (p) {
   }
 
   p.parseInteger = function (integerString) {
-    // var type = new types.Number() // TODO: Look up from type-system
-    var typeName = 'Number'
+    // var type = new types.Integer() // TODO: Look up from type-system
+    var typeName = 'Integer'
     return new AST.Literal(parseInt(integerString, 10), typeName)
   }
   p.parseString = function (string) {

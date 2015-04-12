@@ -2,7 +2,7 @@
 var helper = require('./helper'),
     expect = require('expect.js')
 
-var types = require('../lib/types')
+var types = require('../src/types')
 
 describe('Types', function () {
   var rootObject = new types.Object('fake')
@@ -22,28 +22,28 @@ describe('Types', function () {
         var type = object.getTypeOfProperty('missing')
       }).to.throwException()
     })
-    var Number = new types.Number(rootObject)
+    var Integer = new types.Integer(rootObject)
     it('should create a property', function () {
-      object.setTypeOfProperty('present', Number)
+      object.setTypeOfProperty('present', Integer)
     })
     it('should get that property', function () {
       var type = object.getTypeOfProperty('present')
-      expect(type).to.eql(Number)
+      expect(type).to.eql(Integer)
     })
   })
 
   describe('given a Function', function () {
     var fn     = null,
-        Number = new types.Number(rootObject),
+        Integer = new types.Integer(rootObject),
         String = new types.String(rootObject)
     it('should be constructed correctly', function () {
-      fn = new types.Function(rootObject, [Number], String)
+      fn = new types.Function(rootObject, [Integer], String)
       expect(fn.args.length).to.eql(1)
-      expect(fn.args[0]).to.eql(Number)
+      expect(fn.args[0]).to.eql(Integer)
       expect(fn.ret).to.eql(String)
     })
     it('should not equal non-Function type', function () {
-      expect(fn.equals(Number)).to.be(false)
+      expect(fn.equals(Integer)).to.be(false)
     })
     it('should not equal Function with different number of arguments', function () {
       var otherFn = new types.Function(rootObject, [], String)
@@ -54,7 +54,7 @@ describe('Types', function () {
       expect(fn.equals(otherFn)).to.be(false)
     })
     it('should not equal Function with different return type', function () {
-      var otherFn = new types.Function(rootObject, [Number], Number)
+      var otherFn = new types.Function(rootObject, [Integer], Integer)
       expect(fn.equals(otherFn)).to.be(false)
     })
   })

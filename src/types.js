@@ -37,7 +37,9 @@ Instance.prototype.equals = function (other) {
   if (other.constructor !== Instance) { return false }
   return this.type.equals(other.type)
 }
-Instance.prototype.inspect = function () { return "'"+this.type.inspect() }
+Instance.prototype.inspect = function () {
+  return "'"+this.type.inspect()
+}
 
 
 var Flags = {
@@ -47,14 +49,15 @@ var Flags = {
 // Types ----------------------------------------------------------------------
 
 function Object (supertype) {
-  _super(this).call(this, supertype)
-  this.intrinsic  = true
+  Object.super_.call(this, supertype)
+  this.intrinsic = true
+  this.primitive = false
   // Maps property names (strings) to Types
   this.properties = {}
   // Flags about properties; maps name (string) to optional flags (string)
   //   r = read-only
   this.propertiesFlags = {}
-  // List of initializers for the type
+  // List of initializers (Function) for the type
   this.initializers = []
 }
 inherits(Object, Type)
@@ -85,6 +88,33 @@ Object.prototype.addInitializer = function (initFunction) {
 Object.prototype.inspect = function () { return this.name }
 
 
+// Modules have no supertype
+function Module (name) {
+  _super(this).call(this, 'fake')
+  this.intrinsic = true
+  this.supertype = null
+  this.name      = (name ? name : null)
+  // Parent module (if present)
+  this.parent    = null
+}
+inherits(Module, Object)
+Module.prototype.setParent = function (parent) {
+  if (!(parent instanceof Module)) {
+    throw new TypeError('Expected parent to be a Module')
+  }
+  this.parent = parent
+}
+Module.prototype.addChild = function (child) {
+  var childName = child.name
+  this.setTypeOfProperty(childName, child)
+}
+Module.prototype.getNativeName = function () {
+  // TODO: Incorporate parents
+  return 'M'+this.name
+}
+Module.prototype.inspect = function () { return '.'+this.name }
+
+
 function Any () {
   _super(this).call(this, 'fake')
   this.intrinsic = true
@@ -110,6 +140,7 @@ Void.prototype.equals = function (other) {
 function String (supertype) {
   _super(this).call(this, supertype)
   this.intrinsic = true
+  this.primitive = true
 }
 inherits(String, Type)
 String.prototype.toString = function () { return 'String' }
@@ -120,20 +151,22 @@ String.prototype.equals   = function (other) {
 }
 
 
-function Number (supertype) {
+function Integer (supertype) {
   _super(this).call(this, supertype)
   this.intrinsic = true
+  this.primitive = true
 }
-inherits(Number, Type)
-Number.prototype.inspect = function () { return 'Number' }
-Number.prototype.equals = function (other) {
-  return (other.constructor === Number)
+inherits(Integer, Type)
+Integer.prototype.inspect = function () { return 'Integer' }
+Integer.prototype.equals = function (other) {
+  return (other.constructor === Integer)
 }
 
 
 function Boolean (supertype) {
   _super(this).call(this, supertype)
   this.intrinsic = true
+  this.primitive = true
 }
 inherits(Boolean, Type)
 Boolean.prototype.inspect = function () { return 'Boolean' }
@@ -160,7 +193,8 @@ function isTrue (value) {
 
 function Function (supertype, args, ret) {
   _super(this).call(this, supertype)
-  this.intrinsic = true
+  this.intrinsic        = true
+  this.isInstanceMethod = false
   // Types of arguments and return
   this.args = (args === undefined) ? [] : args
   this.ret  = (ret === undefined) ? null : ret
@@ -226,8 +260,9 @@ module.exports = {
   Any: Any,
   Void: Void,
   Object: Object,
+  Module: Module,
   String: String,
-  Number: Number,
+  Integer: Integer,
   Boolean: Boolean,
   Unknown: Unknown,
   Function: Function,

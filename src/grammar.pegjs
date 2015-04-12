@@ -83,7 +83,8 @@ innerstmt = modstmt
 modstmt = importstmt
         / exportstmt
 
-importstmt = "import" whitespace s:string { return pos(p.parseImport(s)) }
+importstmt = "import" whitespace "<" i:importpath ">" { return pos(p.parseImport(i)) }
+importpath = c:[A-Za-z0-9-_/]+ { return text() }
 exportstmt = "export" whitespace n:name   { return pos(p.parseExport(n)) }
 
 ctrl = ifctrl

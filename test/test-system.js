@@ -3,8 +3,8 @@
 
 var fs           = require('fs'),
     expect       = require('expect.js'),
-    AST          = require('../lib/ast'),
-    types        = require('../lib/types'),
+    AST          = require('../src/ast'),
+    types        = require('../src/types'),
     parseAndWalk = require('./helper').parseAndWalk
 
 var programs = {

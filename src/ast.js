@@ -35,7 +35,7 @@ var _ind = 0,
 var Node = function () {}
 Node.prototype.print = function () { out.write(inspect(this)) }
 Node.prototype.compile = function (context) {
-  throw new Error('Compilation not yet implemented for node type: '+this.constructor.name)
+  throw new Error('Compilation not yet implemented for node: '+this.constructor.name)
 }
 // Node.prototype.setParsePosition = function (parser) {
 //   this._file   = parser.file
@@ -94,7 +94,7 @@ Var.prototype.toString = Let.prototype.toString
 
 
 function Import (name) {
-  this.name = name
+  this.name = new String(name)
   // Will be set to the File object when it's visited
   this.file = null
 }
@@ -122,6 +122,10 @@ Export.prototype.toString = function () {
 function Class (name, block) {
   this.name       = name
   this.definition = block
+  // Computed nodes from the definition
+  this.initializers = this.definition.statements.filter(function (stmt) {
+    return (stmt instanceof Init)
+  })
 }
 inherits(Class, Node)
 Class.prototype.print = function () {
@@ -393,6 +397,9 @@ For.prototype.print = function () {
 function Chain (name, tail) {
   this.name = name
   this.tail = tail
+  // Added by the typesystem
+  this.headType = null
+  this.type     = null
 }
 inherits(Chain, Node)
 Chain.prototype.toString = function () {
@@ -421,6 +428,7 @@ Return.prototype.toString = function () {
 function Root (statements) {
   this.statements = statements
   this.sourceMap  = null
+  this.scope      = null
   // Lists of import and export nodes; the nodes add themselves during
   // type-system walking
   this.imports = []
@@ -439,10 +447,23 @@ Root.prototype.print = function (includeTypes) {
   })
   _wout("}\n");
 }
+Root.prototype.getRootScope = function () {
+  var rootScope = this.scope.parent
+  if (!rootScope || !rootScope.isRoot) {
+    throw new TypeError('Missing root scope', this)
+  }
+  return rootScope
+}
 
 
 function Block (statements) {
   this.statements = statements
+  this.scope      = null
+  // Set the `isLastStatement` property on the last statement
+  var lastStatement = statements[statements.length - 1]
+  if (lastStatement) {
+    lastStatement.isLastStatement = true
+  }
 }
 inherits(Block, Node)
 Block.prototype.print = function () {

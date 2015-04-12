@@ -1,7 +1,7 @@
 
 var expect       = require('expect.js'),
-    types        = require('../lib/types'),
-    AST          = require('../lib/ast'),
+    types        = require('../src/types'),
+    AST          = require('../src/ast'),
     parseAndWalk = require('./helper').parseAndWalk
 
 describe('Parser', function () {
@@ -11,11 +11,11 @@ describe('Parser', function () {
           tree  = parseAndWalk(topic)
       expect(tree.statements.length).to.eql(1)
       var decl = tree.statements[0]
-      // Check that it parsed as a var-assignment with a type of Number
+      // Check that it parsed as a var-assignment with a type of Integer
       expect(decl).to.be.an(AST.Assignment)
       expect(decl.type).to.eql('var')
       expect(decl.lvalue.type).to.be.a(types.Instance)
-      expect(decl.lvalue.type.type).to.be.a(types.Number)
+      expect(decl.lvalue.type.type).to.be.a(types.Integer)
     })
 
     it('should parse an explicit type', function () {

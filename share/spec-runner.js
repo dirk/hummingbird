@@ -27,7 +27,7 @@ describe('NAME spec', function () {
     expect(tree).to.be.ok()
   })
   // Pull in the JavaScript target
-  require('../../lib/targets/javascript')
+  require('../../src/targets/javascript')
 
   var compiledSource
   it('should compile', function () {

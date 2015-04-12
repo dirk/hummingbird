@@ -1,9 +1,12 @@
 
-var inherits  = require('util').inherits,
-    types     = require('./types'),
-    AST       = require('./ast'),
-    Scope     = require('./typesystem/scope'),
-    TypeError = require('./typesystem/typeerror')
+var inherits     = require('util').inherits,
+    types        = require('./types'),
+    AST          = require('./ast'),
+    scope        = require('./typesystem/scope'),
+    Scope        = scope.Scope,
+    ClosingScope = scope.ClosingScope,
+    errors       = require('./errors'),
+    TypeError    = errors.TypeError
 
 var inspect = require('util').inspect
 
@@ -39,8 +42,11 @@ TypeSystem.prototype.walk = function (rootNode, file, compiler) {
   this.file     = file     ? file     : null
   this.compiler = compiler ? compiler : null
 
-  var self = this
   var topLevelScope = new Scope(this.root)
+  // Save this top-level scope on the root
+  rootNode.scope = topLevelScope
+
+  var self = this
   rootNode.statements.forEach(function (stmt) {
     self.visitStatement(stmt, topLevelScope, rootNode)
   })
@@ -50,6 +56,12 @@ TypeSystem.prototype.walk = function (rootNode, file, compiler) {
 }
 
 TypeSystem.prototype.visitBlock = function (node, scope) {
+  if (node.scope) {
+    throw new TypeError('Scope already established for block', node)
+  }
+  // Save the scope for this block for later use by target compilers
+  node.scope = scope
+
   var self = this
   node.statements.forEach(function (stmt) {
     self.visitStatement(stmt, scope, node)
@@ -132,11 +144,8 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
 
 
 TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
-  assertInstanceOf(node.name,  AST.Literal, "Import expects Literal as name")
-  assertInstanceOf(parentNode, AST.Root,    "Import can only be a child of a Root")
-  if (node.name.typeName !== 'String') {
-    throw new TypeError('Import requires a String as module name', node)
-  }
+  assertInstanceOf(node.name,  String,   "Import expects String as path")
+  assertInstanceOf(parentNode, AST.Root, "Import can only be a child of a Root")
   if (!this.compiler) {
     throw new Error('Type-system not provided with current Compiler instance')
   }
@@ -146,7 +155,7 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
   // Add ourselves to the root's list of imports it contains
   parentNode.imports.push(node)
 
-  var moduleName = node.name.value
+  var moduleName = node.name
   // Preserve current file to restore after visiting the imported file
   var currentFile = this.file
   // Now ask the compiler to import the file
@@ -156,8 +165,8 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
   this.file = currentFile
   this.file.dependencies.push(importedFile)
   // Then build a module object for it
-  var module = new types.Object(this.rootObject)
-  module.name = 'Module'
+  var module = new types.Module()
+  module.name = moduleName
   var exportedNames = Object.keys(importedFile.exports)
   for (var i = exportedNames.length - 1; i >= 0; i--) {
     var name = exportedNames[i],
@@ -167,8 +176,9 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
     module.setTypeOfProperty(name, type)
     module.setFlagsOfProperty(name, 'r')
   }
+  scope.setLocal(moduleName, module)
   // Now create a faux instance of this module and add it to the scope
-  scope.setLocal(moduleName, new types.Instance(module))
+  // scope.setLocal(moduleName, new types.Instance(module))
 }
 
 
@@ -189,6 +199,7 @@ TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
   if (type instanceof types.Instance) {
     type = type.type
   }
+  node.type = type
   // TODO: Check that the name is a constant binding (rather than variable)
   this.file.exports[name] = type
 }
@@ -200,18 +211,23 @@ TypeSystem.prototype.visitClass = function (node, scope) {
   var klass = new types.Object(rootObject)
   klass.name = node.name
   scope.setLocal(klass.name, klass)
+  scope.setFlagsForLocal(klass.name, Scope.Flags.Constant)
   // Now create a new scope and visit the definition in that scope
   var scope = new Scope(scope)
   this.visitClassDefinition(node.definition, scope, klass)
   // Set the class as the node's type
   node.type = klass
 }
+
+// Given a class type and a scope, sets up `this` bindings in that scope
+// for instances of that class (with proper constant flags)
+function setupThisInScope (klass, scope) {
+  scope.setLocal('this', new types.Instance(klass))
+  scope.setFlagsForLocal('this', Scope.Flags.Constant)
+}
+
 TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
   var self = this
-  // Create the parent scope for functions and other blocks
-  var thisScope = new Scope(scope)
-  thisScope.setLocal('this', new types.Instance(klass))
-
   node.statements.forEach(function (stmt) {
     switch (stmt.constructor) {
       case AST.Assignment:
@@ -237,11 +253,13 @@ TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
         }
         break
       case AST.Function:
-        self.visitClassFunction(stmt, thisScope, klass)
+        self.visitClassFunction(stmt, scope, klass)
         break
       case AST.Init:
         var initType = new types.Function(self.rootObject),
-            initScope = new Scope(thisScope)
+            initScope = new Scope(scope)
+        // Add an instance of 'this' for the initializer's scope
+        setupThisInScope(klass, initScope)
         // Resolve the arguments
         var args = []
         stmt.args.forEach(function (arg) {
@@ -253,7 +271,9 @@ TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
         initType.ret  = self.root.getLocal('Void')
         // Then visit the block with the new scope
         self.visitBlock(stmt.block, initScope)
+        // Add the Function init type to the class and to this initializer node
         klass.addInitializer(initType)
+        stmt.type = initType
         break
       default:
         console.log(stmt)
@@ -262,18 +282,24 @@ TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
     }
   })
 }
-TypeSystem.prototype.visitClassFunction = function (node, thisScope, klass) {
+
+TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
   var functionName = node.name
   // Check that it's a function statement (ie. has a name)
   if (!functionName) {
     throw new TypeError('Missing function name', node)
   }
   // Run the generic visitor to figure out argument and return types
-  this.visitFunction(node, thisScope)
+  this.visitFunction(node, scope, function (functionType, functionScope) {
+    assertInstanceOf(functionScope, ClosingScope, "Function's scope must be a ClosingScope")
+    setupThisInScope(klass, functionScope)
+  })
   var functionInstance = node.type
   // Unbox the instance generated by the visitor to get the pure
   // function type
   var functionType = functionInstance.type
+  // Let the function type know that it's an instance method (used by the compiler)
+  functionType.isInstanceMethod = true
   // Add that function type as a property of the class
   // TODO: Maybe have a separate dictionary for instance methods
   klass.setTypeOfProperty(functionName, functionType)
@@ -361,7 +387,7 @@ TypeSystem.prototype.visitReturn = function (node, scope, parentNode) {
     }
     // The expression should return an instance, we'll have to unbox that
     assertInstanceOf(exprType, types.Instance, 'Expected Instance as argument to Return')
-    parentNode.returnType = exprType ? exprType.type : null
+    parentNode.returnType = exprType.type
   }
 }
 
@@ -371,7 +397,7 @@ TypeSystem.prototype.visitPath = function (node, scope) {
   if (foundScope === null) {
     throw new TypeError('Failed to find '+path.name)
   }
-  var lvalueType = foundScope.get(path.name, node)
+  var lvalueType = foundScope.get(path.name)
   // Now revise that type according to the path
   path.path.forEach(function (item) {
     switch (item.constructor) {
@@ -461,6 +487,11 @@ TypeSystem.prototype.visitLet = function (node, scope) {
     // No rvalue present
     node.lvalue.type = lvalueType
     scope.setLocal(name, lvalueType)
+  }
+  // Now that the local is set in the parent scope we can set its flags
+  // if it was a `let`-declaration
+  if (node.type === 'let') {
+    scope.setFlagsForLocal(name, Scope.Flags.Constant)
   }
 }
 // Alias the var visitor to the let visitor
@@ -593,15 +624,17 @@ TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
     type.ret = this.resolveType(node.ret)
   }
 
-  // If we have a callback for the immediate (not-yet-fully resolved type)
-  // then call it now.
-  if (immediate !== undefined) {
-    immediate(type)
-  }
-
-  var functionScope = new Scope(parentScope)
+  // Set up a closing scope for everything in the function
+  var functionScope = new ClosingScope(parentScope)
   // Save this new scope on the node object for later use
   node.scope = functionScope
+
+  // If we have a callback for the immediate (not-yet-fully resolved type)
+  // then call it now. This is also an opportunity for class and instance
+  // methods to add their `this` bindings to the function's closing scope.
+  if (immediate !== undefined) {
+    immediate(type, functionScope)
+  }
 
   // Build up the args to go into the type definition
   var typeArgs = [], n = 0
@@ -659,16 +692,33 @@ TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
     throw new TypeError('Too many return types (have '+t+')', node)
   }
   // Final return type
-  var returnType;
+  var returnType, isReturningVoid = false;
   if (reducedTypes.length > 0) {
     returnType = reducedTypes[0]
   } else {
-    returnType = this.root.getLocal('Void')
+    isReturningVoid = true
+    returnType      = this.root.getLocal('Void')
   }
   // Update the type definition (if there we 0 then it will be null which is
   // Void in the type-system)
   type.ret = returnType
-}
+
+  // If we know we're returning Void then check for a missing final return
+  // and insert it to help the user out.
+  if (isReturningVoid) {
+    var lastStatement = node.block.statements[node.block.statements.length - 1]
+    if (lastStatement && !(lastStatement instanceof AST.Return)) {
+      // Last statement isn't a return, so let's insert one for them
+      var returnStmt = new AST.Return(null)
+      returnStmt.setPosition('(internal)', -1, -1)
+      node.block.statements.push(returnStmt)
+      this.visitReturn(returnStmt, functionScope, node.block)
+      // Update the `isLastStatement` properties
+      lastStatement.isLastStatement = false
+      returnStmt.isLastStatement    = true
+    }
+  }
+}//visitFunction
 
 function uniqueWithComparator (array, comparator) {
   var acc    = [],
@@ -739,9 +789,14 @@ var know = function (node, type) {
 }
 
 TypeSystem.prototype.visitChain = function (node, scope) {
-  var self = this
-  var type = know(node, scope.get(node.name, node))
-  node.tail.forEach(function (item) {
+  var self = this,
+      headType = know(node, scope.get(node.name))
+  // Save the type of the head
+  node.headType = headType
+  // Start at the head of the chain
+  var type = headType 
+  for (var i = 0; i < node.tail.length; i++) {
+    var item = node.tail[i]
     if (item instanceof AST.Call) {
       // Make sure we're trying to call an instance
       assertInstanceOf(type, types.Instance, 'Unexpected non-Instanced Function')
@@ -756,9 +811,9 @@ TypeSystem.prototype.visitChain = function (node, scope) {
         throw new TypeError('Wrong number of arguments: expected '+t+', got '+i)
       }
       // Then type-check each individual arguments
-      for (var i = itemArgs.length - 1; i >= 0; i--) {
+      for (var argIdx = itemArgs.length - 1; argIdx >= 0; argIdx--) {
         // Visit each argument item
-        var itemArg = itemArgs[i]
+        var itemArg = itemArgs[argIdx]
         self.visitExpression(itemArg, scope)
         // Get the Instance type of the passing argument node
         var itemArgInstance = itemArg.type
@@ -769,7 +824,7 @@ TypeSystem.prototype.visitChain = function (node, scope) {
         var itemArgType = itemArgInstance.type
         // Then get the type from the function definition to compare to the
         // passed argument
-        var typeArg = typeArgs[i]
+        var typeArg = typeArgs[argIdx]
         if (!typeArg.equals(itemArgType)) {
           var message  = 'Argument mismatch at argument index '+i,
               got      = itemArgType.inspect(),
@@ -784,18 +839,36 @@ TypeSystem.prototype.visitChain = function (node, scope) {
 
     } else
     if (item instanceof AST.Property) {
-      // Can only get properties of Instances right now
-      assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance')
-      var instance     = type,
-          propertyType = instance.getTypeOfProperty(item.name)
-      // Set the type to an Instance of the property
-      type = new types.Instance(propertyType)
+      type = this.getTypeOfTypesProperty(type, item.name)
 
     } else {
       throw new TypeError('Cannot handle Chain item of type: '+item.constructor.name, node)
     }
-  })
+  }
   node.type = type
+}
+
+
+// Utility function for resolving the type of a type's property. Handles
+// either Modules or Instances of a type; for everything else it will
+// throw an error.
+TypeSystem.prototype.getTypeOfTypesProperty = function (type, name) {
+  var returnType = null
+  if (type instanceof types.Module) {
+    // pass
+  } else {
+    assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance: '+type.inspect())
+    var instance = type
+    // Unbox the instance
+    type = instance.type
+  }
+  returnType = type.getTypeOfProperty(name)
+  // If it's another Module then just return that
+  if (returnType instanceof types.Module) {
+    return returnType
+  }
+  // Otherwise box it into an instance
+  return new types.Instance(returnType)
 }
 
 

@@ -3,22 +3,22 @@
 require('blanket')({
   "pattern": [""],
   "data-cover-never": [
-    "lib/ast",
-    "lib/grammar",
-    "lib/parser",
-    "lib/util",
+    "src/ast",
+    "src/grammar",
+    "src/parser",
+    "src/util",
     "node_modules",
     "test"
   ]
 })
 
-var types      = require('../lib/types'),
-    Parser     = require('../lib/parser'),
-    TypeSystem = require('../lib/typesystem').TypeSystem,
+var types      = require('../src/types'),
+    Parser     = require('../src/parser'),
+    TypeSystem = require('../src/typesystem').TypeSystem,
     parser     = new Parser()
 
 // Load the JavaScript compilation target
-require(__dirname+'/../lib/targets/javascript')
+require(__dirname+'/../src/targets/javascript')
 
 var parseAndWalk = function (source, filename) {
   parser.file = filename ? filename : 'unknown'

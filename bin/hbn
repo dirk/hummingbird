@@ -3,6 +3,5 @@
 var path         = require('path'),
     libDirectory = path.join(path.dirname(__filename), '..', 'src')
 
-var command = require(path.join(libDirectory, 'command'))
-command.run()
+require(path.join(libDirectory, 'command-native'))
 

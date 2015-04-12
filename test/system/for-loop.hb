@@ -1,5 +1,5 @@
 
-var int: Number
+var int: Integer
 var acc = 0
 for int = 1; int < 5; int += 1 {
   acc += int
