@@ -354,6 +354,9 @@ AST.Property.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
       type      = null,
       value     = null
 
+  if (this.base.type instanceof types.Module) {
+    return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
+  }
   if (parent === null) {
     // Start off with an Identifier
     assertInstanceOf(this.base, AST.Identifier)
@@ -372,6 +375,19 @@ AST.Property.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     throw new ICE("Encountered a null return value")
   }
   return ret
+}
+AST.Property.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var parent = null,
+      path   = []
+  if (parent === null) {
+    var retCtx = {}
+    this.base.compileAsModuleMember(ctx, blockCtx, retCtx)
+    assertInstanceOf(retCtx.path, Array)
+    path = retCtx.path
+  } else {
+    path = exprCtx.path
+  }
+  return this.property.compileAsModuleMember(ctx, blockCtx, {path: path})
 }
 
 AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
@@ -447,6 +463,40 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
   tryUpdatingExpressionContext(exprCtx, this.type, retValue)
   return retValue
 }
+AST.Call.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var parent = this.parent
+  if (parent === null) {
+    throw new ICE('Not implemented yet')
+  }
+  assertInstanceOf(exprCtx.path, Array)
+  var retCtx = {path: _.clone(exprCtx.path)}
+  this.base.compileAsModuleMember(ctx, blockCtx, retCtx)
+  var path = retCtx.path
+  assertInstanceOf(path, Array)
+  // Join the path and look up the function type from the box on our base
+  var name = path.join('_')
+  assertInstanceOf(this.base.type, types.Instance)
+  assertInstanceOf(this.base.type.type, types.Function)
+  var type = this.base.type.type
+  // Look up the actual function global via the name path
+  var global = null
+  if (ctx.hasGlobal(name)) {
+    global = ctx.getGlobal(name)
+  } else {
+    var args    = type.args.map(nativeTypeForType),
+        ret     = nativeTypeForType(type.ret),
+        fnTy    = new LLVM.FunctionType(ret, args, false),
+        fnPtrTy = LLVM.Types.pointerType(fnTy.ptr)
+    // Add the function as a global
+    global = ctx.addGlobal(name, fnPtrTy)
+  }
+  // Look up the function and call it with the arguments
+  var fn = ctx.buildGlobalLoad(name),
+      args = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  return ctx.builder.buildCall(fn, args, '')
+}
 
 function tryUpdatingExpressionContext (exprCtx, type, value) {
   if (!exprCtx) { return }
@@ -462,6 +512,10 @@ AST.Identifier.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
       newType  = null,
       newValue = null
 
+  // First check if we're working on a module
+  if (this.type instanceof types.Module) {
+    return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
+  }
   if (parent === null) {
     // Look up ourselves rather than building off a parent
     var pair = getTypeAndSlotsForName(ctx, blockCtx, this.name)
@@ -483,6 +537,28 @@ AST.Identifier.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
   tryUpdatingExpressionContext(exprCtx, newType, newValue)
   return newValue
 }
+AST.Identifier.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var path = (exprCtx.path ? exprCtx.path : []),
+      type = this.type,
+      name = null
+  switch (type.constructor) {
+    case types.Module:
+      name = type.getNativeName()
+      break
+    case types.Instance:
+      var unboxed = type.type
+      assertInstanceOf(unboxed, types.Function, "Currently can only target module functions")
+      name = 'F'+this.name
+      break
+    default:
+      throw new ICE("Don't know how to handle module member of type: "+type.constructor.name)
+  }
+  path.push(name)
+  // Update the expression context and return
+  exprCtx.path = path
+  return null
+}
+
 
 AST.Literal.prototype.compileToValue = function (ctx, blockCtx) {
   var instance = this.type
