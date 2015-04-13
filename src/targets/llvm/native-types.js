@@ -3,7 +3,9 @@ var LLVM  = require('../../../../llvm2'),
 
 var VoidType    = LLVM.Types.VoidType,
     Int64Type   = LLVM.Types.Int64Type,
-    Int8PtrType = LLVM.Types.pointerType(LLVM.Types.Int8Type)
+    Int8Type    = LLVM.Types.Int8Type,
+    Int8PtrType = LLVM.Types.pointerType(Int8Type),
+    Int1Type    = LLVM.Types.Int1Type
 
 // Computes the equivalent native type for a given Hummingbird type
 function nativeTypeForType (type) {
@@ -17,6 +19,8 @@ function nativeTypeForType (type) {
       return Int8PtrType
     case types.Integer:
       return Int64Type
+    case types.Boolean:
+      return Int1Type
     case types.Function:
       var nativeFunction = type.getNativeFunction()
       return nativeFunction.type.ptr

@@ -28,7 +28,8 @@ var Slots         = slots.Slots,
     ConstantSlots = slots.ConstantSlots,
     GlobalSlots   = slots.GlobalSlots
 
-var Int8Type    = LLVM.Types.Int8Type,
+var Int1Type    = LLVM.Types.Int1Type,
+    Int8Type    = LLVM.Types.Int8Type,
     Int32Type   = LLVM.Types.Int32Type,
     Int64Type   = LLVM.Types.Int64Type,
     VoidType    = LLVM.Types.VoidType,
@@ -337,6 +338,17 @@ AST.Literal.prototype.compileToValue = function (ctx, blockCtx) {
       return ctx.builder.buildGlobalStringPtr(stringValue, '')
     case types.Integer:
       return LLVM.Library.LLVMConstInt(Int64Type, this.value, '')
+    case types.Boolean:
+      var booleanValue = null
+      if (this.value === 'true') {
+        booleanValue = true
+      } else if (this.value === 'false') {
+        booleanValue = false
+      }
+      if (booleanValue === null) {
+        throw new ICE('Unexpected null value when compiling boolean Literal')
+      }
+      return LLVM.Library.LLVMConstInt(Int1Type, booleanValue ? 1 : 0, '')
     default:
       var name = instance.type.constructor.name
       throw new ICE('Cannot handle instance type: '+name)

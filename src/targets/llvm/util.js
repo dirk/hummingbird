@@ -1,10 +1,15 @@
-var LLVM  = require('../../../../llvm2'),
-    types = require('../../types')
+var LLVM   = require('../../../../llvm2'),
+    types  = require('../../types'),
+    errors = require('../../errors'),
+    ICE    = errors.InternalCompilerError
 
 var Int64Type   = LLVM.Types.Int64Type,
     Int8Type    = LLVM.Types.Int8Type,
     Int8PtrType = LLVM.Types.pointerType(Int8Type),
     IntNE       = LLVM.Library.LLVMIntNE
+
+var TypeOf            = LLVM.Library.LLVMTypeOf,
+    PrintTypeToString = LLVM.Library.LLVMPrintTypeToString
 
 function isLastInstructionTerminator (bb) {
   var lastInstr = LLVM.Library.LLVMGetLastInstruction(bb)
@@ -40,6 +45,14 @@ function compileTruthyTest (ctx, blockCtx, expr) {
   case types.Integer:
     var zeroInteger = LLVM.Library.LLVMConstInt(Int64Type, 0, true)
     return ctx.builder.buildICmp(IntNE, value, zeroInteger, '')
+  case types.Boolean:
+    // Pre-condition check to make sure we really have an `i1`
+    var type       = TypeOf(value),
+        typeString = PrintTypeToString(type)
+    if (typeString !== 'i1') {
+      throw new ICE('Cannot compile Boolean to truthy-testable value (expected: i1, have: '+typeString+')')
+    }
+    return value
   default:
     throw new ICE('Cannot compile to truthy-testable value: '+type.constructor.name)
   }
