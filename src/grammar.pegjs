@@ -88,7 +88,11 @@ modstmt = importstmt
 
 importstmt = "import" whitespace "<" i:importpath ">" u:usingpath? { return pos(p.parseImport(i, u)) }
 importpath = [A-Za-z0-9-_/.]+ { return text() }
-usingpath  = whitespace "using" whitespace n:name { return [n] }
+usingpath  = whitespace "using" whitespace n:name e:(_ "," _ name)* {
+  return [n].concat((!e) ? [] : e.map(function (a) {
+    return a[3]
+  }))
+}
 exportstmt = "export" whitespace n:name   { return pos(p.parseExport(n)) }
 
 ctrl = ifctrl
