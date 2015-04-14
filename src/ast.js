@@ -93,8 +93,10 @@ Var.prototype.print    = Let.prototype.print
 Var.prototype.toString = Let.prototype.toString
 
 
-function Import (name) {
-  this.name = new String(name)
+function Import (name, using) {
+  this.name  = new String(name)
+  this.using = using
+  assertPropertyIsInstanceOf(this, 'using', Array)
   // Will be set to the File object when it's visited
   this.file = null
 }

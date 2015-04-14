@@ -6,8 +6,8 @@ var AST   = require('./ast'),
 // matched grammar rules.
 module.exports = function (p) {
 
-  p.parseImport = function (name) {
-    return new AST.Import(name)
+  p.parseImport = function (name, using) {
+    return new AST.Import(name, using)
   }
   p.parseExport = function (name) {
     return new AST.Export(name)
