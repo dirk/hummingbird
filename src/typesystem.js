@@ -822,12 +822,18 @@ TypeSystem.prototype.visitIdentifier = function (node, scope) {
 }
 
 TypeSystem.prototype.visitProperty = function (node, scope, parentNode) {
+  var property = node.property,
+      base     = node.base
+
+  // Set up the parents
+  if (node.parent) {
+    base.parent = node.parent
+  }
+  property.parent = node
+
+  // Then visit the base and the child
   this.visitExpression(node.base, scope)
   node.baseType = node.base.type
-
-  var property = node.property
-  // Set the parent on the child property and visit it
-  property.parent = node
 
   if (typeof property === 'string') {
     throw new Error('Unreachable')
@@ -949,7 +955,8 @@ TypeSystem.prototype.getTypeOfTypesProperty = function (type, name) {
   if (type instanceof types.Module) {
     // pass
   } else {
-    assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance: '+type.inspect())
+    var typeName = (type ? type.inspect() : String(type))
+    assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance: '+typeName)
     var instance = type
     // Unbox the instance
     type = instance.type
