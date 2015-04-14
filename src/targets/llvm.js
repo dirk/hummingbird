@@ -358,8 +358,6 @@ AST.Property.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
   }
   if (parent === null) {
-    // Start off with an Identifier
-    assertInstanceOf(this.base, AST.Identifier)
     var retCtx = {}
     this.base.compile(ctx, blockCtx, retCtx)
     type  = retCtx.type
@@ -413,6 +411,31 @@ AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx)
   return retValue
 }
 
+AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
+  var receiverInstance = this.parent.type,
+      receiverType     = receiverInstance.type
+  
+  // Look up the shim method. The shim will get transformed into a proper call
+  var shimMethodInstance = this.base.type,
+      shimMethod         = shimMethodInstance.type
+  // Look up the ultimate method via the shim
+  if (shimMethod.shimFor == null) {
+    throw new ICE('Missing ultimate method for shim: '+this.base.name)
+  }
+  var method   = shimMethod.shimFor,
+      nativeFn = method.getNativeFunction(),
+      argValues = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  // Add the receiver to the front of the arguments
+  var receiverValue = exprCtx.value
+  argValues.unshift(receiverValue)
+  // Build the call
+  var retValue = ctx.builder.buildCall(nativeFn.getPtr(), argValues, '')
+  tryUpdatingExpressionContext(exprCtx, this.type, retValue)
+  return retValue
+}
+
 AST.Call.prototype.compile = function (ctx, blockCtx, exprCtx) {
   this.compileToValue(ctx, blockCtx, exprCtx)
 }
@@ -428,9 +451,16 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     // Unbox the instance and check if it's an instace method
     methodType = methodType.type
     if (!methodType.isInstanceMethod) { break }
-    // If it was an instance method then we'll go directly to that
-    // compilation path
-    return this.compileInstanceMethodCall(ctx, blockCtx, exprCtx)
+    var receiverInstance = parent.type,
+        receiverType     = receiverInstance.type
+    if (receiverType.intrinsic === true) {
+      // Need to do a little bit of special handling for intrinsics
+      return this.compileIntrinsicInstanceMethodCall(ctx, blockCtx, exprCtx)
+    } else {
+      // If it was an instance method then we'll go directly to that
+      // compilation path
+      return this.compileInstanceMethodCall(ctx, blockCtx, exprCtx)
+    }
   }
 
   if (parent === null) {

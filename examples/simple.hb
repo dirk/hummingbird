@@ -1,10 +1,13 @@
-var a = 1
-var b = a - 1
+# var a = 1
+# var b = a - 1
 # console.log(a)
 
-var c = "Hello "
-var d = "world!"
+let c = "Hello "
+let d = "world!"
+let e = (c + d).uppercase()
 console.log(c + d)
+console.log(e)
+console.log(e.lowercase())
 
 # if b {
 #   console.log("1")
