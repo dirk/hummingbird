@@ -1244,7 +1244,11 @@ AST.If.prototype.compileConditionBlock = function (ctx, parentFn, blockNode, blo
   }
 }
 
-AST.Binary.prototype.compileToValue = function (ctx, blockCtx) {
+AST.Binary.prototype.compile = function (ctx, blockCtx, exprCtx) {
+  this.compileToValue(ctx, blockCtx, exprCtx)
+}
+
+AST.Binary.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
   var lexpr = this.lexpr,
       rexpr = this.rexpr
   // Check (and unbox) the types
@@ -1260,10 +1264,10 @@ AST.Binary.prototype.compileToValue = function (ctx, blockCtx) {
   // Compile the two sides down to a value that we can use
   var lexprValue = lexpr.compileToValue(ctx, blockCtx),
       rexprValue = rexpr.compileToValue(ctx, blockCtx)
-  // Build the call to the function
   // Call the builder function that we got from BinaryOps
-  return builder(ctx, lexprValue, rexprValue)
-  // return ctx.builder.buildCall(fn, [lexprValue, rexprValue], 'op'+this.op)
-  throw new ICE('Unreachable')
+  var retValue = builder(ctx, lexprValue, rexprValue),
+      retType  = this.type
+  tryUpdatingExpressionContext(exprCtx, retType, retValue)
+  return retValue
 }
 
