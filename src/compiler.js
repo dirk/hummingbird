@@ -29,6 +29,9 @@ function Compiler () {
   this.entryFile  = null
   this.typeSystem = new TypeSystem()
   this.parser     = new Parser()
+  // Setup the default import path
+  var extDir = path.join(path.dirname(__filename), '..', 'ext')
+  this.importPath.push(extDir)
 }
 Compiler.prototype.compile = function (filePath, opts) {
   if (!opts) { opts = {} }
@@ -68,13 +71,15 @@ Compiler.prototype.walkFile = function (file) {
   this.typeSystem.walk(file.tree, file, this)
 }
 
-Compiler.prototype.importFileByName = function (fileName) {
+Compiler.prototype.importFileByName = function (moduleName) {
   var foundFilePath   = null,
       foundImportPath = null
+  // Replace the separators in the file-name
+  var systemFileName = moduleName.replace(/\./g, path.sep)
   // console.log('importFileByName: '+fileName)
   for (var i = 0; i < this.importPath.length; i++) {
     var p = this.importPath[i]
-    var filePath = path.join(p, fileName+'.hb')
+    var filePath = path.join(p, systemFileName+'.hb')
     if (fs.existsSync(filePath)) {
       foundFilePath   = filePath
       foundImportPath = p
@@ -83,13 +88,6 @@ Compiler.prototype.importFileByName = function (fileName) {
   }// for
   if (!foundFilePath) {
     throw new Error('File not found: '+fileName)
-  }
-  var relativeName = path.relative(foundImportPath, foundFilePath)
-  // TODO: Actually do some handling with the relative name. Also use the import
-  //       path and all that jazz.
-  var moduleName = relativeName.replace(/\.hb$/i, '')
-  if (/[^A-Za-z0-9_-]/.test(moduleName)) {
-    throw new Error('Cannot handle module name: '+moduleName)
   }
   var mod  = new types.Module(moduleName),
       file = this.compile(foundFilePath, {module: mod})
