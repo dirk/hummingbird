@@ -182,7 +182,17 @@ TypeSystem.prototype.visitImport = function (node, scope, parentNode) {
     module.setTypeOfProperty(name, type)
     module.setFlagsOfProperty(name, 'r')
   }
-  scope.setLocal(moduleName, module)
+  if (node.using) {
+    assertInstanceOf(node.using, Array)
+    for (var i = 0; i < node.using.length; i++) {
+      var use = node.using[i],
+          useType = module.getTypeOfProperty(use)
+      scope.setLocal(use, new types.Instance(useType))
+    }
+  } else {
+    // If there's no `using` then just add the whole module
+    scope.setLocal(moduleName, module)
+  }
   // Now create a faux instance of this module and add it to the scope
   // scope.setLocal(moduleName, new types.Instance(module))
 }
@@ -201,6 +211,7 @@ TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
   }
   // Look up the type for the name in the root
   var type = scope.getLocal(name)
+  this.file.module.setTypeOfProperty(name, type)
   // Need to unbox an instance if we encounter one
   if (type instanceof types.Instance) {
     type = type.type

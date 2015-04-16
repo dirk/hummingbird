@@ -89,8 +89,15 @@ Compiler.prototype.importFileByName = function (moduleName) {
   if (!foundFilePath) {
     throw new Error('File not found: '+fileName)
   }
-  var mod  = new types.Module(moduleName),
-      file = this.compile(foundFilePath, {module: mod})
+  var parts = moduleName.split('.'),
+      mod   = new types.Module(parts.shift())
+  while (parts.length > 0) {
+    var parentMod = mod
+    mod = new types.Module(parts.shift())
+    mod.setParent(parentMod)
+    parentMod.addChild(mod)
+  }
+  var file = this.compile(foundFilePath, {module: mod})
   return file
 }
 

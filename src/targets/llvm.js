@@ -720,6 +720,27 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
       initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
   // And then call it so that the module gets initialized at the correct time
   ctx.builder.buildCall(initFn, [], '')
+  
+  var basePath = this.file.module.getNativeName()
+  if (this.using) {
+    var slots = blockCtx.slots
+    // Load items from the module into the local scope
+    for (var i = 0; i < this.using.length; i++) {
+      var use  = this.using[i],
+          type = this.file.module.getTypeOfProperty(use)
+      assertInstanceOf(type, types.Instance)
+      var path = basePath+'_'+type.type.getNativePrefix()+use
+      // Sanity-check to make sure this is the first time this global has
+      // been set up
+      if (ctx.hasGlobal(path)) {
+        throw new ICE('Global already exists: '+path)
+      }
+      var global   = ctx.addGlobal(path, nativeTypeForType(type)),
+          value    = ctx.buildGlobalLoad(path)
+      // Store the value in the local slot
+      slots.buildSet(ctx, use, value)
+    }
+  }
 }
 
 AST.Export.prototype.compile = function (ctx, blockCtx) {
