@@ -761,19 +761,7 @@ function uniqueWithComparator (array, comparator) {
   return acc
 }
 
-
-TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInParent) {
-  var name = node.name
-  // Now look up the parent `multi` in the containing block
-  var multiNode = searchInParent(function (stmt) {
-    if (stmt.constructor === AST.Multi && stmt.name === name) {
-      return true
-    }
-    return false
-  })
-  if (!multiNode) {
-    throw new TypeError('Failed to find associated multi statement')
-  }
+TypeSystem.prototype.visitMultiFunction = function (node, scope, multiNode) {
   var multiType = multiNode.type
   // Add this implementation to its list of functions and set the parent of
   // the function so that it knows not to codegen itself
@@ -799,6 +787,22 @@ TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInPar
   // Now do statement-level visiting
   if (node.when) {
     this.visitExpression(node.when, node.scope)
+  }
+}
+
+TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInParent) {
+  var name = node.name
+  // Now look up the parent `multi` in the containing block
+  var multiNode = searchInParent(function (stmt) {
+    if (stmt.constructor === AST.Multi && stmt.name === name) {
+      return true
+    }
+    return false
+  })
+  if (multiNode) {
+    this.visitMultiFunction(node, scope, multiNode)
+  } else {
+    throw new TypeError('Failed to find associated multi statement')
   }
 }
 
