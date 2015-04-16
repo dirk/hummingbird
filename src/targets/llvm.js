@@ -236,8 +236,8 @@ function compileBlock (ctx, block, parentFn, preStatementsCb) {
   for (var i = 0; i < statements.length; i++) {
     var stmt = statements[i]
     stmt.compile(ctx, blockCtx)
-  }
-}
+  }//for
+}//compileBlock
 
 // Look up the type and Slots for a given name; begins search from the passed
 // block-context. Returns a 2-tuple of Slots and Type.
@@ -1021,6 +1021,28 @@ AST.Function.prototype.getAnonymousNativeFunction = function (ctx) {
     type.setNativeFunction(fn)
   }
   return fn
+}
+
+AST.Function.prototype.compile = function(ctx, blockCtx) {
+  var instance = this.type,
+      type     = unboxInstanceType(instance, types.Function)
+  if (type.parentMultiType) {
+    throw new ICE('Compilation of multi-functions not yet implemented')
+  } else {
+    if (typeof this.name !== 'string') {
+      throw new ICE('Missing name of Function statement')
+    }
+    var name = type.getNativePrefix()+this.name
+    // Setup the native function
+    var fn = new NativeFunction(name, type.args, type.ret)
+    type.setNativeFunction(fn)
+    // Compile the native function with our block
+    genericCompileFunction(ctx, fn, this)
+    // Set the linkage of the function to private
+    LLVM.Library.LLVMSetLinkage(fn.getPtr(), LLVM.Library.LLVMPrivateLinkage)
+    // Add this to the slots
+    blockCtx.slots.buildSet(ctx, this.name, fn.getPtr())
+  }
 }
 
 AST.Function.prototype.compileToValue = function (ctx, blockCtx) {

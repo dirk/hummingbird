@@ -790,6 +790,11 @@ TypeSystem.prototype.visitMultiFunction = function (node, scope, multiNode) {
   }
 }
 
+TypeSystem.prototype.visitNamedFunction = function (node, scope) {
+  this.visitFunction(node, scope)
+  scope.setLocal(node.name, node.type)
+}
+
 TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInParent) {
   var name = node.name
   // Now look up the parent `multi` in the containing block
@@ -802,7 +807,7 @@ TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInPar
   if (multiNode) {
     this.visitMultiFunction(node, scope, multiNode)
   } else {
-    throw new TypeError('Failed to find associated multi statement')
+    this.visitNamedFunction(node, scope)
   }
 }
 
