@@ -726,16 +726,16 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
     var slots = blockCtx.slots
     // Load items from the module into the local scope
     for (var i = 0; i < this.using.length; i++) {
-      var use  = this.using[i],
-          type = this.file.module.getTypeOfProperty(use)
-      assertInstanceOf(type, types.Instance)
-      var path = basePath+'_'+type.type.getNativePrefix()+use
+      var use      = this.using[i],
+          instance = this.file.module.getTypeOfProperty(use),
+          type     = unboxInstanceType(instance),
+          path     = basePath+'_'+type.getNativePrefix()+use
       // Sanity-check to make sure this is the first time this global has
       // been set up
       if (ctx.hasGlobal(path)) {
         throw new ICE('Global already exists: '+path)
       }
-      var global   = ctx.addGlobal(path, nativeTypeForType(type)),
+      var global   = ctx.addGlobal(path, nativeTypeForType(instance)),
           value    = ctx.buildGlobalLoad(path)
       // Store the value in the local slot
       slots.buildSet(ctx, use, value)
