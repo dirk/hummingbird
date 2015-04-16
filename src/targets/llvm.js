@@ -436,6 +436,15 @@ AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx,
   return retValue
 }
 
+function unboxInstanceType (instance, expectedType) {
+  assertInstanceOf(instance, types.Instance)
+  var type = instance.type
+  if (expectedType !== undefined) {
+    assertInstanceOf(type, expectedType)
+  }
+  return type
+}
+
 AST.Call.prototype.compile = function (ctx, blockCtx, exprCtx) {
   this.compileToValue(ctx, blockCtx, exprCtx)
 }
@@ -479,17 +488,12 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     type  = retCtx.type
     value = retCtx.value
   }
-  assertInstanceOf(type, types.Instance)
-  var funcType  = type.type,
+  var funcType  = unboxInstanceType(type, types.Function),
       argValues = this.args.map(function (arg) {
         return arg.compileToValue(ctx, blockCtx)
       })
-  // Look up the native function and call it
-  var nativeFn = funcType.getNativeFunction()
-  assertInstanceOf(nativeFn, NativeFunction)
-  var fnPtr = nativeFn.getPtr()
   // Build return call and update the context to return
-  var retValue = ctx.builder.buildCall(fnPtr, argValues, '')
+  var retValue = ctx.builder.buildCall(value, argValues, '')
   tryUpdatingExpressionContext(exprCtx, this.type, retValue)
   return retValue
 }
