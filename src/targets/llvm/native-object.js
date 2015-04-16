@@ -52,6 +52,7 @@ NativeObject.prototype.define = function (ctx) {
         throw new ICE('Encountered non-boolean is-instance-method property on function')
       }
       var nf = propType.getNativeFunction()
+      if (!nf.defined) { nf.definer() }
       // Type will be a pointer to the function
       var fnPtr = LLVM.Types.pointerType(nf.type.ptr)
       // Get the pointer to the LLVM type out of the NativeFunction
