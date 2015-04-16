@@ -750,26 +750,25 @@ AST.Export.prototype.compile = function (ctx, blockCtx) {
   var path = [ctx.targetModule.getNativeName()],
       name = this.name,
       type = this.type
-  switch (type.constructor) {
-    case types.Function:
-      path.push('F'+name)
-      var exportName = path.join('_')
-      // Create a global value with that name
-      var value    = blockCtx.slots.buildGet(ctx, this.name),
-          nativeFn = type.getNativeFunction(),
-          nativeTy = TypeOf(nativeFn.getPtr()),
-          global   = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, nativeTy, exportName)
-      // Set it to externally link and initialize it to null
-      LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
-      var initialNull = LLVM.Library.LLVMConstPointerNull(nativeTy)
-      LLVM.Library.LLVMSetInitializer(global, initialNull)
-      // Set the native function pointer in the global so it will be exposed
-      ctx.builder.buildStore(value, global, '')
-      break
 
-    default:
-      throw new ICE('Cannot export something of type: '+type.inspect())
+  function setupGlobal (name, exportName) {
+    var value = blockCtx.slots.buildGet(ctx, name),
+        type  = TypeOf(value),
+        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, exportName)
+    // Set the linkage and initializer
+    LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
+    var initialNull = LLVM.Library.LLVMConstPointerNull(type)
+    LLVM.Library.LLVMSetInitializer(global, initialNull)
+    // Store the value in the global
+    ctx.builder.buildStore(value, global, '')
+    return global
   }
+  var exportableTypes = [types.Function, types.String]
+  if (exportableTypes.indexOf(type.constructor) === -1) {
+    throw new ICE('Cannot export something of type: '+type.inspect())
+  }
+  var exportName = path.concat(type.getNativePrefix()+name).join('_'),
+      global     = setupGlobal(name, exportName)
 }
 
 AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
