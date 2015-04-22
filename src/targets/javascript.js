@@ -546,7 +546,7 @@ AST.Chain.prototype.compile = function (context, opts) {
 AST.Return.prototype.compile  = function (context) {
   var ret = "return;\n"
   if (this.expr) {
-    ret = ['return ', this.expr.compile(context), ";\n"]
+    ret = ['return ', this.expr.compile(context, {omitTerminator: true}), ";\n"]
   }
   return asSourceNode(this, ret)
 }

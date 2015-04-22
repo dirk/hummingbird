@@ -75,10 +75,7 @@ describe('System', function () {
       })
       it('should produce an expected result', function () {
         var extended = source+"return a.c(1)\n",
-            tree     = parseAndWalk(extended)
-              console.log(tree.compile())
-
-          
+            tree     = parseAndWalk(extended),
             result   = runCompiledCode(tree)
         expect(result).to.eql(3)
       })
