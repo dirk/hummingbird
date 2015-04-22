@@ -1,9 +1,12 @@
 var fs            = require('fs'),
     path          = require('path'),
     child_process = require('child_process'),
+    reportError   = require('./util').reportError,
     TypeSystem    = require('./typesystem').TypeSystem,
     Parser        = require('./parser'),
     Compiler      = require('./compiler')
+
+require('./targets/llvm')
 
 // Command-line arguments ----------------------------------------------------
 
@@ -57,33 +60,25 @@ if (argv._.length === 0 || argv._[0] === 'help') {
   process.exit(0)
 }
 
-var entryFile = argv._[0]
+var entryFile = argv._[0],
+    binFile   = 'a.out' // entryFile.replace(/\.hb$/i, '')
 
 var parser     = new Parser(),
     compiler   = new Compiler()
 
-var entryDirectory = path.dirname(entryFile)
-compiler.importPath.push(entryDirectory)
-var file = compiler.compile(entryFile, {isEntry: true}),
-    tree = file.tree
+try {
+  var entryDirectory = path.dirname(entryFile)
+  compiler.importPath.push(entryDirectory)
+  var file = compiler.compile(entryFile, {isEntry: true}),
+      tree = file.tree
 
-// var source = fs.readFileSync(entryFile).toString()
-// var tree = parser.parse(source)
-// typesystem.walk(tree)
-
-require('./targets/llvm')
-
-// Compute the path of the source file without the .hb extension
-var outBase = entryFile.replace(/\.hb$/i, '')
-if (outBase === entryFile) {
-  console.error("Couldn't figure out base output file path for input file: "+entryFile)
-  process.exit(0)
+  // var source = fs.readFileSync(entryFile).toString()
+  // var tree = parser.parse(source)
+  // typesystem.walk(tree)
+} catch (err) {
+  reportError(err)
+  process.exit(1)
 }
-
-// var outBase = 'out',
-var bitFile = outBase+'.bc',
-    objFile = outBase+'.o',
-    binFile = 'a.out'
 
 var outputs = []
 tree.emitToFile({logger: logger, outputs: outputs})

@@ -44,5 +44,10 @@ function nativeTypeForType (type) {
   }
 }
 
+// Add native names for some types
+types.Module.prototype.getNativeName = function () {
+  return 'M'+this.name
+}
+
 module.exports = {nativeTypeForType: nativeTypeForType}
 

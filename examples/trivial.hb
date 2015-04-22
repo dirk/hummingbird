@@ -19,6 +19,7 @@ class A {
 }
 console.log("Foo bar.")
 let e = new A()
+let f = e.b
 console.log(e.b)
 console.log(e.d())
 

@@ -273,24 +273,39 @@ AST.Assignment.prototype.compileToStorable = function (ctx, blockCtx, lvalue) {
     }
     var item = path[i]
     switch (item.constructor) {
-    case AST.Property:
-      assertInstanceOf(itemType, types.Instance)
-      // Make sure it's pointing to an Object
-      var objectType = itemType.type
-      assertInstanceOf(objectType, types.Object)
-      var nativeObject = objectType.getNativeObject()
-      // Now get the property
-      var propName = item.name,
-          propPtr  = nativeObject.buildStructGEPForProperty(ctx, itemValue, propName)
-      // If it's the end of the path then we return the pointer since it's storable
-      if (isLast) {
-        return propPtr
-      }
-      itemType = new types.Instance(itemType.getTypeOfPropertyName(propName))
-      itemValue = ctx.builder.buildLoad(propPtr, propName)
-      break
-    default:
-      throw new ICE('Cannot handle path item type: '+item.constructor.name)
+      case AST.Identifier:
+        // Unbox and ensure we've got an Object we can work with
+        assertInstanceOf(itemType, types.Instance)
+        var objType = itemType.type
+        assertInstanceOf(objType, types.Object)
+        var nativeObj = objType.getNativeObject(),
+            propName  = item.name,
+            propType  = item.type,
+            propPtr   = nativeObj.buildStructGEPForProperty(ctx, itemValue, propName)
+        // Return storable pointer if we're the last item in the chain
+        if (isLast) { return propPtr }
+        // Otherwise build a dereference
+        itemType  = propType
+        itemValue = ctx.builder.buildLoad(propPtr, propName)
+        break
+   /* case AST.Property:
+        assertInstanceOf(itemType, types.Instance)
+        // Make sure it's pointing to an Object
+        var objectType = itemType.type
+        assertInstanceOf(objectType, types.Object)
+        var nativeObject = objectType.getNativeObject()
+        // Now get the property
+        var propName = item.name,
+            propPtr  = nativeObject.buildStructGEPForProperty(ctx, itemValue, propName)
+        // If it's the end of the path then we return the pointer since it's storable
+        if (isLast) {
+          return propPtr
+        }
+        itemType = new types.Instance(itemType.getTypeOfPropertyName(propName))
+        itemValue = ctx.builder.buildLoad(propPtr, propName)
+        break */
+      default:
+        throw new ICE('Cannot handle path item type: '+item.constructor.name)
     }
   }
 }
@@ -311,6 +326,223 @@ AST.Assignment.prototype.compileNamed = function (ctx, blockCtx) {
   // Get the slot pointer
   blockCtx.slots.buildSet(ctx, this.lvalue.name, rvalue)
 }
+
+AST.Property.prototype.compile = function (ctx, blockCtx, exprCtx) {
+  this.compileToValue(ctx, blockCtx, exprCtx)
+}
+
+AST.Property.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
+  var base      = this.base,
+      parent    = this.parent,
+      property  = this.property,
+      type      = null,
+      value     = null
+
+  if (this.base.type instanceof types.Module) {
+    return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
+  }
+  if (parent === null) {
+    // Start off with an Identifier
+    assertInstanceOf(this.base, AST.Identifier)
+    var retCtx = {}
+    this.base.compile(ctx, blockCtx, retCtx)
+    type  = retCtx.type
+    value = retCtx.value
+
+  } else {
+    type  = exprCtx.type
+    value = exprCtx.value
+  }
+  assertInstanceOf(value, Buffer)
+  var ret = this.property.compileToValue(ctx, blockCtx, {type: type, value: value})
+  if (!ret) {
+    throw new ICE("Encountered a null return value")
+  }
+  return ret
+}
+AST.Property.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var parent = null,
+      path   = []
+  if (parent === null) {
+    var retCtx = {}
+    this.base.compileAsModuleMember(ctx, blockCtx, retCtx)
+    assertInstanceOf(retCtx.path, Array)
+    path = retCtx.path
+  } else {
+    path = exprCtx.path
+  }
+  return this.property.compileAsModuleMember(ctx, blockCtx, {path: path})
+}
+
+AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
+  var recvValue    = exprCtx.value,
+      recvInstance = exprCtx.type,
+      instance     = this.base.type,
+      method       = instance.type
+  assertInstanceOf(recvValue, Buffer)
+  assertInstanceOf(recvInstance.type, types.Object)
+  assertInstanceOf(method, types.Function)
+  // Get the object we're going to use and compile the argument values
+  var recvObj   = recvInstance.type.getNativeObject(),
+      argValues = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  // Get the function to call
+  var methodFn = method.getNativeFunction()
+  // And add the receiver object pointer and call the function
+  argValues.unshift(recvValue)
+  var retValue  = ctx.builder.buildCall(methodFn.getPtr(), argValues, '')
+  exprCtx.type  = this.type
+  exprCtx.value = retValue
+  return retValue
+}
+
+AST.Call.prototype.compile = function (ctx, blockCtx, exprCtx) {
+  this.compileToValue(ctx, blockCtx, exprCtx)
+}
+AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
+  var parent = this.parent,
+      type   = null,
+      value  = null
+
+  // First we need to check for it being an instance method
+  while (parent !== null) {
+    var methodType = this.base.type
+    if (!(methodType instanceof types.Instance)) { break }
+    // Unbox the instance and check if it's an instace method
+    methodType = methodType.type
+    if (!methodType.isInstanceMethod) { break }
+    // If it was an instance method then we'll go directly to that
+    // compilation path
+    return this.compileInstanceMethodCall(ctx, blockCtx, exprCtx)
+  }
+
+  if (parent === null) {
+    // Make sure we have a real Identifier to start off with
+    assertInstanceOf(this.base, AST.Identifier)
+    var retCtx = {}
+    this.base.compile(ctx, blockCtx, retCtx)
+    type  = retCtx.type
+    value = retCtx.value
+
+  } else {
+    baseType  = exprCtx.type
+    baseValue = exprCtx.value
+    var retCtx = {type: baseType, value: baseValue}
+    this.base.compile(ctx, blockCtx, retCtx)
+    type  = retCtx.type
+    value = retCtx.value
+  }
+  assertInstanceOf(type, types.Instance)
+  var funcType  = type.type,
+      argValues = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  // Look up the native function and call it
+  var nativeFn = funcType.getNativeFunction()
+  assertInstanceOf(nativeFn, NativeFunction)
+  var fnPtr = nativeFn.getPtr()
+  // Build return call and update the context to return
+  var retValue = ctx.builder.buildCall(fnPtr, argValues, '')
+  tryUpdatingExpressionContext(exprCtx, this.type, retValue)
+  return retValue
+}
+AST.Call.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var parent = this.parent
+  if (parent === null) {
+    throw new ICE('Not implemented yet')
+  }
+  assertInstanceOf(exprCtx.path, Array)
+  var retCtx = {path: _.clone(exprCtx.path)}
+  this.base.compileAsModuleMember(ctx, blockCtx, retCtx)
+  var path = retCtx.path
+  assertInstanceOf(path, Array)
+  // Join the path and look up the function type from the box on our base
+  var name = path.join('_')
+  assertInstanceOf(this.base.type, types.Instance)
+  assertInstanceOf(this.base.type.type, types.Function)
+  var type = this.base.type.type
+  // Look up the actual function global via the name path
+  var global = null
+  if (ctx.hasGlobal(name)) {
+    global = ctx.getGlobal(name)
+  } else {
+    var args    = type.args.map(nativeTypeForType),
+        ret     = nativeTypeForType(type.ret),
+        fnTy    = new LLVM.FunctionType(ret, args, false),
+        fnPtrTy = LLVM.Types.pointerType(fnTy.ptr)
+    // Add the function as a global
+    global = ctx.addGlobal(name, fnPtrTy)
+  }
+  // Look up the function and call it with the arguments
+  var fn = ctx.buildGlobalLoad(name),
+      args = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  return ctx.builder.buildCall(fn, args, '')
+}
+
+function tryUpdatingExpressionContext (exprCtx, type, value) {
+  if (!exprCtx) { return }
+  exprCtx.type  = type
+  exprCtx.value = value
+}
+
+AST.Identifier.prototype.compile = function (ctx, blockCtx, exprCtx) {
+  this.compileToValue(ctx, blockCtx, exprCtx)
+}
+AST.Identifier.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
+  var parent   = this.parent,
+      newType  = null,
+      newValue = null
+
+  // First check if we're working on a module
+  if (this.type instanceof types.Module) {
+    return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
+  }
+  if (parent === null) {
+    // Look up ourselves rather than building off a parent
+    var pair = getTypeAndSlotsForName(ctx, blockCtx, this.name)
+    newValue = pair[0].buildGet(ctx, this.name)
+    newType  = pair[1]
+  } else {
+    var type  = exprCtx.type,
+        value = exprCtx.value
+    // Check the types and then build the GEP
+    assertInstanceOf(type, types.Instance)
+    var objType   = type.type,
+        nativeObj = objType.getNativeObject()
+
+    // Build the pointer and load it into a value
+    var ptr  = nativeObj.buildStructGEPForProperty(ctx, value, this.name)
+    newType  = this.type
+    newValue = ctx.builder.buildLoad(ptr, this.name)
+  }
+  tryUpdatingExpressionContext(exprCtx, newType, newValue)
+  return newValue
+}
+AST.Identifier.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
+  var path = (exprCtx.path ? exprCtx.path : []),
+      type = this.type,
+      name = null
+  switch (type.constructor) {
+    case types.Module:
+      name = type.getNativeName()
+      break
+    case types.Instance:
+      var unboxed = type.type
+      assertInstanceOf(unboxed, types.Function, "Currently can only target module functions")
+      name = 'F'+this.name
+      break
+    default:
+      throw new ICE("Don't know how to handle module member of type: "+type.constructor.name)
+  }
+  path.push(name)
+  // Update the expression context and return
+  exprCtx.path = path
+  return null
+}
+
 
 AST.Literal.prototype.compileToValue = function (ctx, blockCtx) {
   var instance = this.type

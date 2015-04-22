@@ -32,7 +32,7 @@ var _ind = 0,
 
 // Nodes ----------------------------------------------------------------------
 
-var Node = function () {}
+function Node () {}
 Node.prototype.print = function () { out.write(inspect(this)) }
 Node.prototype.compile = function (context) {
   throw new Error('Compilation not yet implemented for node: '+this.constructor.name)
@@ -220,6 +220,10 @@ function assertPropertyIsInstanceOf (recv, prop, type) {
   if (recv[prop] instanceof type) { return }
   throw new Error('Expected '+prop+' to be an instance of '+type.name)
 }
+function assertPropertyIsTypeOf (recv, prop, type) {
+  if (typeof recv[prop] === type) { return }
+  throw new Error('Expected '+prop+' to be a type of '+type)
+}
 
 
 // Compiler sanity check to make sure all the args have the correct properties
@@ -319,21 +323,43 @@ New.prototype.toString = function () {
 New.prototype.print = function () { out.write(this.toString()) }
 
 
-function Call(args) {
-  this.args = args
+function Identifier (name) {
+  this.name   = name
+  this.parent = null
+}
+inherits(Identifier, Node)
+Identifier.prototype.toString = function () { return this.name }
+Identifier.prototype.print    = function () { out.write(this.toString()) }
+
+
+function Call(base, callArgs) {
+  this.base   = base
+  this.args   = callArgs
+  this.parent = null
+  assertPropertyIsInstanceOf(this, 'base', Node)
+  assertPropertyIsInstanceOf(this, 'args', Array)
 }
 inherits(Call, Node)
 Call.prototype.toString = function () {
-  return '('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
+  var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
+  return this.base+args
+}
+Call.prototype.print = function () {
+  out.write(this.toString())
 }
 
-function Property (name) {
-  this.name = name
+function Property (base, property) {
+  this.base     = base
+  this.property = property
+  this.parent   = null
+  assertPropertyIsInstanceOf(this, 'base', Node)
+  assertPropertyIsInstanceOf(this, 'property', Node)
 }
 inherits(Property, Node)
 Property.prototype.toString = function () {
-  return '.'+this.name
+  return this.base+'.'+this.property.toString()
 }
+Property.prototype.print = function () { out.write(this.toString()) }
 
 
 function If (cond, block, elseIfs, elseBlock) {
@@ -504,6 +530,7 @@ module.exports = {
   If: If,
   While: While,
   For: For,
+  Identifier: Identifier,
   Chain: Chain,
   Return: Return,
   Call: Call,

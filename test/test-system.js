@@ -104,13 +104,13 @@ describe('System', function () {
         var extended = source+"a.c(1, 2)\n"
         expect(function () {
           parseAndWalk(extended)
-        }).to.throwException(/Wrong number of arguments/)
+        }).to.throwException(/Argument length mismatch/)
       })
       it('should fail on parsing mismatched argument types', function () {
         var extended = source+"a.c(\"1\")\n"
         expect(function () {
           parseAndWalk(extended)
-        }).to.throwException(/Argument mismatch/)
+        }).to.throwException(/Argument type mismatch/)
       })
     })
 

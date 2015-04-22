@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var path         = require('path'),
-    libDirectory = path.join(path.dirname(__filename), '..', 'src')
+    srcDirectory = path.join(path.dirname(__filename), '..', 'src')
 
-require(path.join(libDirectory, 'command-native'))
+require(path.join(srcDirectory, 'command-native'))
 

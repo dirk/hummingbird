@@ -32,6 +32,10 @@ NativeFunction.prototype.computeType = function () {
   }
   this.type = new LLVM.FunctionType(ret, args, false)
 }
+NativeFunction.prototype.defineExternal = function (ctx) {
+  this.computeType()
+  this.fn = NativeFunction.addExternalFunction(ctx, this.name, this.ret, this.args)
+}
 NativeFunction.prototype.defineBody = function (ctx, cb) {
   if (!this.type) {
     this.computeType()

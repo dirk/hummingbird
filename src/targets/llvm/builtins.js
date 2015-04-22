@@ -33,9 +33,10 @@ function compile (ctx, mainEntry, root) {
       consoleType     = consoleInstance.type,
       logType         = consoleType.getTypeOfProperty('log')
 
-  // Create the NativeFunction for logging strings
+  // Create the NativeFunction for logging strings and define it as
+  // externally (computes type and builds external function pointer).
   var log = new NativeFunction('TBuiltinConsole_mlog', [rootScope.getLocal('String')], rootScope.getLocal('Void'))
-  log.computeType()
+  log.defineExternal(ctx)
   logType.setNativeFunction(log)
   /*
   log.defineBody(ctx, function (entry) {

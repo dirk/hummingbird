@@ -107,9 +107,14 @@ function compileFile (args) {
   var filePath      = fileFromArgs(args, 0),
       // Get the directory of the file for the import-path
       fileDirectory = path.dirname(filePath)
-  var compiler = new Compiler()
-  compiler.importPath.push(fileDirectory)
-  var file = compiler.compile(filePath, compileOpts)
+  try {
+    var compiler = new Compiler()
+    compiler.importPath.push(fileDirectory)
+    var file = compiler.compile(filePath, compileOpts)
+  } catch (err) {
+    reportError(err)
+    process.exit(1)
+  }
   return file
 }
 
