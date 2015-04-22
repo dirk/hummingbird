@@ -152,8 +152,8 @@ indexerexpr  = indexer
 basicexpr = "(" e:expr ")" { return e }
           / funcexpr
           / newexpr
-          / identifierexpr
           / literalexpr
+          / identifierexpr
 
 identifierexpr = n:name { return pos(p.parseIdentifier(n)) }
 
