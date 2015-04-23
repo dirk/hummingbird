@@ -48,9 +48,7 @@ types.Module.prototype.getNativeName = function () {
   }
   return ret
 }
-types.String.prototype.getNativePrefix = function () {
-  return 'S'
-}
+types.String.prototype.getNativePrefix   = function () { return 'S' }
 types.Function.prototype.getNativePrefix = function () { return 'F' }
 
 module.exports = {nativeTypeForType: nativeTypeForType}

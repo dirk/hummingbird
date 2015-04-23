@@ -194,7 +194,8 @@ function Function (supertype, args, ret) {
   _super(this).call(this, supertype)
   this.intrinsic        = true
   this.isInstanceMethod = false
-  // Shim for the ultimate method
+  // If this is an intrinsic instance method shimming for a module method,
+  // this points to that module method to call in place of this shim.
   this.shimFor          = null
   // Types of arguments and return
   this.args = (args === undefined) ? [] : args
