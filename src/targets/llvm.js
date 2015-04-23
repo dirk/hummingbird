@@ -220,8 +220,8 @@ function compileBlock (ctx, block, parentFn, preStatementsCb) {
   for (var i = 0; i < statements.length; i++) {
     var stmt = statements[i]
     stmt.compile(ctx, blockCtx)
-  }
-}
+  }//for
+}//compileBlock
 
 // Look up the type and Slots for a given name; begins search from the passed
 // block-context. Returns a 2-tuple of Slots and Type.
@@ -342,8 +342,6 @@ AST.Property.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     return this.compileAsModuleMember(ctx, blockCtx, exprCtx)
   }
   if (parent === null) {
-    // Start off with an Identifier
-    assertInstanceOf(this.base, AST.Identifier)
     var retCtx = {}
     this.base.compile(ctx, blockCtx, retCtx)
     type  = retCtx.type
@@ -397,6 +395,40 @@ AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx)
   return retValue
 }
 
+AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
+  var receiverInstance = this.parent.type,
+      receiverType     = receiverInstance.type
+  
+  // Look up the shim method. The shim will get transformed into a proper call
+  var shimMethodInstance = this.base.type,
+      shimMethod         = shimMethodInstance.type
+  // Look up the ultimate method via the shim
+  if (shimMethod.shimFor == null) {
+    throw new ICE('Missing ultimate method for shim: '+this.base.name)
+  }
+  var method   = shimMethod.shimFor,
+      nativeFn = method.getNativeFunction(),
+      argValues = this.args.map(function (arg) {
+        return arg.compileToValue(ctx, blockCtx)
+      })
+  // Add the receiver to the front of the arguments
+  var receiverValue = exprCtx.value
+  argValues.unshift(receiverValue)
+  // Build the call
+  var retValue = ctx.builder.buildCall(nativeFn.getPtr(), argValues, '')
+  tryUpdatingExpressionContext(exprCtx, this.type, retValue)
+  return retValue
+}
+
+function unboxInstanceType (instance, expectedType) {
+  assertInstanceOf(instance, types.Instance)
+  var type = instance.type
+  if (expectedType !== undefined) {
+    assertInstanceOf(type, expectedType)
+  }
+  return type
+}
+
 AST.Call.prototype.compile = function (ctx, blockCtx, exprCtx) {
   this.compileToValue(ctx, blockCtx, exprCtx)
 }
@@ -412,9 +444,16 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     // Unbox the instance and check if it's an instace method
     methodType = methodType.type
     if (!methodType.isInstanceMethod) { break }
-    // If it was an instance method then we'll go directly to that
-    // compilation path
-    return this.compileInstanceMethodCall(ctx, blockCtx, exprCtx)
+    var receiverInstance = parent.type,
+        receiverType     = receiverInstance.type
+    if (receiverType.intrinsic === true) {
+      // Need to do a little bit of special handling for intrinsics
+      return this.compileIntrinsicInstanceMethodCall(ctx, blockCtx, exprCtx)
+    } else {
+      // If it was an instance method then we'll go directly to that
+      // compilation path
+      return this.compileInstanceMethodCall(ctx, blockCtx, exprCtx)
+    }
   }
 
   if (parent === null) {
@@ -433,17 +472,12 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     type  = retCtx.type
     value = retCtx.value
   }
-  assertInstanceOf(type, types.Instance)
-  var funcType  = type.type,
+  var funcType  = unboxInstanceType(type, types.Function),
       argValues = this.args.map(function (arg) {
         return arg.compileToValue(ctx, blockCtx)
       })
-  // Look up the native function and call it
-  var nativeFn = funcType.getNativeFunction()
-  assertInstanceOf(nativeFn, NativeFunction)
-  var fnPtr = nativeFn.getPtr()
   // Build return call and update the context to return
-  var retValue = ctx.builder.buildCall(fnPtr, argValues, '')
+  var retValue = ctx.builder.buildCall(value, argValues, '')
   tryUpdatingExpressionContext(exprCtx, this.type, retValue)
   return retValue
 }
@@ -681,6 +715,27 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
       initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
   // And then call it so that the module gets initialized at the correct time
   ctx.builder.buildCall(initFn, [], '')
+  
+  var basePath = this.file.module.getNativeName()
+  if (this.using) {
+    var slots = blockCtx.slots
+    // Load items from the module into the local scope
+    for (var i = 0; i < this.using.length; i++) {
+      var use      = this.using[i],
+          instance = this.file.module.getTypeOfProperty(use),
+          type     = unboxInstanceType(instance),
+          path     = basePath+'_'+type.getNativePrefix()+use
+      // Sanity-check to make sure this is the first time this global has
+      // been set up
+      if (ctx.hasGlobal(path)) {
+        throw new ICE('Global already exists: '+path)
+      }
+      var global   = ctx.addGlobal(path, nativeTypeForType(instance)),
+          value    = ctx.buildGlobalLoad(path)
+      // Store the value in the local slot
+      slots.buildSet(ctx, use, value)
+    }
+  }
 }
 
 AST.Export.prototype.compile = function (ctx, blockCtx) {
@@ -690,26 +745,25 @@ AST.Export.prototype.compile = function (ctx, blockCtx) {
   var path = [ctx.targetModule.getNativeName()],
       name = this.name,
       type = this.type
-  switch (type.constructor) {
-    case types.Function:
-      path.push('F'+name)
-      var exportName = path.join('_')
-      // Create a global value with that name
-      var value    = blockCtx.slots.buildGet(ctx, this.name),
-          nativeFn = type.getNativeFunction(),
-          nativeTy = TypeOf(nativeFn.getPtr()),
-          global   = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, nativeTy, exportName)
-      // Set it to externally link and initialize it to null
-      LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
-      var initialNull = LLVM.Library.LLVMConstPointerNull(nativeTy)
-      LLVM.Library.LLVMSetInitializer(global, initialNull)
-      // Set the native function pointer in the global so it will be exposed
-      ctx.builder.buildStore(value, global, '')
-      break
 
-    default:
-      throw new ICE('Cannot export something of type: '+type.inspect())
+  function setupGlobal (name, exportName) {
+    var value = blockCtx.slots.buildGet(ctx, name),
+        type  = TypeOf(value),
+        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, exportName)
+    // Set the linkage and initializer
+    LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
+    var initialNull = LLVM.Library.LLVMConstPointerNull(type)
+    LLVM.Library.LLVMSetInitializer(global, initialNull)
+    // Store the value in the global
+    ctx.builder.buildStore(value, global, '')
+    return global
   }
+  var exportableTypes = [types.Function, types.String]
+  if (exportableTypes.indexOf(type.constructor) === -1) {
+    throw new ICE('Cannot export something of type: '+type.inspect())
+  }
+  var exportName = path.concat(type.getNativePrefix()+name).join('_'),
+      global     = setupGlobal(name, exportName)
 }
 
 AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
@@ -963,6 +1017,28 @@ AST.Function.prototype.getAnonymousNativeFunction = function (ctx) {
   return fn
 }
 
+AST.Function.prototype.compile = function(ctx, blockCtx) {
+  var instance = this.type,
+      type     = unboxInstanceType(instance, types.Function)
+  if (type.parentMultiType) {
+    throw new ICE('Compilation of multi-functions not yet implemented')
+  } else {
+    if (typeof this.name !== 'string') {
+      throw new ICE('Missing name of Function statement')
+    }
+    var name = type.getNativePrefix()+this.name
+    // Setup the native function
+    var fn = new NativeFunction(name, type.args, type.ret)
+    type.setNativeFunction(fn)
+    // Compile the native function with our block
+    genericCompileFunction(ctx, fn, this)
+    // Set the linkage of the function to private
+    LLVM.Library.LLVMSetLinkage(fn.getPtr(), LLVM.Library.LLVMPrivateLinkage)
+    // Add this to the slots
+    blockCtx.slots.buildSet(ctx, this.name, fn.getPtr())
+  }
+}
+
 AST.Function.prototype.compileToValue = function (ctx, blockCtx) {
   var self = this,
       fn   = this.getAnonymousNativeFunction(ctx)
@@ -1209,7 +1285,11 @@ AST.If.prototype.compileConditionBlock = function (ctx, parentFn, blockNode, blo
   }
 }
 
-AST.Binary.prototype.compileToValue = function (ctx, blockCtx) {
+AST.Binary.prototype.compile = function (ctx, blockCtx, exprCtx) {
+  this.compileToValue(ctx, blockCtx, exprCtx)
+}
+
+AST.Binary.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
   var lexpr = this.lexpr,
       rexpr = this.rexpr
   // Check (and unbox) the types
@@ -1225,10 +1305,10 @@ AST.Binary.prototype.compileToValue = function (ctx, blockCtx) {
   // Compile the two sides down to a value that we can use
   var lexprValue = lexpr.compileToValue(ctx, blockCtx),
       rexprValue = rexpr.compileToValue(ctx, blockCtx)
-  // Build the call to the function
   // Call the builder function that we got from BinaryOps
-  return builder(ctx, lexprValue, rexprValue)
-  // return ctx.builder.buildCall(fn, [lexprValue, rexprValue], 'op'+this.op)
-  throw new ICE('Unreachable')
+  var retValue = builder(ctx, lexprValue, rexprValue),
+      retType  = this.type
+  tryUpdatingExpressionContext(exprCtx, retType, retValue)
+  return retValue
 }
 

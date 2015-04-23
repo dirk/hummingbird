@@ -1,3 +1,4 @@
+#import <ctype.h>
 #import <stdlib.h>
 #import <stdio.h>
 #import <string.h>
@@ -28,6 +29,25 @@ char *Mstd_Mcore_Mtypes_Mstring_Fconcat(char *lvalue, char *rvalue) {
   size_t retLen    = lvalueLen + rvalueLen;
   void *ret = GC_malloc(retLen + 1);
   snprintf(ret, retLen + 1, "%s%s", lvalue, rvalue);
+  return ret;
+}
+
+char *Mstd_Mcore_Mtypes_Mstring_Fuppercase(char *recv) {
+  size_t recvLen = strlen(recv);
+  char *ret = GC_malloc(recvLen + 1);
+  for (unsigned int i = 0; i < recvLen; i++) {
+    ret[i] = toupper(recv[i]);
+  }
+  recv[recvLen] = '\0';
+  return ret;
+}
+char *Mstd_Mcore_Mtypes_Mstring_Flowercase(char *recv) {
+  size_t recvLen = strlen(recv);
+  char *ret = GC_malloc(recvLen + 1);
+  for (unsigned int i = 0; i < recvLen; i++) {
+    ret[i] = tolower(recv[i]);
+  }
+  recv[recvLen] = '\0';
   return ret;
 }
 

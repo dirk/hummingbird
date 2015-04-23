@@ -15,6 +15,10 @@ function NativeFunction (name, args, ret) {
   // LLVM variable set during definition/compilation
   this.type = null
   this.fn   = null
+  // Whether or not this function has been defined
+  this.defined = false
+  // The function to call to define the function (if it hasn't been defined)
+  this.definer = null
 }
 NativeFunction.prototype.computeType = function () {
   var args  = this.args.map(nativeTypeForType)
@@ -33,14 +37,21 @@ NativeFunction.prototype.computeType = function () {
   this.type = new LLVM.FunctionType(ret, args, false)
 }
 NativeFunction.prototype.defineExternal = function (ctx) {
-  this.computeType()
-  this.fn = NativeFunction.addExternalFunction(ctx, this.name, this.ret, this.args)
+  if (this.defined) {
+    throw new ICE('Cannot redefine external function')
+  }
+  this.definer = function () {
+    this.computeType()
+    this.fn = NativeFunction.addExternalFunction(ctx, this.name, this.ret, this.args)
+    this.defined = true
+  }
 }
 NativeFunction.prototype.defineBody = function (ctx, cb) {
   if (!this.type) {
     this.computeType()
   }
   this.fn = ctx.module.addFunction(this.name, this.type)
+  this.defined = true
   // Get the previous entry so we can restore it
   var builderPtr    = ctx.builder.ptr,
       previousEntry = LLVM.Library.LLVMGetInsertBlock(builderPtr)
@@ -53,6 +64,12 @@ NativeFunction.prototype.defineBody = function (ctx, cb) {
   ctx.builder.positionAtEnd(previousEntry)
 }
 NativeFunction.prototype.getPtr = function () {
+  if (!this.defined) {
+    if (!(this.definer instanceof Function)) {
+      throw new ICE('Missing definer for not-yet-defined NativeFunction')
+    }
+    this.definer()
+  }
   return this.fn.ptr
 }
 

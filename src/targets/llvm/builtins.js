@@ -67,6 +67,17 @@ function compile (ctx, mainEntry, root) {
   // Finally we'll expose the console object in the global slots
   ctx.globalSlots.buildDefine(ctx, 'console', LLVM.Types.pointerType(consoleObject.structType))
   // ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
+
+  var stringModule = rootScope.getLocal('std').getChild('core').getChild('types').getChild('string'),
+      StringType   = rootScope.getLocal('String')
+  
+  var uppercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fuppercase', [StringType], StringType)
+  uppercase.defineExternal(ctx)
+  stringModule.getTypeOfProperty('uppercase').setNativeFunction(uppercase)
+
+  var lowercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Flowercase', [StringType], StringType)
+  lowercase.defineExternal(ctx)
+  stringModule.getTypeOfProperty('lowercase').setNativeFunction(lowercase)
 }
 
 module.exports = {

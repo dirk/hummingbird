@@ -12,11 +12,22 @@ function Type (supertype, isRoot) {
     throw new TypeError('Missing supertype')
   }
   // Whether or not the type is intrinsic to the language
-  this.intrinsic = false
-  this.name      = this.constructor.name
-  this.supertype = supertype
+  this.intrinsic  = false
+  this.name       = this.constructor.name
+  this.supertype  = supertype
+  // Maps property names (strings) to Types
+  this.properties = {}
   // Whether or not the type is a root type in the type hierarchy
-  this.isRoot    = isRoot ? true : false
+  this.isRoot     = isRoot ? true : false
+}
+Type.prototype.getTypeOfProperty = function (name, fromNode) {
+  var type = this.properties[name]
+  if (type) { return type }
+  throw new TypeError('Property not found on '+this.name+': '+name, fromNode)
+}
+Type.prototype.setTypeOfProperty = function (name, type) {
+  // TODO: Check that it's not overwriting properties
+  this.properties[name] = type
 }
 Type.prototype.equals = function (other) { return false }
 Type.prototype.toString = function () {
@@ -52,8 +63,6 @@ function Object (supertype) {
   Object.super_.call(this, supertype)
   this.intrinsic = true
   this.primitive = false
-  // Maps property names (strings) to Types
-  this.properties = {}
   // Flags about properties; maps name (string) to optional flags (string)
   //   r = read-only
   this.propertiesFlags = {}
@@ -61,15 +70,6 @@ function Object (supertype) {
   this.initializers = []
 }
 inherits(Object, Type)
-Object.prototype.getTypeOfProperty = function (name, fromNode) {
-  var type = this.properties[name]
-  if (type) { return type }
-  throw new TypeError('Property not found on '+this.name+': '+name, fromNode)
-}
-Object.prototype.setTypeOfProperty = function (name, type) {
-  // TODO: Check that it's not overwriting properties
-  this.properties[name] = type
-}
 Object.prototype.getFlagsOfProperty = function (name) {
   var flags = this.propertiesFlags[name]
   return (flags ? flags : null)
@@ -107,6 +107,9 @@ Module.prototype.setParent = function (parent) {
 Module.prototype.addChild = function (child) {
   var childName = child.name
   this.setTypeOfProperty(childName, child)
+}
+Module.prototype.getChild = function (name) {
+  return this.getTypeOfProperty(name)
 }
 Module.prototype.inspect = function () { return '.'+this.name }
 
@@ -191,6 +194,9 @@ function Function (supertype, args, ret) {
   _super(this).call(this, supertype)
   this.intrinsic        = true
   this.isInstanceMethod = false
+  // If this is an intrinsic instance method shimming for a module method,
+  // this points to that module method to call in place of this shim.
+  this.shimFor          = null
   // Types of arguments and return
   this.args = (args === undefined) ? [] : args
   this.ret  = (ret === undefined) ? null : ret

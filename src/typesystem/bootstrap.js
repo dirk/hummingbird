@@ -10,12 +10,13 @@ module.exports = function (TypeSystem) {
 
     // Setup the basic intrinsic types (Any, Object, Integer, etc.)
     this.bootstrapIntrinsicTypes(rootObject)
-    // Set up our built-ins
-    this.bootstrapStd()
-    this.bootstrapConsole(rootObject)
 
     // Expose rootObject to later functions
     this.rootObject = rootObject
+
+    // Set up our built-ins
+    this.bootstrapStd()
+    this.bootstrapConsole(rootObject)
   }// bootstrap()
 
   TypeSystem.prototype.bootstrapIntrinsicTypes = function (rootObject) {
@@ -45,7 +46,7 @@ module.exports = function (TypeSystem) {
   TypeSystem.prototype.bootstrapStd = function () {
     var std = new types.Module('std')
     this.root.setLocal('std', std)
-    
+
     var core = new types.Module('core')
     core.setParent(std)
     std.addChild(core)
@@ -53,6 +54,38 @@ module.exports = function (TypeSystem) {
     var typs = new types.Module('types')
     typs.setParent(core)
     core.addChild(typs)
+
+    this.bootstrapStdCoreTypesString(typs)
+  }
+
+  TypeSystem.prototype.bootstrapStdCoreTypesString = function (typs) {
+    var stringModule = new types.Module('string'),
+        StringType   = this.root.getLocal('String')
+    stringModule.setParent(typs)
+    typs.addChild(stringModule)
+
+    var self = this
+    function addInstanceMethodAndShim (module, receiverType, methodName, returnType) {
+      var moduleMethod = new types.Function(self.rootObject, [receiverType], returnType)
+      stringModule.setTypeOfProperty(methodName, moduleMethod)
+      var instanceMethod = new types.Function(self.rootObject, [], returnType)
+      instanceMethod.isInstanceMethod = true
+      instanceMethod.shimFor          = moduleMethod
+      StringType.setTypeOfProperty(methodName, instanceMethod)
+    }
+
+    // Add function to module and the String type
+    /*
+    var uppercase = new types.Function(this.rootObject, [this.root.getLocal('String')], this.root.getLocal('String'))
+    stringModule.setTypeOfProperty('uppercase', uppercase)
+    var uppercaseMethod = new types.Function(this.rootObject, [], this.root.getLocal('String'))
+    uppercaseMethod.isInstanceMethod = true
+    uppercaseMethod.shimFor          = uppercase
+    StringType.setTypeOfProperty('uppercase', uppercaseMethod)
+    */
+    addInstanceMethodAndShim(stringModule, StringType, 'uppercase', StringType)
+    addInstanceMethodAndShim(stringModule, StringType, 'lowercase', StringType)
+    
   }
 
 }// module.exports

@@ -27,7 +27,7 @@
   }
 
   // Forward declarations that will be overwritten parser-extension.js
-  p.parseImport = function (name) { return [name] }
+  p.parseImport = function (name, using) { return [name, using] }
   p.parseExport = function (name) { return [name] }
   p.parseDeclaration = function (lvalue, rvalue) { return [lvalue, rvalue] }
   p.parseClass = function (name, block) { return [name, block] }
@@ -87,8 +87,13 @@ innerstmt = modstmt
 modstmt = importstmt
         / exportstmt
 
-importstmt = "import" whitespace "<" i:importpath ">" { return pos(p.parseImport(i)) }
-importpath = c:[A-Za-z0-9-_/]+ { return text() }
+importstmt = "import" whitespace "<" i:importpath ">" u:usingpath? { return pos(p.parseImport(i, u)) }
+importpath = [A-Za-z0-9-_/.]+ { return text() }
+usingpath  = whitespace "using" whitespace n:name e:(_ "," _ name)* {
+  return [n].concat((!e) ? [] : e.map(function (a) {
+    return a[3]
+  }))
+}
 exportstmt = "export" whitespace n:name   { return pos(p.parseExport(n)) }
 
 ctrl = ifctrl

@@ -46,8 +46,14 @@ function nativeTypeForType (type) {
 
 // Add native names for some types
 types.Module.prototype.getNativeName = function () {
-  return 'M'+this.name
+  var ret = 'M'+this.name
+  if (this.parent) {
+    ret = this.parent.getNativeName()+'_'+ret
+  }
+  return ret
 }
+types.String.prototype.getNativePrefix   = function () { return 'S' }
+types.Function.prototype.getNativePrefix = function () { return 'F' }
 
 module.exports = {nativeTypeForType: nativeTypeForType}
 
