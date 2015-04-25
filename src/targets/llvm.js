@@ -84,6 +84,17 @@ function BasicLogger () {
   this.info = console.log
 }
 
+
+function unboxInstanceType (instance, expectedType) {
+  assertInstanceOf(instance, types.Instance)
+  var type = instance.type
+  if (expectedType !== undefined) {
+    assertInstanceOf(type, expectedType)
+  }
+  return type
+}
+
+
 AST.Node.prototype.compileToValue = function () {
   throw new Error('Compilation to value not yet implemented for: '+this.constructor.name)
 }
@@ -275,10 +286,8 @@ AST.Assignment.prototype.compileToStorable = function (ctx, blockCtx, lvalue) {
     switch (item.constructor) {
       case AST.Identifier:
         // Unbox and ensure we've got an Object we can work with
-        assertInstanceOf(itemType, types.Instance)
-        var objType = itemType.type
-        assertInstanceOf(objType, types.Object)
-        var nativeObj = objType.getNativeObject(),
+        var objType   = unboxInstanceType(itemType, types.Object),
+            nativeObj = objType.getNativeObject(),
             propName  = item.name,
             propType  = item.type,
             propPtr   = nativeObj.buildStructGEPForProperty(ctx, itemValue, propName)
@@ -375,13 +384,13 @@ AST.Property.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx)
 AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
   var recvValue    = exprCtx.value,
       recvInstance = exprCtx.type,
+      recvType     = unboxInstanceType(recvInstance, types.Object),
       instance     = this.base.type,
       method       = instance.type
   assertInstanceOf(recvValue, Buffer)
-  assertInstanceOf(recvInstance.type, types.Object)
   assertInstanceOf(method, types.Function)
   // Get the object we're going to use and compile the argument values
-  var recvObj   = recvInstance.type.getNativeObject(),
+  var recvObj   = recvType.getNativeObject(),
       argValues = this.args.map(function (arg) {
         return arg.compileToValue(ctx, blockCtx)
       })
@@ -398,7 +407,7 @@ AST.Call.prototype.compileInstanceMethodCall = function (ctx, blockCtx, exprCtx)
 AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx, exprCtx) {
   var receiverInstance = this.parent.type,
       receiverType     = receiverInstance.type
-  
+
   // Look up the shim method. The shim will get transformed into a proper call
   var shimMethodInstance = this.base.type,
       shimMethod         = shimMethodInstance.type
@@ -420,14 +429,6 @@ AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx,
   return retValue
 }
 
-function unboxInstanceType (instance, expectedType) {
-  assertInstanceOf(instance, types.Instance)
-  var type = instance.type
-  if (expectedType !== undefined) {
-    assertInstanceOf(type, expectedType)
-  }
-  return type
-}
 
 AST.Call.prototype.compile = function (ctx, blockCtx, exprCtx) {
   this.compileToValue(ctx, blockCtx, exprCtx)
@@ -540,11 +541,9 @@ AST.Identifier.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     newValue = pair[0].buildGet(ctx, this.name)
     newType  = pair[1]
   } else {
-    var type  = exprCtx.type,
-        value = exprCtx.value
+    value = exprCtx.value
     // Check the types and then build the GEP
-    assertInstanceOf(type, types.Instance)
-    var objType   = type.type,
+    var objType   = unboxInstanceType(exprCtx.type),
         nativeObj = objType.getNativeObject()
 
     // Build the pointer and load it into a value
@@ -715,7 +714,7 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
       initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
   // And then call it so that the module gets initialized at the correct time
   ctx.builder.buildCall(initFn, [], '')
-  
+
   var basePath = this.file.module.getNativeName()
   if (this.using) {
     var slots = blockCtx.slots
@@ -830,9 +829,8 @@ AST.Chain.prototype.compileToValue = function (ctx, blockCtx) {
     var item = this.tail[i]
     switch (item.constructor) {
     case AST.Property:
-      assertInstanceOf(itemType, types.Instance)
       // Look up the type of the instance and get the native struct for it
-      var type         = itemType.type,
+      var type         = unboxInstanceType(itemType),
           nativeObject = type.getNativeObject(),
           propertyName = item.name,
           propertyType = type.getTypeOfProperty(propertyName)
@@ -861,9 +859,8 @@ AST.Chain.prototype.compileToValue = function (ctx, blockCtx) {
       itemValue = ctx.builder.buildLoad(ptr, propertyName)
       break
     case AST.Call:
-      assertInstanceOf(itemType, types.Instance)
       // Unbox the instance and check its type
-      var type = itemType.type
+      var type = unboxInstanceType(itemType)
       assertInstanceOf(type, types.Function)
       // Compile all the args into values
       var argValues = item.args.map(function (arg) {
@@ -917,7 +914,7 @@ function predefineTypes (ctx, block) {
         }
         if (stmt.rvalue instanceof AST.Function) {
           var rvalueInstanceType = stmt.rvalue.type,
-              rvalueType         = rvalueInstanceType.type
+              rvalueType         = unboxInstanceType(rvalueInstanceType)
           // If the native function hasn't been typed
           if (!rvalueType.hasNativeFunction()) {
             var fn = stmt.rvalue.getAnonymousNativeFunction(ctx)
@@ -996,10 +993,8 @@ AST.Function.prototype.getAnonymousNativeFunction = function (ctx) {
   if (this.name) {
     throw new ICE('Trying to set up named function as anonymous native function')
   }
-  assertInstanceOf(this.type, types.Instance)
-
   var instance = this.type,
-      type     = instance.type,
+      type     = unboxInstanceType(instance),
       fn       = null
   // Check if the native function has already been set up
   if (type.hasNativeFunction()) {
@@ -1111,9 +1106,8 @@ AST.Class.prototype.compileInstanceMethods = function (ctx, blockCtx, nativeObje
     // Skip over non-functions
     if (!(stmt instanceof AST.Function)) { continue }
     var instance = stmt.type
-    assertInstanceOf(instance, types.Instance)
     // Mark the type as an instance method
-    var type = instance.type
+    var type = unboxInstanceType(instance)
     if (type.isInstanceMethod !== true) {
       throw new ICE('Encountered non-instance-method in class definition')
     }
@@ -1295,10 +1289,8 @@ AST.Binary.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
   // Check (and unbox) the types
   var lexprType = lexpr.type,
       rexprType = rexpr.type
-  assertInstanceOf(lexprType, types.Instance)
-  assertInstanceOf(rexprType, types.Instance)
-  lexprType = lexprType.type
-  rexprType = rexprType.type
+  lexprType = unboxInstanceType(lexprType)
+  rexprType = unboxInstanceType(rexprType)
   // Find the binary-op NativeFunction
   var builder = BinaryOps.getBuilder(this.op, lexprType, rexprType)
   assertInstanceOf(builder, Function)

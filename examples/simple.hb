@@ -14,11 +14,11 @@ console.log(e.lowercase())
 # } else if a {
 #   console.log("2")
 # }
-  
-var e = func () {
-  return "1"
-}
-console.log(e())
+
+# var e = func () {
+#   return "1"
+# }
+# console.log(e())
 
 # var d = true
 # console.log(d)
