@@ -1,20 +1,20 @@
 
 class Foo {
-  var bar: Integer = 0
-  let baz: Integer = 2
+  var bar: String = "0"
+  let baz: String = "2"
 
   init () {
-    this.bar = 1
+    this.bar = "1"
   }
-  init (bar: Integer) {
+  init (bar: String) {
     this.bar = bar
   }
 
-  func zip () -> Integer {
+  func zip () -> String {
     return this.bar
   }
 }
 
-var f = new Foo(2)
+var f = new Foo("3")
 console.log(f.bar)
 

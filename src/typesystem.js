@@ -590,9 +590,34 @@ TypeSystem.prototype.visitNew = function (node, scope) {
   if (type.initializers.length === 0) {
     throw new TypeError('No initializer found for class', node)
   }
-  // TODO: Find a matching initializer
-  var initializer  = type.initializers[0]
-  node.initializer = initializer
+  // Unboxed types of all the arguments for comparing with the class'
+  // set of initializers.
+  var argTypes = new Array(node.args.length)
+  // Visit all of the arguments
+  for (var i = 0; i < node.args.length; i++) {
+    var arg = node.args[i]
+    this.visitExpression(arg, scope)
+    var argType = arg.type
+    if (!(argType instanceof types.Instance)) {
+      throw new TypeError('Expected Instance as argument to New')
+    }
+    argTypes[i] = argType.type
+  }
+  var initializers = type.initializers,
+      initializer  = false
+  // Look for a matching initializer
+  for (var i = initializers.length - 1; i >= 0; i--) {
+    var init = initializers[i]
+    var argsMatch = init.argsMatch(argTypes)
+    if (argsMatch) {
+      initializer = init
+      break
+    }
+  }
+  if (initializer === false) {
+    throw new TypeError('No initializer not found')
+  }
+  node.setInitializer(initializer)
 }
 
 var COMPARATOR_OPS = ['<']

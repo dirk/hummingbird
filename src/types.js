@@ -231,6 +231,22 @@ Function.prototype.equals = function (other) {
   // Finally compare types of their returns
   return this.ret.equals(other.ret)
 }
+// Returns true if this function's arguments match the given array of
+// other arguments (`otherArgs`).
+Function.prototype.argsMatch = function (otherArgs) {
+  var args = this.args
+  if (args.length !== otherArgs.length) {
+    return false
+  }
+  var matching = new Array(args.length)
+  for (var i = args.length - 1; i >= 0; i--) {
+    var arg      = args[i],
+        otherArg = otherArgs[i]
+    matching[i] = arg.equals(otherArg)
+  }
+  if (!matching.every(isTrue)) { return false }
+  return true
+}
 
 
 function assertPresent (recv, prop) {

@@ -316,8 +316,17 @@ Init.prototype.print = function () {
 function New (name, args) {
   this.name = name
   this.args = args
+  // Corresponding initializer Function for the class type it's initializing
+  this.initializer = null
 }
 inherits(New, Node)
+New.prototype.setInitializer = function (init) {
+  this.initializer = init
+  assertPropertyIsInstanceOf(this, 'initializer', types.Function)
+}
+New.prototype.getInitializer = function () {
+  return this.initializer
+}
 New.prototype.toString = function () {
   var args = this.args.map(function(arg) { return arg.toString() }).join(', ')
   return 'new '+this.name+'('+args+')'
