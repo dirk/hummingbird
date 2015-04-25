@@ -1082,7 +1082,7 @@ AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject)
       initializers = this.initializers
   // Build and compile a native function for each initializer function
   for (var i = 0; i < initializers.length; i++) {
-    var init         = initializers[0],
+    var init         = initializers[i],
         initType     = init.type,
         internalName = nativeObject.internalName+'_i'+i
     // Make a copy of the initializer args and prepend an argument for the
