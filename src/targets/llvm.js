@@ -1094,7 +1094,9 @@ AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject)
     genericCompileFunction(ctx, fn, init)
 
     // Add this native function to the native object's list of initializers
+    // and to the initializer function type
     nativeObject.addInitializer(fn)
+    initType.setNativeFunction(fn)
   }
 }
 AST.Class.prototype.compileInstanceMethods = function (ctx, blockCtx, nativeObject) {
@@ -1123,45 +1125,18 @@ AST.Class.prototype.compileInstanceMethods = function (ctx, blockCtx, nativeObje
   }
 }
 
+
 AST.New.prototype.compile = function (ctx, blockCtx) {
   this.compileToValue(ctx, blockCtx)
 }
-
-// TODO: Maybe move this into `AST.New.prototype`?
-function findInitializer (nativeObject, argsNodes) {
-  var type         = nativeObject.type,
-      initializers = nativeObject.initializers
-  for (var i = 0; i < initializers.length; i++) {
-    var init = initializers[i]
-    // Slice off the first argument since it will be an instance of the type
-    var initArgs = init.args.slice(1)
-    // Skip if lengths aren't the same
-    if (initArgs.length !== argsNodes.length) {
-      continue
-    }
-    // Then actually check the types of the arguments
-    var argsMatch = true
-    for (var x = 0; x < initArgs.length; x++) {
-      var ia = initArgs[x],
-          an = argsNodes[x]
-      console.log(ia)
-      console.log(an)
-      throw new ICE('Argument comparison not implemented yet')
-    }
-    // If all the arguments match then we've found our NativeFunction intializer
-    if (argsMatch) {
-      return init
-    }
-  }
-  throw new ICE('Initializer not found')
-}
-
 AST.New.prototype.compileToValue = function (ctx, blockCtx) {
   var type         = this.constructorType,
       args         = this.args,
       nativeObject = type.getNativeObject()
+  // Look up the initializer determined by the typesystem
+  var initializer = this.getInitializer()
   // Figure out the correct NativeFunction to use to initialize this object
-  var init = findInitializer(nativeObject, args)
+  var init = initializer.getNativeFunction()
   // Compile all of the arguments down to values
   var argValues = []
   for (var i = 0; i < args.length; i++) {
