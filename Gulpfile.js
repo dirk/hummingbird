@@ -32,7 +32,6 @@ gulp.task('default', function () {
 
 gulp.task('watch', function () {
   watch(paths.typescriptSrc, function () {
-    console.log('there')
     gulp.start('default')
   })
 })

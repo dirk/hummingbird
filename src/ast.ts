@@ -289,13 +289,19 @@ function assertSaneArgs (args) {
 }// assertSaneArgs
 
 
+interface FunctionArgument {
+  name:  string
+  type?: _Node
+  def?:  _Node
+}
+
 class _Function extends _Node {
-  args:  any
+  args:  FunctionArgument[]
   ret:   any
-  block: any
+  block: Block
   // Statement properties
-  name: any = null
-  when: any = null
+  name: string = null
+  when: _Node  = null
   // Computed type (set by typesystem)
   type: any = null
   // Parent `multi` type (if this is present the Function will not
