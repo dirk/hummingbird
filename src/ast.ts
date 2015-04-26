@@ -1,7 +1,10 @@
+/// <reference path="typescript/node-0.12.0.d.ts" />
+import util   = require('util')
+import errors = require('./errors')
 
-var inherits  = require('util').inherits,
-    inspect   = require('util').inspect,
-    // repeat = require('./util').repeat,
+var inherits  = util.inherits,
+    inspect   = util.inspect,
+    TypeError = errors.TypeError,
     out       = process.stdout
 
 var types = require('./types')
@@ -79,134 +82,158 @@ class FunctionType extends _Node {
 }
 
 
-function Let (name, immediateType) {
-  this.name          = name.trim()
-  this.immediateType = immediateType
-}
-inherits(Let, _Node)
-Let.prototype.print    = function () { _w(this.toString()+"\n") }
-Let.prototype.toString = function () {
-  var ret = this.name
-  if (_include_types && this.immediateType) {
-    ret += ': '+this.immediateType.toString()
+class Let extends _Node {
+  name:          string
+  immediateType: any
+
+  constructor(name, immediateType) {
+    super()
+    this.name          = name.trim()
+    this.immediateType = immediateType
   }
-  return ret
+  print(): void { _w(this.toString()+"\n") }
+  toString(): string {
+    var ret = this.name
+    if (_include_types && this.immediateType) {
+      ret += ': '+this.immediateType.toString()
+    }
+    return ret
+  }
 }
 
 
 // Quick and dirty clone of Let
-function Var (name, immediateType) {
-  this.name          = name.trim()
-  this.immediateType = immediateType
-}
-inherits(Var, _Node)
-Var.prototype.print    = Let.prototype.print
-Var.prototype.toString = Let.prototype.toString
+class Var extends Let {}
 
-
-function Import (name, using) {
-  this.name  = new String(name)
-  this.using = using
-  // .using can only be null or an Array
-  if (this.using !== null) {
-    assertPropertyIsInstanceOf(this, 'using', Array)
+class Import extends _Node {
+  name:  String
+  using: any[]
+  file:  any
+  constructor(name, using) {
+    super()
+    this.name  = new String(name)
+    this.using = using
+    // .using can only be null or an Array
+    if (this.using !== null) {
+      assertPropertyIsInstanceOf(this, 'using', Array)
+    }
+    // Will be set to the File object when it's visited
+    this.file = null
   }
-  // Will be set to the File object when it's visited
-  this.file = null
-}
-inherits(Import, _Node)
-Import.prototype.print = function () {
-  out.write(this.toString())
-}
-Import.prototype.toString = function () {
-  return 'import '+this.name
+  print() { out.write(this.toString()) }
+  toString() { return 'import '+this.name }
 }
 
 
-function Export (name) {
-  this.name = name
-}
-inherits(Export, _Node)
-Export.prototype.print = function () {
-  out.write(this.toString())
-}
-Export.prototype.toString = function () {
-  return 'export '+this.name
-}
-
-
-function Class (name, block) {
-  this.name       = name
-  this.definition = block
-  // Computed nodes from the definition
-  this.initializers = this.definition.statements.filter(function (stmt) {
-    return (stmt instanceof Init)
-  })
-}
-inherits(Class, _Node)
-Class.prototype.print = function () {
-  out.write('class '+this.name+" ")
-  this.definition.print()
+class Export extends _Node {
+  name: string
+  constructor(name) {
+    super()
+    this.name = name
+  }
+  print() { out.write(this.toString()) }
+  toString(): string { return 'export '+this.name }
 }
 
 
-var Expression = function () {}
-inherits(Expression, _Node)
+class Class extends _Node {
+  name:         any
+  definition:   any
+  initializers: any[]
 
-
-function Group (expr) {
-  this.expr = expr
-}
-inherits(Group, Expression)
-Group.prototype.toString = function () { return '('+this.expr.toString()+')' }
-
-
-function Binary (lexpr, op, rexpr) {
-  this.lexpr = lexpr
-  this.op    = op
-  this.rexpr = rexpr
-}
-inherits(Binary, Expression)
-Binary.prototype.isBinaryStatement = function () {
-  return (this.op === '+=')
-}
-Binary.prototype.print = function () { out.write(this.toString()) }
-Binary.prototype.toString = function () {
-  return this.lexpr.toString()+' '+this.op+' '+this.rexpr.toString()
-}
-
-
-var Literal = function Literal (value, typeName) {
-  this.value    = value
-  this.typeName = (typeName !== undefined) ? typeName : null
-  this.type     = null
-}
-inherits(Literal, _Node)
-Literal.prototype.print    = function () { out.write(this.toString()) }
-Literal.prototype.toString = function () { return JSON.stringify(this.value) }
-
-
-function Assignment (type, lvalue, op, rvalue) {
-  this.type   = type
-  this.lvalue = lvalue
-  this.rvalue = rvalue
-  // Possible values: '=', '+=', or null
-  this.op     = op
-  // Only allowed .op for lets/vars is a '='
-  if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
-    throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
+  constructor(name, block) {
+    super()
+    this.name       = name
+    this.definition = block
+    // Computed nodes from the definition
+    this.initializers = this.definition.statements.filter(function (stmt) {
+      return (stmt instanceof Init)
+    })
+  }
+  print() {
+    out.write('class '+this.name+" ")
+    this.definition.print()
   }
 }
-inherits(Assignment, _Node)
-Assignment.prototype.print = function () {
-  var type = (this.type != 'path') ? (this.type+' ') : ''
-  out.write(type + this.lvalue.toString())
-  if (this.rvalue) {
-    var op = (this.op === null) ? '?' : this.op.toString()
-    out.write(' '+op+' ')
-    // _ind += INDENT
-    this.rvalue.print()
-    // _ind -= INDENT
+
+
+class Expression extends _Node {}
+
+
+class Group extends _Node {
+  expr: any
+  constructor(expr) {
+    super()
+    this.expr = expr
+  }
+  toString() { return '('+this.expr.toString()+')' }
+}
+
+
+class Binary extends _Node {
+  lexpr: any
+  op:    string
+  rexpr: any
+
+  constructor(lexpr, op, rexpr) {
+    super()
+    this.lexpr = lexpr
+    this.op    = op
+    this.rexpr = rexpr
+  }
+  isBinaryStatement(): boolean { return (this.op === '+=') }
+
+  print(): void { out.write(this.toString()) }
+  toString(): string {
+    return this.lexpr.toString()+' '+this.op+' '+this.rexpr.toString()
+  }
+}
+
+
+class Literal extends _Node {
+  value:    any
+  typeName: string
+  type:     any
+
+  constructor(value, typeName) {
+    super()
+    this.value    = value
+    this.typeName = (typeName !== undefined) ? typeName : null
+    this.type     = null
+  }
+  print(): void { out.write(this.toString()) }
+  toString(): string { return JSON.stringify(this.value) }
+}
+
+
+class Assignment extends _Node {
+  type:   any
+  lvalue: any
+  op:     string
+  rvalue: any
+
+  constructor(type, lvalue, op, rvalue) {
+    super()
+    this.type   = type
+    this.lvalue = lvalue
+    this.rvalue = rvalue
+    // Possible values: '=', '+=', or null
+    this.op     = op
+    // Only allowed .op for lets/vars is a '='
+    if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
+      throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
+    }
+  }
+  print() {
+    var type = (this.type != 'path') ? (this.type+' ') : ''
+    out.write(type + this.lvalue.toString())
+    if (this.rvalue) {
+      var op = (this.op === null) ? '?' : this.op.toString()
+      out.write(' '+op+' ')
+      // _ind += INDENT
+      this.rvalue.print()
+      // _ind -= INDENT
+    }
   }
 }
 
@@ -308,30 +335,40 @@ class _Function extends _Node {
 }
 
 
-function Multi (name, args, ret) {
-  this.name = name
-  this.args = args
-  this.ret  = ret
-}
-inherits(Multi, _Node)
-Multi.prototype.print = function () {
-  var args = this.args.map(function (arg) {
-    return arg.name+(arg.type ? (': '+arg.type) : '')
-  }).join(', ')
-  out.write('multi '+this.name+'('+args+")\n")
+class Multi extends _Node {
+  name: any
+  args: any
+  ret:  any
+
+  constructor(name, args, ret) {
+    super()
+    this.name = name
+    this.args = args
+    this.ret  = ret
+  }
+  print() {
+    var args = this.args.map(function (arg) {
+      return arg.name+(arg.type ? (': '+arg.type) : '')
+    }).join(', ')
+    out.write('multi '+this.name+'('+args+")\n")
+  }
 }
 
 
-function Init (args, block) {
-  this.args  = args
-  this.block = block
-  assertSaneArgs(this.args)
-}
-inherits(Init, _Node)
-Init.prototype.print = function () {
-  var args = this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
-  out.write('init ('+args+') ')
-  this.block.print()
+class Init extends _Node {
+  args:  any
+  block: Block
+  constructor(args, block) {
+    super()
+    this.args  = args
+    this.block = block
+    assertSaneArgs(this.args)
+  }
+  print() {
+    var args = this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
+    out.write('init ('+args+') ')
+    this.block.print()
+  }
 }
 
 
@@ -515,31 +552,35 @@ Root.prototype.getRootScope = function () {
 }
 
 
-function Block (statements) {
-  this.statements = statements
-  this.scope      = null
-  // Set the `isLastStatement` property on the last statement
-  var lastStatement = statements[statements.length - 1]
-  if (lastStatement) {
-    lastStatement.isLastStatement = true
+class Block extends _Node {
+  statements: any[]
+  scope:      any
+
+  constructor(statements) {
+    super()
+    this.statements = statements
+    this.scope      = null
+    // Set the `isLastStatement` property on the last statement
+    var lastStatement = statements[statements.length - 1]
+    if (lastStatement) {
+      lastStatement.isLastStatement = true
+    }
+  }
+  print() {
+    out.write("{\n")
+    _ind += INDENT
+    this.statements.forEach(function (stmt) {
+      _w('')
+      stmt.print()
+      out.write("\n")
+    })
+    _ind -= INDENT
+    _w('}')
+    // out.write(repeat(' ', _ind - INDENT) + '}')
   }
 }
-inherits(Block, _Node)
-Block.prototype.print = function () {
-  out.write("{\n")
-  _ind += INDENT
-  this.statements.forEach(function (stmt) {
-    _w('')
-    stmt.print()
-    out.write("\n")
-  })
-  _ind -= INDENT
-  _w('}')
-  // out.write(repeat(' ', _ind - INDENT) + '}')
-}
 
-
-module.exports = {
+var mod = {
   Node: _Node,
   NameType: NameType,
   FunctionType: FunctionType,
@@ -569,3 +610,5 @@ module.exports = {
   Call: Call,
   Property: Property
 }
+export = mod
+

@@ -23,7 +23,8 @@ gulp.task('default', function () {
   return gulp.src(paths.typescriptSrc)
   .pipe(gtypescript({
     // TypeScript opts
-    typescript: typescript
+    typescript: typescript,
+    module:     'commonjs'
   }))
   .pipe(gulp.dest('src'))
   .pipe(fileLogger)

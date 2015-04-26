@@ -4,9 +4,10 @@ var __extends = this.__extends || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-var inherits = require('util').inherits, inspect = require('util').inspect, 
-// repeat = require('./util').repeat,
-out = process.stdout;
+/// <reference path="typescript/node-0.12.0.d.ts" />
+var util = require('util');
+var errors = require('./errors');
+var inherits = util.inherits, inspect = util.inspect, TypeError = errors.TypeError, out = process.stdout;
 var types = require('./types');
 // http://stackoverflow.com/a/5450113
 function repeat(pattern, count) {
@@ -83,128 +84,164 @@ var FunctionType = (function (_super) {
     };
     return FunctionType;
 })(_Node);
-function Let(name, immediateType) {
-    this.name = name.trim();
-    this.immediateType = immediateType;
-}
-inherits(Let, _Node);
-Let.prototype.print = function () {
-    _w(this.toString() + "\n");
-};
-Let.prototype.toString = function () {
-    var ret = this.name;
-    if (_include_types && this.immediateType) {
-        ret += ': ' + this.immediateType.toString();
+var Let = (function (_super) {
+    __extends(Let, _super);
+    function Let(name, immediateType) {
+        _super.call(this);
+        this.name = name.trim();
+        this.immediateType = immediateType;
     }
-    return ret;
-};
+    Let.prototype.print = function () {
+        _w(this.toString() + "\n");
+    };
+    Let.prototype.toString = function () {
+        var ret = this.name;
+        if (_include_types && this.immediateType) {
+            ret += ': ' + this.immediateType.toString();
+        }
+        return ret;
+    };
+    return Let;
+})(_Node);
 // Quick and dirty clone of Let
-function Var(name, immediateType) {
-    this.name = name.trim();
-    this.immediateType = immediateType;
-}
-inherits(Var, _Node);
-Var.prototype.print = Let.prototype.print;
-Var.prototype.toString = Let.prototype.toString;
-function Import(name, using) {
-    this.name = new String(name);
-    this.using = using;
-    // .using can only be null or an Array
-    if (this.using !== null) {
-        assertPropertyIsInstanceOf(this, 'using', Array);
+var Var = (function (_super) {
+    __extends(Var, _super);
+    function Var() {
+        _super.apply(this, arguments);
     }
-    // Will be set to the File object when it's visited
-    this.file = null;
-}
-inherits(Import, _Node);
-Import.prototype.print = function () {
-    out.write(this.toString());
-};
-Import.prototype.toString = function () {
-    return 'import ' + this.name;
-};
-function Export(name) {
-    this.name = name;
-}
-inherits(Export, _Node);
-Export.prototype.print = function () {
-    out.write(this.toString());
-};
-Export.prototype.toString = function () {
-    return 'export ' + this.name;
-};
-function Class(name, block) {
-    this.name = name;
-    this.definition = block;
-    // Computed nodes from the definition
-    this.initializers = this.definition.statements.filter(function (stmt) {
-        return (stmt instanceof Init);
-    });
-}
-inherits(Class, _Node);
-Class.prototype.print = function () {
-    out.write('class ' + this.name + " ");
-    this.definition.print();
-};
-var Expression = function () {
-};
-inherits(Expression, _Node);
-function Group(expr) {
-    this.expr = expr;
-}
-inherits(Group, Expression);
-Group.prototype.toString = function () {
-    return '(' + this.expr.toString() + ')';
-};
-function Binary(lexpr, op, rexpr) {
-    this.lexpr = lexpr;
-    this.op = op;
-    this.rexpr = rexpr;
-}
-inherits(Binary, Expression);
-Binary.prototype.isBinaryStatement = function () {
-    return (this.op === '+=');
-};
-Binary.prototype.print = function () {
-    out.write(this.toString());
-};
-Binary.prototype.toString = function () {
-    return this.lexpr.toString() + ' ' + this.op + ' ' + this.rexpr.toString();
-};
-var Literal = function Literal(value, typeName) {
-    this.value = value;
-    this.typeName = (typeName !== undefined) ? typeName : null;
-    this.type = null;
-};
-inherits(Literal, _Node);
-Literal.prototype.print = function () {
-    out.write(this.toString());
-};
-Literal.prototype.toString = function () {
-    return JSON.stringify(this.value);
-};
-function Assignment(type, lvalue, op, rvalue) {
-    this.type = type;
-    this.lvalue = lvalue;
-    this.rvalue = rvalue;
-    // Possible values: '=', '+=', or null
-    this.op = op;
-    // Only allowed .op for lets/vars is a '='
-    if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
-        throw new Error('Invalid operator on ' + this.type + " statement: '" + this.op + "'");
+    return Var;
+})(Let);
+var Import = (function (_super) {
+    __extends(Import, _super);
+    function Import(name, using) {
+        _super.call(this);
+        this.name = new String(name);
+        this.using = using;
+        // .using can only be null or an Array
+        if (this.using !== null) {
+            assertPropertyIsInstanceOf(this, 'using', Array);
+        }
+        // Will be set to the File object when it's visited
+        this.file = null;
     }
-}
-inherits(Assignment, _Node);
-Assignment.prototype.print = function () {
-    var type = (this.type != 'path') ? (this.type + ' ') : '';
-    out.write(type + this.lvalue.toString());
-    if (this.rvalue) {
-        var op = (this.op === null) ? '?' : this.op.toString();
-        out.write(' ' + op + ' ');
-        // _ind += INDENT
-        this.rvalue.print();
+    Import.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Import.prototype.toString = function () {
+        return 'import ' + this.name;
+    };
+    return Import;
+})(_Node);
+var Export = (function (_super) {
+    __extends(Export, _super);
+    function Export(name) {
+        _super.call(this);
+        this.name = name;
     }
-};
+    Export.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Export.prototype.toString = function () {
+        return 'export ' + this.name;
+    };
+    return Export;
+})(_Node);
+var Class = (function (_super) {
+    __extends(Class, _super);
+    function Class(name, block) {
+        _super.call(this);
+        this.name = name;
+        this.definition = block;
+        // Computed nodes from the definition
+        this.initializers = this.definition.statements.filter(function (stmt) {
+            return (stmt instanceof Init);
+        });
+    }
+    Class.prototype.print = function () {
+        out.write('class ' + this.name + " ");
+        this.definition.print();
+    };
+    return Class;
+})(_Node);
+var Expression = (function (_super) {
+    __extends(Expression, _super);
+    function Expression() {
+        _super.apply(this, arguments);
+    }
+    return Expression;
+})(_Node);
+var Group = (function (_super) {
+    __extends(Group, _super);
+    function Group(expr) {
+        _super.call(this);
+        this.expr = expr;
+    }
+    Group.prototype.toString = function () {
+        return '(' + this.expr.toString() + ')';
+    };
+    return Group;
+})(_Node);
+var Binary = (function (_super) {
+    __extends(Binary, _super);
+    function Binary(lexpr, op, rexpr) {
+        _super.call(this);
+        this.lexpr = lexpr;
+        this.op = op;
+        this.rexpr = rexpr;
+    }
+    Binary.prototype.isBinaryStatement = function () {
+        return (this.op === '+=');
+    };
+    Binary.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Binary.prototype.toString = function () {
+        return this.lexpr.toString() + ' ' + this.op + ' ' + this.rexpr.toString();
+    };
+    return Binary;
+})(_Node);
+var Literal = (function (_super) {
+    __extends(Literal, _super);
+    function Literal(value, typeName) {
+        _super.call(this);
+        this.value = value;
+        this.typeName = (typeName !== undefined) ? typeName : null;
+        this.type = null;
+    }
+    Literal.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Literal.prototype.toString = function () {
+        return JSON.stringify(this.value);
+    };
+    return Literal;
+})(_Node);
+var Assignment = (function (_super) {
+    __extends(Assignment, _super);
+    function Assignment(type, lvalue, op, rvalue) {
+        _super.call(this);
+        this.type = type;
+        this.lvalue = lvalue;
+        this.rvalue = rvalue;
+        // Possible values: '=', '+=', or null
+        this.op = op;
+        // Only allowed .op for lets/vars is a '='
+        if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
+            throw new Error('Invalid operator on ' + this.type + " statement: '" + this.op + "'");
+        }
+    }
+    Assignment.prototype.print = function () {
+        var type = (this.type != 'path') ? (this.type + ' ') : '';
+        out.write(type + this.lvalue.toString());
+        if (this.rvalue) {
+            var op = (this.op === null) ? '?' : this.op.toString();
+            out.write(' ' + op + ' ');
+            // _ind += INDENT
+            this.rvalue.print();
+        }
+    };
+    return Assignment;
+})(_Node);
 function Path(name, path) {
     this.name = name;
     this.path = path;
@@ -297,31 +334,39 @@ var _Function = (function (_super) {
     };
     return _Function;
 })(_Node);
-function Multi(name, args, ret) {
-    this.name = name;
-    this.args = args;
-    this.ret = ret;
-}
-inherits(Multi, _Node);
-Multi.prototype.print = function () {
-    var args = this.args.map(function (arg) {
-        return arg.name + (arg.type ? (': ' + arg.type) : '');
-    }).join(', ');
-    out.write('multi ' + this.name + '(' + args + ")\n");
-};
-function Init(args, block) {
-    this.args = args;
-    this.block = block;
-    assertSaneArgs(this.args);
-}
-inherits(Init, _Node);
-Init.prototype.print = function () {
-    var args = this.args.map(function (arg) {
-        return arg.name + ': ' + arg.type.toString();
-    }).join(', ');
-    out.write('init (' + args + ') ');
-    this.block.print();
-};
+var Multi = (function (_super) {
+    __extends(Multi, _super);
+    function Multi(name, args, ret) {
+        _super.call(this);
+        this.name = name;
+        this.args = args;
+        this.ret = ret;
+    }
+    Multi.prototype.print = function () {
+        var args = this.args.map(function (arg) {
+            return arg.name + (arg.type ? (': ' + arg.type) : '');
+        }).join(', ');
+        out.write('multi ' + this.name + '(' + args + ")\n");
+    };
+    return Multi;
+})(_Node);
+var Init = (function (_super) {
+    __extends(Init, _super);
+    function Init(args, block) {
+        _super.call(this);
+        this.args = args;
+        this.block = block;
+        assertSaneArgs(this.args);
+    }
+    Init.prototype.print = function () {
+        var args = this.args.map(function (arg) {
+            return arg.name + ': ' + arg.type.toString();
+        }).join(', ');
+        out.write('init (' + args + ') ');
+        this.block.print();
+    };
+    return Init;
+})(_Node);
 function New(name, args) {
     this.name = name;
     this.args = args;
@@ -502,29 +547,33 @@ Root.prototype.getRootScope = function () {
     }
     return rootScope;
 };
-function Block(statements) {
-    this.statements = statements;
-    this.scope = null;
-    // Set the `isLastStatement` property on the last statement
-    var lastStatement = statements[statements.length - 1];
-    if (lastStatement) {
-        lastStatement.isLastStatement = true;
+var Block = (function (_super) {
+    __extends(Block, _super);
+    function Block(statements) {
+        _super.call(this);
+        this.statements = statements;
+        this.scope = null;
+        // Set the `isLastStatement` property on the last statement
+        var lastStatement = statements[statements.length - 1];
+        if (lastStatement) {
+            lastStatement.isLastStatement = true;
+        }
     }
-}
-inherits(Block, _Node);
-Block.prototype.print = function () {
-    out.write("{\n");
-    _ind += INDENT;
-    this.statements.forEach(function (stmt) {
-        _w('');
-        stmt.print();
-        out.write("\n");
-    });
-    _ind -= INDENT;
-    _w('}');
-    // out.write(repeat(' ', _ind - INDENT) + '}')
-};
-module.exports = {
+    Block.prototype.print = function () {
+        out.write("{\n");
+        _ind += INDENT;
+        this.statements.forEach(function (stmt) {
+            _w('');
+            stmt.print();
+            out.write("\n");
+        });
+        _ind -= INDENT;
+        _w('}');
+        // out.write(repeat(' ', _ind - INDENT) + '}')
+    };
+    return Block;
+})(_Node);
+var mod = {
     Node: _Node,
     NameType: NameType,
     FunctionType: FunctionType,
@@ -554,3 +603,4 @@ module.exports = {
     Call: Call,
     Property: Property
 };
+module.exports = mod;

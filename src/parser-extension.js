@@ -19,10 +19,10 @@ module.exports = function (p) {
 
   p.parseDeclaration = function (lvalue, rvalue) {
     var type = null
-    if (lvalue instanceof AST.Let) {
-      type = 'let'
-    } else if (lvalue instanceof AST.Var) {
+    if (lvalue instanceof AST.Var) {
       type = 'var'
+    } else if (lvalue instanceof AST.Let) {
+      type = 'let'
     }
     if (type === null) {
       throw new Error('Can\'t figure out type of declaration')
