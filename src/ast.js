@@ -124,6 +124,7 @@ var Export = (function (_super) {
     __extends(Export, _super);
     function Export(name) {
         _super.call(this);
+        this.type = null;
         this.name = name;
     }
     Export.prototype.print = function () { out.write(this.toString()); };

@@ -128,6 +128,8 @@ export class Import extends _Node {
 
 export class Export extends _Node {
   name: string
+  type: any = null
+
   constructor(name) {
     super()
     this.name = name
@@ -141,6 +143,8 @@ export class Class extends _Node {
   name:         any
   definition:   any
   initializers: any[]
+  // Computed by the typesystem
+  type:         any
 
   constructor(name, block) {
     super()
@@ -175,6 +179,7 @@ export class Binary extends _Node {
   lexpr: any
   op:    string
   rexpr: any
+  type:  any
 
   constructor(lexpr, op, rexpr) {
     super()
@@ -351,6 +356,7 @@ export class Multi extends _Node {
   name: any
   args: any
   ret:  any
+  type: any
 
   constructor(name, args, ret) {
     super()
@@ -385,9 +391,13 @@ export class Init extends _Node {
 
 
 export class New extends _Node {
-  name:        any
-  args:        any
-  initializer: _Function
+  name:            any
+  args:            any
+  initializer:     _Function
+  // Type of the class that's going to be constructed
+  constructorType: any
+  // Type of the object once it's been constructed
+  type:            any
 
   constructor(name, args) {
     super()
@@ -414,6 +424,7 @@ export class New extends _Node {
 export class Identifier extends _Node {
   name:   any
   parent: any
+  type:   any
 
   constructor(name) {
     super()
@@ -426,9 +437,11 @@ export class Identifier extends _Node {
 
 
 export class Call extends _Node {
-  base:   any
-  args:   any
-  parent: any
+  base:     any
+  args:     any
+  parent:   any
+  type:     any
+  baseType: any
 
   constructor(base, callArgs) {
     super()
@@ -452,6 +465,8 @@ export class Property extends _Node {
   base:     any
   property: any
   parent:   any
+  type:     any
+  baseType: any
   
   constructor(base, property) {
     super()
@@ -573,7 +588,8 @@ export class Chain extends _Node {
 
 
 export class Return extends _Node {
-  expr: any
+  expr: any 
+  type: any
   
   constructor(expr) {
     super()

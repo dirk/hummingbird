@@ -203,7 +203,7 @@ TypeSystem.prototype.visitImport = function (node: AST.Import, scope, parentNode
 }
 
 
-TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
+TypeSystem.prototype.visitExport = function (node: AST.Export, scope, parentNode) {
   // Make sure our parent node is the root
   assertInstanceOf(parentNode, AST.Root, "Import can only be a child of a Root")
   // Add ourselves to the root node's list of export nodes
@@ -227,7 +227,7 @@ TypeSystem.prototype.visitExport = function (node, scope, parentNode) {
 }
 
 
-TypeSystem.prototype.visitClass = function (node, scope) {
+TypeSystem.prototype.visitClass = function (node: AST.Class, scope) {
   var rootObject = this.rootObject
   // Create a new Object type with the root object as the supertype
   var klass = new types.Object(rootObject)
@@ -248,7 +248,7 @@ function setupThisInScope (klass, scope) {
   scope.setFlagsForLocal('this', Scope.Flags.Constant)
 }
 
-TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
+TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, klass) {
   var self = this
   node.statements.forEach(function (stmt) {
     switch (stmt.constructor) {
@@ -327,7 +327,7 @@ TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
 }
 
 
-TypeSystem.prototype.visitFor = function (node, scope) {
+TypeSystem.prototype.visitFor = function (node: AST.For, scope) {
   this.visitStatement(node.init, scope)
 
   // If there's a condition present then we need to visit the expression
@@ -350,7 +350,7 @@ TypeSystem.prototype.visitFor = function (node, scope) {
   this.visitBlock(node.block, blockScope)
 }
 
-TypeSystem.prototype.visitIf = function (node, scope) {
+TypeSystem.prototype.visitIf = function (node: AST.If, scope) {
   assertInstanceOf(node.block, AST.Block, 'Expected Block in If statement')
 
   this.visitExpression(node.cond, scope)
@@ -375,7 +375,7 @@ TypeSystem.prototype.visitIf = function (node, scope) {
   }
 }
 
-TypeSystem.prototype.visitWhile = function (node, scope) {
+TypeSystem.prototype.visitWhile = function (node: AST.While, scope) {
   assertInstanceOf(node.block, AST.Block, 'Expected Block in While statement')
 
   this.visitExpression(node.expr, scope)
@@ -384,7 +384,7 @@ TypeSystem.prototype.visitWhile = function (node, scope) {
   this.visitBlock(node.block, blockScope)
 }
 
-TypeSystem.prototype.visitReturn = function (node, scope, parentNode) {
+TypeSystem.prototype.visitReturn = function (node: AST.Return, scope, parentNode) {
   if (node.expr === undefined) {
     throw new TypeError('Cannot handle undefined expression in Return')
   }
@@ -572,7 +572,7 @@ TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
   }
 }
 
-TypeSystem.prototype.visitLiteral = function (node, scope) {
+TypeSystem.prototype.visitLiteral = function (node: AST.Literal, scope) {
   // If we've already identified the type
   if (node.type) {
     return node.type
@@ -585,7 +585,7 @@ TypeSystem.prototype.visitLiteral = function (node, scope) {
   }
 }
 
-TypeSystem.prototype.visitNew = function (node, scope) {
+TypeSystem.prototype.visitNew = function (node: AST.New, scope) {
   // Look up the type of what we're going to construct
   var type = scope.get(node.name)
   node.constructorType = type
@@ -627,7 +627,7 @@ TypeSystem.prototype.visitNew = function (node, scope) {
 
 var COMPARATOR_OPS = ['<']
 
-TypeSystem.prototype.visitBinary = function (node, scope) {
+TypeSystem.prototype.visitBinary = function (node: AST.Binary, scope) {
   var lexprType = this.resolveExpression(node.lexpr, scope)
   var rexprType = this.resolveExpression(node.rexpr, scope)
 
@@ -670,7 +670,7 @@ function getAllReturnTypes (block) {
   return returnTypes
 }
 
-TypeSystem.prototype.visitFunction = function (node, parentScope, immediate) {
+TypeSystem.prototype.visitFunction = function (node: AST._Function, parentScope, immediate) {
   if (node.type) { return node.type }
   var self = this
   var type = new types.Function(this.rootObject)
@@ -825,7 +825,7 @@ TypeSystem.prototype.visitNamedFunction = function (node, scope) {
   scope.setLocal(node.name, node.type)
 }
 
-TypeSystem.prototype.visitFunctionStatement = function (node, scope, searchInParent) {
+TypeSystem.prototype.visitFunctionStatement = function (node: AST._Function, scope, searchInParent) {
   var name = node.name
   // Now look up the parent `multi` in the containing block
   var multiNode = searchInParent(function (stmt) {
@@ -862,7 +862,7 @@ function parentTypeLooup (node, scope, name) {
   }
 }
 
-TypeSystem.prototype.visitIdentifier = function (node, scope) {
+TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
   if (node.parent) {
     // throw new TypeError("Identifier cannot have a parent", node)
     node.type = this.getTypeOfTypesProperty(node.parent.baseType, node.name)
@@ -871,7 +871,7 @@ TypeSystem.prototype.visitIdentifier = function (node, scope) {
   }
 }
 
-TypeSystem.prototype.visitProperty = function (node, scope, parentNode) {
+TypeSystem.prototype.visitProperty = function (node: AST.Property, scope, parentNode) {
   var property = node.property,
       base     = node.base
 
@@ -899,7 +899,7 @@ TypeSystem.prototype.visitProperty = function (node, scope, parentNode) {
   }
 }
 
-TypeSystem.prototype.visitCall = function (node, scope) {
+TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {
   // Make our base identifier point to our parent so it will resolve correctly
   // when we visit it
   node.base.parent = node.parent
@@ -1022,7 +1022,7 @@ TypeSystem.prototype.getTypeOfTypesProperty = function (type, name) {
 }
 
 
-TypeSystem.prototype.visitMulti = function (node, scope) {
+TypeSystem.prototype.visitMulti = function (node: AST.Multi, scope) {
   var self = this
   // Construct a new array of name-type args
   var args = node.args.map(function (arg) {
@@ -1043,3 +1043,4 @@ TypeSystem.prototype.visitMulti = function (node, scope) {
 
 
 module.exports = {TypeSystem: TypeSystem}
+
