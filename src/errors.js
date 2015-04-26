@@ -5,7 +5,7 @@ var __extends = this.__extends || function (d, b) {
     d.prototype = new __();
 };
 var inherits = require('util').inherits;
-// Internal base error clss
+// Internal base error class
 var BaseError = (function (_super) {
     __extends(BaseError, _super);
     function BaseError(message) {

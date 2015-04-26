@@ -24,27 +24,19 @@ function repeat(pattern, count) {
 }
 // TODO: Refactor all this crazy indentation stuff!
 var INDENT = 2;
-var _ind = 0, _i = function () {
-    return repeat(' ', _ind);
-}, _w = function (s) {
-    out.write(_i() + s);
-}, _win = function (s) {
+var _ind = 0, _i = function () { return repeat(' ', _ind); }, _w = function (s) { out.write(_i() + s); }, _win = function (s) {
     // Indent and write
     _w(s);
     _ind += INDENT;
-}, _wout = function (s) {
-    _ind -= INDENT;
-    _w(s);
-}, _include_types = true;
+}, _wout = function (s) { _ind -= INDENT; _w(s); }, _include_types = true;
 // Nodes ----------------------------------------------------------------------
 var _Node = (function () {
     function _Node() {
+        this.isLastStatement = false;
     }
-    _Node.prototype.print = function () {
-        out.write(inspect(this));
-    };
+    _Node.prototype.print = function () { out.write(inspect(this)); };
     _Node.prototype.compile = function () {
-        throw new Error('Compilation not yet implemented for node: ' + this.constructor.name);
+        throw new Error('Compilation not yet implemented for node: ' + this.constructor['name']);
     };
     _Node.prototype.setPosition = function (file, line, column) {
         this._file = file;
@@ -53,6 +45,7 @@ var _Node = (function () {
     };
     return _Node;
 })();
+exports._Node = _Node;
 // Node.prototype.setParsePosition = function (parser) {
 //   this._file   = parser.file
 //   this._line   = parser.line
@@ -64,11 +57,10 @@ var NameType = (function (_super) {
         _super.call(this);
         this.name = name.trim();
     }
-    NameType.prototype.toString = function () {
-        return this.name;
-    };
+    NameType.prototype.toString = function () { return this.name; };
     return NameType;
 })(_Node);
+exports.NameType = NameType;
 var FunctionType = (function (_super) {
     __extends(FunctionType, _super);
     function FunctionType(args, ret) {
@@ -77,13 +69,12 @@ var FunctionType = (function (_super) {
         this.ret = ret;
     }
     FunctionType.prototype.toString = function () {
-        var args = this.args.map(function (arg) {
-            return arg.toString();
-        }).join(', '), ret = (this.ret ? this.ret.toString() : 'Void');
+        var args = this.args.map(function (arg) { return arg.toString(); }).join(', '), ret = (this.ret ? this.ret.toString() : 'Void');
         return '(' + args + ') -> ' + ret;
     };
     return FunctionType;
 })(_Node);
+exports.FunctionType = FunctionType;
 var Let = (function (_super) {
     __extends(Let, _super);
     function Let(name, immediateType) {
@@ -91,9 +82,7 @@ var Let = (function (_super) {
         this.name = name.trim();
         this.immediateType = immediateType;
     }
-    Let.prototype.print = function () {
-        _w(this.toString() + "\n");
-    };
+    Let.prototype.print = function () { _w(this.toString() + "\n"); };
     Let.prototype.toString = function () {
         var ret = this.name;
         if (_include_types && this.immediateType) {
@@ -103,6 +92,7 @@ var Let = (function (_super) {
     };
     return Let;
 })(_Node);
+exports.Let = Let;
 // Quick and dirty clone of Let
 var Var = (function (_super) {
     __extends(Var, _super);
@@ -111,6 +101,7 @@ var Var = (function (_super) {
     }
     return Var;
 })(Let);
+exports.Var = Var;
 var Import = (function (_super) {
     __extends(Import, _super);
     function Import(name, using) {
@@ -124,28 +115,22 @@ var Import = (function (_super) {
         // Will be set to the File object when it's visited
         this.file = null;
     }
-    Import.prototype.print = function () {
-        out.write(this.toString());
-    };
-    Import.prototype.toString = function () {
-        return 'import ' + this.name;
-    };
+    Import.prototype.print = function () { out.write(this.toString()); };
+    Import.prototype.toString = function () { return 'import ' + this.name; };
     return Import;
 })(_Node);
+exports.Import = Import;
 var Export = (function (_super) {
     __extends(Export, _super);
     function Export(name) {
         _super.call(this);
         this.name = name;
     }
-    Export.prototype.print = function () {
-        out.write(this.toString());
-    };
-    Export.prototype.toString = function () {
-        return 'export ' + this.name;
-    };
+    Export.prototype.print = function () { out.write(this.toString()); };
+    Export.prototype.toString = function () { return 'export ' + this.name; };
     return Export;
 })(_Node);
+exports.Export = Export;
 var Class = (function (_super) {
     __extends(Class, _super);
     function Class(name, block) {
@@ -158,11 +143,12 @@ var Class = (function (_super) {
         });
     }
     Class.prototype.print = function () {
-        out.write('class ' + this.name + " ");
+        out.write('export class ' + this.name + " ");
         this.definition.print();
     };
     return Class;
 })(_Node);
+exports.Class = Class;
 var Expression = (function (_super) {
     __extends(Expression, _super);
     function Expression() {
@@ -170,17 +156,17 @@ var Expression = (function (_super) {
     }
     return Expression;
 })(_Node);
+exports.Expression = Expression;
 var Group = (function (_super) {
     __extends(Group, _super);
     function Group(expr) {
         _super.call(this);
         this.expr = expr;
     }
-    Group.prototype.toString = function () {
-        return '(' + this.expr.toString() + ')';
-    };
+    Group.prototype.toString = function () { return '(' + this.expr.toString() + ')'; };
     return Group;
 })(_Node);
+exports.Group = Group;
 var Binary = (function (_super) {
     __extends(Binary, _super);
     function Binary(lexpr, op, rexpr) {
@@ -189,17 +175,14 @@ var Binary = (function (_super) {
         this.op = op;
         this.rexpr = rexpr;
     }
-    Binary.prototype.isBinaryStatement = function () {
-        return (this.op === '+=');
-    };
-    Binary.prototype.print = function () {
-        out.write(this.toString());
-    };
+    Binary.prototype.isBinaryStatement = function () { return (this.op === '+='); };
+    Binary.prototype.print = function () { out.write(this.toString()); };
     Binary.prototype.toString = function () {
         return this.lexpr.toString() + ' ' + this.op + ' ' + this.rexpr.toString();
     };
     return Binary;
 })(_Node);
+exports.Binary = Binary;
 var Literal = (function (_super) {
     __extends(Literal, _super);
     function Literal(value, typeName) {
@@ -208,14 +191,11 @@ var Literal = (function (_super) {
         this.typeName = (typeName !== undefined) ? typeName : null;
         this.type = null;
     }
-    Literal.prototype.print = function () {
-        out.write(this.toString());
-    };
-    Literal.prototype.toString = function () {
-        return JSON.stringify(this.value);
-    };
+    Literal.prototype.print = function () { out.write(this.toString()); };
+    Literal.prototype.toString = function () { return JSON.stringify(this.value); };
     return Literal;
 })(_Node);
+exports.Literal = Literal;
 var Assignment = (function (_super) {
     __extends(Assignment, _super);
     function Assignment(type, lvalue, op, rvalue) {
@@ -242,6 +222,7 @@ var Assignment = (function (_super) {
     };
     return Assignment;
 })(_Node);
+exports.Assignment = Assignment;
 var Path = (function (_super) {
     __extends(Path, _super);
     function Path(name, path) {
@@ -258,6 +239,7 @@ var Path = (function (_super) {
     };
     return Path;
 })(_Node);
+exports.Path = Path;
 function assertHasProperty(obj, prop) {
     var val = obj[prop];
     if (val !== undefined) {
@@ -288,7 +270,7 @@ function assertSaneArgs(args) {
         if (def && !(def instanceof Literal)) {
             throw new Error('Expected default to be an AST.Literal');
         }
-    }
+    } // for
 } // assertSaneArgs
 var _Function = (function (_super) {
     __extends(_Function, _super);
@@ -338,6 +320,7 @@ var _Function = (function (_super) {
     };
     return _Function;
 })(_Node);
+exports._Function = _Function;
 var Multi = (function (_super) {
     __extends(Multi, _super);
     function Multi(name, args, ret) {
@@ -354,6 +337,7 @@ var Multi = (function (_super) {
     };
     return Multi;
 })(_Node);
+exports.Multi = Multi;
 var Init = (function (_super) {
     __extends(Init, _super);
     function Init(args, block) {
@@ -363,21 +347,20 @@ var Init = (function (_super) {
         assertSaneArgs(this.args);
     }
     Init.prototype.print = function () {
-        var args = this.args.map(function (arg) {
-            return arg.name + ': ' + arg.type.toString();
-        }).join(', ');
+        var args = this.args.map(function (arg) { return arg.name + ': ' + arg.type.toString(); }).join(', ');
         out.write('init (' + args + ') ');
         this.block.print();
     };
     return Init;
 })(_Node);
+exports.Init = Init;
 var New = (function (_super) {
     __extends(New, _super);
     function New(name, args) {
         _super.call(this);
         this.name = name;
         this.args = args;
-        // Corresponding initializer Function for the class type it's initializing
+        // Corresponding initializer Function for the export class type it's initializing
         this.initializer = null;
     }
     New.prototype.setInitializer = function (init) {
@@ -388,16 +371,13 @@ var New = (function (_super) {
         return this.initializer;
     };
     New.prototype.toString = function () {
-        var args = this.args.map(function (arg) {
-            return arg.toString();
-        }).join(', ');
+        var args = this.args.map(function (arg) { return arg.toString(); }).join(', ');
         return 'new ' + this.name + '(' + args + ')';
     };
-    New.prototype.print = function () {
-        out.write(this.toString());
-    };
+    New.prototype.print = function () { out.write(this.toString()); };
     return New;
 })(_Node);
+exports.New = New;
 var Identifier = (function (_super) {
     __extends(Identifier, _super);
     function Identifier(name) {
@@ -405,14 +385,11 @@ var Identifier = (function (_super) {
         this.name = name;
         this.parent = null;
     }
-    Identifier.prototype.print = function () {
-        out.write(this.toString());
-    };
-    Identifier.prototype.toString = function () {
-        return this.name;
-    };
+    Identifier.prototype.print = function () { out.write(this.toString()); };
+    Identifier.prototype.toString = function () { return this.name; };
     return Identifier;
 })(_Node);
+exports.Identifier = Identifier;
 var Call = (function (_super) {
     __extends(Call, _super);
     function Call(base, callArgs) {
@@ -424,9 +401,7 @@ var Call = (function (_super) {
         assertPropertyIsInstanceOf(this, 'args', Array);
     }
     Call.prototype.toString = function () {
-        var args = '(' + this.args.map(function (arg) {
-            return arg.toString();
-        }).join(', ') + ')';
+        var args = '(' + this.args.map(function (arg) { return arg.toString(); }).join(', ') + ')';
         return this.base + args;
     };
     Call.prototype.print = function () {
@@ -434,6 +409,7 @@ var Call = (function (_super) {
     };
     return Call;
 })(_Node);
+exports.Call = Call;
 var Property = (function (_super) {
     __extends(Property, _super);
     function Property(base, property) {
@@ -447,11 +423,10 @@ var Property = (function (_super) {
     Property.prototype.toString = function () {
         return this.base + '.' + this.property.toString();
     };
-    Property.prototype.print = function () {
-        out.write(this.toString());
-    };
+    Property.prototype.print = function () { out.write(this.toString()); };
     return Property;
 })(_Node);
+exports.Property = Property;
 var If = (function (_super) {
     __extends(If, _super);
     function If(cond, block, elseIfs, elseBlock) {
@@ -480,6 +455,7 @@ var If = (function (_super) {
     };
     return If;
 })(_Node);
+exports.If = If;
 var While = (function (_super) {
     __extends(While, _super);
     function While(expr, block) {
@@ -493,6 +469,7 @@ var While = (function (_super) {
     };
     return While;
 })(_Node);
+exports.While = While;
 var For = (function (_super) {
     __extends(For, _super);
     function For(init, cond, after, block) {
@@ -519,8 +496,9 @@ var For = (function (_super) {
     };
     return For;
 })(_Node);
+exports.For = For;
 /*
-class Chain extends _Node {
+export class Chain extends _Node {
   name:     any
   tail:     any
   headType: any
@@ -550,9 +528,7 @@ var Return = (function (_super) {
         _super.call(this);
         this.expr = expr;
     }
-    Return.prototype.print = function () {
-        out.write(this.toString());
-    };
+    Return.prototype.print = function () { out.write(this.toString()); };
     Return.prototype.toString = function () {
         if (this.expr) {
             return 'return ' + this.expr.toString();
@@ -561,6 +537,7 @@ var Return = (function (_super) {
     };
     return Return;
 })(_Node);
+exports.Return = Return;
 var Root = (function (_super) {
     __extends(Root, _super);
     function Root(statements) {
@@ -593,6 +570,7 @@ var Root = (function (_super) {
     };
     return Root;
 })(_Node);
+exports.Root = Root;
 var Block = (function (_super) {
     __extends(Block, _super);
     function Block(statements) {
@@ -619,34 +597,37 @@ var Block = (function (_super) {
     };
     return Block;
 })(_Node);
+exports.Block = Block;
+/*
 var mod = {
-    Node: _Node,
-    NameType: NameType,
-    FunctionType: FunctionType,
-    Import: Import,
-    Export: Export,
-    Class: Class,
-    Init: Init,
-    New: New,
-    Let: Let,
-    Var: Var,
-    Path: Path,
-    Root: Root,
-    Assignment: Assignment,
-    Expression: Expression,
-    Binary: Binary,
-    Literal: Literal,
-    Group: Group,
-    Function: _Function,
-    Multi: Multi,
-    Block: Block,
-    If: If,
-    While: While,
-    For: For,
-    Identifier: Identifier,
-    // Chain: Chain,
-    Return: Return,
-    Call: Call,
-    Property: Property
-};
-module.exports = mod;
+  Node: _Node,
+  NameType: NameType,
+  FunctionType: FunctionType,
+  Import: Import,
+  Export: Export,
+  Class: Class,
+  Init: Init,
+  New: New,
+  Let: Let,
+  Var: Var,
+  Path: Path,
+  Root: Root,
+  Assignment: Assignment,
+  Expression: Expression,
+  Binary: Binary,
+  Literal: Literal,
+  Group: Group,
+  Function: _Function,
+  Multi: Multi,
+  Block: Block,
+  If: If,
+  While: While,
+  For: For,
+  Identifier: Identifier,
+  // Chain: Chain,
+  Return: Return,
+  Call: Call,
+  Property: Property
+}
+export = mod
+*/

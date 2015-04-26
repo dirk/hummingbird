@@ -35,7 +35,7 @@ export class InternalCompilerError extends LocativeError {
 }
 
 export class TypeError extends LocativeError {
-  constructor(message, origin) {
+  constructor(message, origin?) {
     super(message, origin)
     this.name = 'TypeError'
   }

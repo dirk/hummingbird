@@ -35,14 +35,15 @@ var _ind = 0,
 
 // Nodes ----------------------------------------------------------------------
 
-class _Node {
-  _file:   string
-  _line:   number
-  _column: number
+export class _Node {
+  _file:           string
+  _line:           number
+  _column:         number
+  isLastStatement: boolean = false
 
   print() { out.write(inspect(this)) }
   compile() {
-    throw new Error('Compilation not yet implemented for node: '+this.constructor.name)
+    throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
   }
   setPosition(file, line, column) {
     this._file   = file
@@ -57,7 +58,7 @@ class _Node {
 // }
 
 
-class NameType extends _Node {
+export class NameType extends _Node {
   name: string
   constructor(name: string) {
     super()
@@ -66,7 +67,7 @@ class NameType extends _Node {
   toString(): string { return this.name }
 }
 
-class FunctionType extends _Node {
+export class FunctionType extends _Node {
   args: any
   ret:  any
   constructor(args, ret) {
@@ -82,7 +83,7 @@ class FunctionType extends _Node {
 }
 
 
-class Let extends _Node {
+export class Let extends _Node {
   name:          string
   immediateType: any
 
@@ -103,9 +104,9 @@ class Let extends _Node {
 
 
 // Quick and dirty clone of Let
-class Var extends Let {}
+export class Var extends Let {}
 
-class Import extends _Node {
+export class Import extends _Node {
   name:  String
   using: any[]
   file:  any
@@ -125,7 +126,7 @@ class Import extends _Node {
 }
 
 
-class Export extends _Node {
+export class Export extends _Node {
   name: string
   constructor(name) {
     super()
@@ -136,7 +137,7 @@ class Export extends _Node {
 }
 
 
-class Class extends _Node {
+export class Class extends _Node {
   name:         any
   definition:   any
   initializers: any[]
@@ -151,16 +152,16 @@ class Class extends _Node {
     })
   }
   print() {
-    out.write('class '+this.name+" ")
+    out.write('export class '+this.name+" ")
     this.definition.print()
   }
 }
 
 
-class Expression extends _Node {}
+export class Expression extends _Node {}
 
 
-class Group extends _Node {
+export class Group extends _Node {
   expr: any
   constructor(expr) {
     super()
@@ -170,7 +171,7 @@ class Group extends _Node {
 }
 
 
-class Binary extends _Node {
+export class Binary extends _Node {
   lexpr: any
   op:    string
   rexpr: any
@@ -190,7 +191,7 @@ class Binary extends _Node {
 }
 
 
-class Literal extends _Node {
+export class Literal extends _Node {
   value:    any
   typeName: string
   type:     any
@@ -206,7 +207,7 @@ class Literal extends _Node {
 }
 
 
-class Assignment extends _Node {
+export class Assignment extends _Node {
   type:   any
   lvalue: any
   op:     string
@@ -238,7 +239,7 @@ class Assignment extends _Node {
 }
 
 
-class Path extends _Node {
+export class Path extends _Node {
   name: any
   path: any
 
@@ -295,7 +296,7 @@ interface FunctionArgument {
   def?:  _Node
 }
 
-class _Function extends _Node {
+export class _Function extends _Node {
   args:  FunctionArgument[]
   ret:   any
   block: Block
@@ -346,7 +347,7 @@ class _Function extends _Node {
 }
 
 
-class Multi extends _Node {
+export class Multi extends _Node {
   name: any
   args: any
   ret:  any
@@ -366,7 +367,7 @@ class Multi extends _Node {
 }
 
 
-class Init extends _Node {
+export class Init extends _Node {
   args:  any
   block: Block
   constructor(args, block) {
@@ -383,7 +384,7 @@ class Init extends _Node {
 }
 
 
-class New extends _Node {
+export class New extends _Node {
   name:        any
   args:        any
   initializer: _Function
@@ -392,7 +393,7 @@ class New extends _Node {
     super()
     this.name = name
     this.args = args
-    // Corresponding initializer Function for the class type it's initializing
+    // Corresponding initializer Function for the export class type it's initializing
     this.initializer = null
   }
   setInitializer(init) {
@@ -410,7 +411,7 @@ class New extends _Node {
 }
 
 
-class Identifier extends _Node {
+export class Identifier extends _Node {
   name:   any
   parent: any
 
@@ -424,7 +425,7 @@ class Identifier extends _Node {
 }
 
 
-class Call extends _Node {
+export class Call extends _Node {
   base:   any
   args:   any
   parent: any
@@ -447,7 +448,7 @@ class Call extends _Node {
 }
 
 
-class Property extends _Node {
+export class Property extends _Node {
   base:     any
   property: any
   parent:   any
@@ -467,7 +468,7 @@ class Property extends _Node {
 }
 
 
-class If extends _Node {
+export class If extends _Node {
   cond:      any
   block:     Block
   elseIfs:   If[]
@@ -500,7 +501,7 @@ class If extends _Node {
 }
 
 
-class While extends _Node {
+export class While extends _Node {
   expr:  any
   block: any
 
@@ -516,7 +517,7 @@ class While extends _Node {
 }
 
 
-class For extends _Node {
+export class For extends _Node {
   init:  any
   cond:  any
   after: any
@@ -545,7 +546,7 @@ class For extends _Node {
 
 
 /*
-class Chain extends _Node {
+export class Chain extends _Node {
   name:     any
   tail:     any
   headType: any
@@ -571,7 +572,7 @@ class Chain extends _Node {
 */
 
 
-class Return extends _Node {
+export class Return extends _Node {
   expr: any
   
   constructor(expr) {
@@ -588,7 +589,7 @@ class Return extends _Node {
 }
 
 
-class Root extends _Node {
+export class Root extends _Node {
   statements:   any[]
   sourceMap:    any
   scope:        any
@@ -626,7 +627,7 @@ class Root extends _Node {
 }
 
 
-class Block extends _Node {
+export class Block extends _Node {
   statements: any[]
   scope:      any
 
@@ -654,6 +655,7 @@ class Block extends _Node {
   }
 }
 
+/*
 var mod = {
   Node: _Node,
   NameType: NameType,
@@ -685,4 +687,5 @@ var mod = {
   Property: Property
 }
 export = mod
+*/
 

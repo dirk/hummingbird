@@ -69,7 +69,7 @@ module.exports = function (p) {
   }
 
   p.parseFunction = function (name, args, returnType, whenCond, block) {
-    var func = new AST.Function(args, returnType, block)
+    var func = new AST._Function(args, returnType, block)
     // Set statement properties (they're null for non-statement functions)
     func.name = name
     func.when = whenCond

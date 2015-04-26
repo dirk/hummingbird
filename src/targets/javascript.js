@@ -239,7 +239,7 @@ AST.Assignment.prototype.compile = function (context, opts) {
   return asSourceNode(this, ret)
 }
 
-AST.Function.prototype.compile = function (context) {
+AST._Function.prototype.compile = function (context) {
   // Skip compilation for functions that are children of multi types
   if (this.isChildOfMulti()) { return "" }
 
@@ -377,7 +377,7 @@ AST.Class.prototype.compile = function (context) {
   ret.push(context.indent()+"}\n")
   // Now add all the instance methods
   this.definition.statements.forEach(function (node) {
-    if (!(node instanceof AST.Function)) { return }
+    if (!(node instanceof AST._Function)) { return }
     var methodName = node.name
     ret.push(name+".prototype."+methodName+" = ", node.compile(context))
   })

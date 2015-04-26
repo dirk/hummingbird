@@ -14,7 +14,7 @@
     "winston": "~1.0.0"
   },
   "devDependencies": {
-    "typescript": "~1.4.1",
+    "typescript": "~1.5.0-alpha",
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
     "expect.js": "~0.3.1",

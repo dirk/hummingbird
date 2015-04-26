@@ -24,7 +24,7 @@ describe('Type-system', function () {
   describe('given a class definition function node', function () {
     it('should fail when function name is missing', function () {
       var typesystem = new TypeSystem(),
-          node       = new AST.Function([], null, null)
+          node       = new AST._Function([], null, null)
       expect(function () {
         typesystem.visitClassFunction(node, null, null)
       }).to.throwException(/Missing function name/)
