@@ -20,7 +20,13 @@
     "esprima": "~2.1.0",
     "blanket": "~1.1.6",
     "mocha-lcov-reporter": "~0.0.2",
-    "coveralls": "~2.11.2"
+    "coveralls": "~2.11.2",
+    "gulp": "~3.8.11",
+    "gulp-typescript": "~2.6.0",
+    "gulp-util": "~3.0.4",
+    "gulp-watch": "~4.2.4",
+    "chalk": "~1.0.0",
+    "through2": "~0.6.5"
   },
   "scripts": {
     "grammar": "node_modules/.bin/pegjs --cache src/grammar.pegjs",
