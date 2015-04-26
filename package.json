@@ -8,12 +8,13 @@
     "xregexp": "~2.0.0",
     "llvm2": "0.2.7",
     "requirejs": "~2.1.17",
-    "lodash": "~3.6.0",
+    "lodash": "~3.7.0",
     "source-map": "~0.4.2",
     "inline-source-map-comment": "~1.0.5",
     "winston": "~1.0.0"
   },
   "devDependencies": {
+    "typescript": "~1.4.1",
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
     "expect.js": "~0.3.1",

@@ -1,12 +1,13 @@
 
-var gulp       = require('gulp'),
-    typescript = require('gulp-typescript'),
-    gutil      = require('gulp-util'),
-    watch      = require('gulp-watch'),
-    chalk      = require('chalk'),
-    path       = require('path'),
-    through    = require('through2'),
-    cwd        = process.cwd()
+var gulp        = require('gulp'),
+    gtypescript = require('gulp-typescript'),
+    gutil       = require('gulp-util'),
+    watch       = require('gulp-watch'),
+    chalk       = require('chalk'),
+    path        = require('path'),
+    through     = require('through2'),
+    typescript  = require('typescript'),
+    cwd         = process.cwd()
 
 var paths = {
   typescriptSrc: 'src/**/*.ts'
@@ -20,8 +21,9 @@ gulp.task('default', function () {
   })
 
   return gulp.src(paths.typescriptSrc)
-  .pipe(typescript({
+  .pipe(gtypescript({
     // TypeScript opts
+    typescript: typescript
   }))
   .pipe(gulp.dest('src'))
   .pipe(fileLogger)
