@@ -5,15 +5,26 @@ var __extends = this.__extends || function (d, b) {
     d.prototype = new __();
 };
 var inherits = require('util').inherits;
+// Internal base error clss
+var BaseError = (function (_super) {
+    __extends(BaseError, _super);
+    function BaseError(message) {
+        _super.call(this, message);
+        this.name = 'BaseError';
+        this.message = message;
+        this.stack = (new Error()).stack;
+    }
+    return BaseError;
+})(Error);
 var LocativeError = (function (_super) {
     __extends(LocativeError, _super);
     function LocativeError(message, origin) {
-        _super.call(this);
-        this.message = message;
+        _super.call(this, message);
+        this.name = 'LocativeError';
         this.origin = (origin ? origin : null);
     }
     return LocativeError;
-})(Error);
+})(BaseError);
 var InternalCompilerError = (function (_super) {
     __extends(InternalCompilerError, _super);
     function InternalCompilerError(message, origin) {

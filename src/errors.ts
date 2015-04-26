@@ -3,14 +3,26 @@ var inherits = require('util').inherits
 declare class Error {
   name:    string
   message: string
+  stack:   string
+  constructor(message?: string)
 }
 
-class LocativeError extends Error {
+// Internal base error class
+class BaseError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name    = 'BaseError'
+    this.message = message
+    this.stack   = (new Error()).stack
+  }
+}
+
+class LocativeError extends BaseError {
   origin: any
 
   constructor(message, origin) {
-    super()
-    this.message = message
+    super(message)
+    this.name = 'LocativeError'
     this.origin = (origin ? origin : null)
   }
 }
