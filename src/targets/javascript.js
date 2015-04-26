@@ -34,7 +34,8 @@ function wrapContextNoop (context, func) {
 
 function compileStatement (context, stmt, opts) {
   opts = (opts ? opts : {})
-  if (stmt instanceof AST.Binary || stmt instanceof AST.Chain) {
+  // if (stmt instanceof AST.Binary || stmt instanceof AST.Chain) {
+  if (stmt instanceof AST.Binary) {
     opts.statement = true
   }
   return stmt.compile(context, opts)
@@ -534,6 +535,7 @@ AST.For.prototype.compile = function (context) {
   return asSourceNode(this, ret)
 }
 
+/*
 AST.Chain.prototype.compile = function (context, opts) {
   var ret = [this.name]
   this.tail.forEach(function (item) {
@@ -542,6 +544,7 @@ AST.Chain.prototype.compile = function (context, opts) {
   if (opts && opts.statement === true) { ret.push(";\n") }
   return asSourceNode(this, ret)
 }
+*/
 
 AST.Return.prototype.compile  = function (context) {
   var ret = "return;\n"

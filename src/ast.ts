@@ -538,6 +538,7 @@ class For extends _Node {
 }
 
 
+/*
 class Chain extends _Node {
   name:     any
   tail:     any
@@ -561,6 +562,7 @@ class Chain extends _Node {
   }
   print() { out.write(this.toString()) }
 }
+*/
 
 
 class Return extends _Node {
@@ -671,7 +673,7 @@ var mod = {
   While: While,
   For: For,
   Identifier: Identifier,
-  Chain: Chain,
+  // Chain: Chain,
   Return: Return,
   Call: Call,
   Property: Property

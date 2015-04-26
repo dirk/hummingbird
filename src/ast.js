@@ -519,28 +519,31 @@ var For = (function (_super) {
     };
     return For;
 })(_Node);
-var Chain = (function (_super) {
-    __extends(Chain, _super);
-    function Chain(name, tail) {
-        _super.call(this);
-        this.name = name;
-        this.tail = tail;
-        // Added by the typesystem
-        this.headType = null;
-        this.type = null;
-    }
-    Chain.prototype.toString = function () {
-        var base = this.name;
-        this.tail.forEach(function (expr) {
-            base += expr.toString();
-        });
-        return base;
-    };
-    Chain.prototype.print = function () {
-        out.write(this.toString());
-    };
-    return Chain;
-})(_Node);
+/*
+class Chain extends _Node {
+  name:     any
+  tail:     any
+  headType: any
+  type:     any
+  
+  constructor(name, tail) {
+    super()
+    this.name = name
+    this.tail = tail
+    // Added by the typesystem
+    this.headType = null
+    this.type     = null
+  }
+  toString() {
+    var base = this.name
+    this.tail.forEach(function (expr) {
+      base += expr.toString()
+    })
+    return base
+  }
+  print() { out.write(this.toString()) }
+}
+*/
 var Return = (function (_super) {
     __extends(Return, _super);
     function Return(expr) {
@@ -641,7 +644,7 @@ var mod = {
     While: While,
     For: For,
     Identifier: Identifier,
-    Chain: Chain,
+    // Chain: Chain,
     Return: Return,
     Call: Call,
     Property: Property

@@ -88,9 +88,9 @@ module.exports = function (p) {
     return new AST.While(cond, block)
   }
 
-  p.parseChain = function (name, tail) {
-    return new AST.Chain(name, tail)
-  }
+  // p.parseChain = function (name, tail) {
+  //   return new AST.Chain(name, tail)
+  // }
 
   p.parseAssignment = function (path, op, expr) {
     return new AST.Assignment('path', path, op, expr)
