@@ -238,17 +238,22 @@ class Assignment extends _Node {
 }
 
 
-function Path (name, path) {
-  this.name = name
-  this.path = path
-}
-inherits(Path, _Node)
-Path.prototype.toString = function () {
-  var ret = this.name
-  this.path.forEach(function (item) {
-    ret += item.toString()
-  })
-  return ret
+class Path extends _Node {
+  name: any
+  path: any
+
+  constructor(name, path) {
+    super()
+    this.name = name
+    this.path = path
+  }
+  toString() {
+    var ret = this.name
+    this.path.forEach(function (item) {
+      ret += item.toString()
+    })
+    return ret
+  }
 }
 
 
@@ -372,183 +377,244 @@ class Init extends _Node {
 }
 
 
-function New (name, args) {
-  this.name = name
-  this.args = args
-  // Corresponding initializer Function for the class type it's initializing
-  this.initializer = null
+class New extends _Node {
+  name:        any
+  args:        any
+  initializer: _Function
+
+  constructor(name, args) {
+    super()
+    this.name = name
+    this.args = args
+    // Corresponding initializer Function for the class type it's initializing
+    this.initializer = null
+  }
+  setInitializer(init) {
+    this.initializer = init
+    assertPropertyIsInstanceOf(this, 'initializer', types.Function)
+  }
+  getInitializer() {
+    return this.initializer
+  }
+  toString() {
+    var args = this.args.map(function(arg) { return arg.toString() }).join(', ')
+    return 'new '+this.name+'('+args+')'
+  }
+  print() { out.write(this.toString()) }
 }
-inherits(New, _Node)
-New.prototype.setInitializer = function (init) {
-  this.initializer = init
-  assertPropertyIsInstanceOf(this, 'initializer', types.Function)
-}
-New.prototype.getInitializer = function () {
-  return this.initializer
-}
-New.prototype.toString = function () {
-  var args = this.args.map(function(arg) { return arg.toString() }).join(', ')
-  return 'new '+this.name+'('+args+')'
-}
-New.prototype.print = function () { out.write(this.toString()) }
 
 
-function Identifier (name) {
-  this.name   = name
-  this.parent = null
+class Identifier extends _Node {
+  name:   any
+  parent: any
+
+  constructor(name) {
+    super()
+    this.name   = name
+    this.parent = null
+  }
+  print(): void { out.write(this.toString()) }
+  toString(): string { return this.name }
 }
-inherits(Identifier, _Node)
-Identifier.prototype.toString = function () { return this.name }
-Identifier.prototype.print    = function () { out.write(this.toString()) }
 
 
-function Call(base, callArgs) {
-  this.base   = base
-  this.args   = callArgs
-  this.parent = null
-  assertPropertyIsInstanceOf(this, 'base', _Node)
-  assertPropertyIsInstanceOf(this, 'args', Array)
-}
-inherits(Call, _Node)
-Call.prototype.toString = function () {
-  var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
-  return this.base+args
-}
-Call.prototype.print = function () {
-  out.write(this.toString())
+class Call extends _Node {
+  base:   any
+  args:   any
+  parent: any
+
+  constructor(base, callArgs) {
+    super()
+    this.base   = base
+    this.args   = callArgs
+    this.parent = null
+    assertPropertyIsInstanceOf(this, 'base', _Node)
+    assertPropertyIsInstanceOf(this, 'args', Array)
+  }
+  toString() {
+    var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
+    return this.base+args
+  }
+  print() {
+    out.write(this.toString())
+  }
 }
 
-function Property (base, property) {
-  this.base     = base
-  this.property = property
-  this.parent   = null
-  assertPropertyIsInstanceOf(this, 'base', _Node)
-  assertPropertyIsInstanceOf(this, 'property', _Node)
+
+class Property extends _Node {
+  base:     any
+  property: any
+  parent:   any
+  
+  constructor(base, property) {
+    super()
+    this.base     = base
+    this.property = property
+    this.parent   = null
+    assertPropertyIsInstanceOf(this, 'base', _Node)
+    assertPropertyIsInstanceOf(this, 'property', _Node)
+  }
+  toString() {
+    return this.base+'.'+this.property.toString()
+  }
+  print() { out.write(this.toString()) }
 }
-inherits(Property, _Node)
-Property.prototype.toString = function () {
-  return this.base+'.'+this.property.toString()
-}
-Property.prototype.print = function () { out.write(this.toString()) }
 
 
-function If (cond, block, elseIfs, elseBlock) {
-  this.cond      = cond
-  this.block     = block
-  this.elseIfs   = elseIfs ? elseIfs : null
-  this.elseBlock = elseBlock ? elseBlock : null
-}
-inherits(If, _Node)
-If.prototype.print = function () {
-  var cond = this.cond.toString()
-  out.write("if "+cond+" ")
-  this.block.print()
-  if (this.elseIfs) {
-    for (var i = 0; i < this.elseIfs.length; i++) {
-      var ei = this.elseIfs[i]
-      cond = ei.cond.toString()
-      out.write(" else if "+cond+" ")
-      ei.block.print()
+class If extends _Node {
+  cond:      any
+  block:     Block
+  elseIfs:   If[]
+  elseBlock: Block
+
+  constructor(cond, block, elseIfs, elseBlock) {
+    super()
+    this.cond      = cond
+    this.block     = block
+    this.elseIfs   = elseIfs ? elseIfs : null
+    this.elseBlock = elseBlock ? elseBlock : null
+  }
+  print() {
+    var cond = this.cond.toString()
+    out.write("if "+cond+" ")
+    this.block.print()
+    if (this.elseIfs) {
+      for (var i = 0; i < this.elseIfs.length; i++) {
+        var ei = this.elseIfs[i]
+        cond = ei.cond.toString()
+        out.write(" else if "+cond+" ")
+        ei.block.print()
+      }
+    }
+    if (this.elseBlock) {
+      out.write(" else ")
+      this.elseBlock.print()
     }
   }
-  if (this.elseBlock) {
-    out.write(" else ")
-    this.elseBlock.print()
+}
+
+
+class While extends _Node {
+  expr:  any
+  block: any
+
+  constructor(expr, block) {
+    super()
+    this.expr  = expr // Loop expression
+    this.block = block
+  }
+  print() {
+    out.write("while "+this.expr.toString()+" ")
+    this.block.print()
   }
 }
 
 
-function While (expr, block) {
-  this.expr  = expr // Loop expression
-  this.block = block
-}
-inherits(While, _Node)
-While.prototype.print = function () {
-  out.write("while "+this.expr.toString()+" ")
-  this.block.print()
-}
+class For extends _Node {
+  init:  any
+  cond:  any
+  after: any
+  block: Block
 
-
-function For (init, cond, after, block) {
-  this.init  = init // Initialization
-  this.cond  = cond // Condition
-  this.after = after // Afterthought
-  this.block = block
-}
-inherits(For, _Node)
-For.prototype.print = function () {
-  out.write("for ")
-  // Don't indent while we're writing out these statements
-  var i = _ind
-  _ind = 0;
-  this.init.print();  out.write('; ')
-  this.cond.print();  out.write('; ')
-  this.after.print(); out.write(' ')
-  // Restore indent and print the block
-  _ind = i;
-  this.block.print()
-}
-
-
-function Chain (name, tail) {
-  this.name = name
-  this.tail = tail
-  // Added by the typesystem
-  this.headType = null
-  this.type     = null
-}
-inherits(Chain, _Node)
-Chain.prototype.toString = function () {
-  var base = this.name
-  this.tail.forEach(function (expr) {
-    base += expr.toString()
-  })
-  return base
-}
-Chain.prototype.print = function () { out.write(this.toString()) }
-
-
-function Return (expr) {
-  this.expr = expr
-}
-inherits(Return, _Node)
-Return.prototype.print    = function () { out.write(this.toString()) }
-Return.prototype.toString = function () {
-  if (this.expr) {
-    return 'return '+this.expr.toString()
+  constructor(init, cond, after, block) {
+    super()
+    this.init  = init // Initialization
+    this.cond  = cond // Condition
+    this.after = after // Afterthought
+    this.block = block
   }
-  return 'return'
+  print() {
+    out.write("for ")
+    // Don't indent while we're writing out these statements
+    var i = _ind
+    _ind = 0;
+    this.init.print();  out.write('; ')
+    this.cond.print();  out.write('; ')
+    this.after.print(); out.write(' ')
+    // Restore indent and print the block
+    _ind = i;
+    this.block.print()
+  }
 }
 
 
-function Root (statements) {
-  this.statements = statements
-  this.sourceMap  = null
-  this.scope      = null
-  // Lists of import and export nodes; the nodes add themselves during
-  // type-system walking
-  this.imports = []
-  this.exports = []
-}
-inherits(Root, _Node)
-Root.prototype.print = function (includeTypes) {
-  if (includeTypes !== undefined) {
-    _include_types = includeTypes
+class Chain extends _Node {
+  name:     any
+  tail:     any
+  headType: any
+  type:     any
+  
+  constructor(name, tail) {
+    super()
+    this.name = name
+    this.tail = tail
+    // Added by the typesystem
+    this.headType = null
+    this.type     = null
   }
-  _win("root {\n")
-  this.statements.forEach(function (stmt) {
-    _w('')
-    stmt.print()
-    out.write("\n")
-  })
-  _wout("}\n");
-}
-Root.prototype.getRootScope = function () {
-  var rootScope = this.scope.parent
-  if (!rootScope || !rootScope.isRoot) {
-    throw new TypeError('Missing root scope', this)
+  toString() {
+    var base = this.name
+    this.tail.forEach(function (expr) {
+      base += expr.toString()
+    })
+    return base
   }
-  return rootScope
+  print() { out.write(this.toString()) }
+}
+
+
+class Return extends _Node {
+  expr: any
+  
+  constructor(expr) {
+    super()
+    this.expr = expr
+  }
+  print() { out.write(this.toString()) }
+  toString() {
+    if (this.expr) {
+      return 'return '+this.expr.toString()
+    }
+    return 'return'
+  }
+}
+
+
+class Root extends _Node {
+  statements:   any[]
+  sourceMap:    any
+  scope:        any
+  imports:      any[]
+  exports:      any[]
+  includeTypes: boolean = false
+  
+  constructor(statements) {
+    super()
+    this.statements = statements
+    this.sourceMap  = null
+    this.scope      = null
+    // Lists of import and export nodes; the nodes add themselves during
+    // type-system walking
+    this.imports = []
+    this.exports = []
+  }
+  print() {
+    _include_types = this.includeTypes
+    _win("root {\n")
+    this.statements.forEach(function (stmt) {
+      _w('')
+      stmt.print()
+      out.write("\n")
+    })
+    _wout("}\n");
+  }
+  getRootScope() {
+    var rootScope = this.scope.parent
+    if (!rootScope || !rootScope.isRoot) {
+      throw new TypeError('Missing root scope', this)
+    }
+    return rootScope
+  }
 }
 
 

@@ -242,18 +242,22 @@ var Assignment = (function (_super) {
     };
     return Assignment;
 })(_Node);
-function Path(name, path) {
-    this.name = name;
-    this.path = path;
-}
-inherits(Path, _Node);
-Path.prototype.toString = function () {
-    var ret = this.name;
-    this.path.forEach(function (item) {
-        ret += item.toString();
-    });
-    return ret;
-};
+var Path = (function (_super) {
+    __extends(Path, _super);
+    function Path(name, path) {
+        _super.call(this);
+        this.name = name;
+        this.path = path;
+    }
+    Path.prototype.toString = function () {
+        var ret = this.name;
+        this.path.forEach(function (item) {
+            ret += item.toString();
+        });
+        return ret;
+    };
+    return Path;
+})(_Node);
 function assertHasProperty(obj, prop) {
     var val = obj[prop];
     if (val !== undefined) {
@@ -367,186 +371,225 @@ var Init = (function (_super) {
     };
     return Init;
 })(_Node);
-function New(name, args) {
-    this.name = name;
-    this.args = args;
-    // Corresponding initializer Function for the class type it's initializing
-    this.initializer = null;
-}
-inherits(New, _Node);
-New.prototype.setInitializer = function (init) {
-    this.initializer = init;
-    assertPropertyIsInstanceOf(this, 'initializer', types.Function);
-};
-New.prototype.getInitializer = function () {
-    return this.initializer;
-};
-New.prototype.toString = function () {
-    var args = this.args.map(function (arg) {
-        return arg.toString();
-    }).join(', ');
-    return 'new ' + this.name + '(' + args + ')';
-};
-New.prototype.print = function () {
-    out.write(this.toString());
-};
-function Identifier(name) {
-    this.name = name;
-    this.parent = null;
-}
-inherits(Identifier, _Node);
-Identifier.prototype.toString = function () {
-    return this.name;
-};
-Identifier.prototype.print = function () {
-    out.write(this.toString());
-};
-function Call(base, callArgs) {
-    this.base = base;
-    this.args = callArgs;
-    this.parent = null;
-    assertPropertyIsInstanceOf(this, 'base', _Node);
-    assertPropertyIsInstanceOf(this, 'args', Array);
-}
-inherits(Call, _Node);
-Call.prototype.toString = function () {
-    var args = '(' + this.args.map(function (arg) {
-        return arg.toString();
-    }).join(', ') + ')';
-    return this.base + args;
-};
-Call.prototype.print = function () {
-    out.write(this.toString());
-};
-function Property(base, property) {
-    this.base = base;
-    this.property = property;
-    this.parent = null;
-    assertPropertyIsInstanceOf(this, 'base', _Node);
-    assertPropertyIsInstanceOf(this, 'property', _Node);
-}
-inherits(Property, _Node);
-Property.prototype.toString = function () {
-    return this.base + '.' + this.property.toString();
-};
-Property.prototype.print = function () {
-    out.write(this.toString());
-};
-function If(cond, block, elseIfs, elseBlock) {
-    this.cond = cond;
-    this.block = block;
-    this.elseIfs = elseIfs ? elseIfs : null;
-    this.elseBlock = elseBlock ? elseBlock : null;
-}
-inherits(If, _Node);
-If.prototype.print = function () {
-    var cond = this.cond.toString();
-    out.write("if " + cond + " ");
-    this.block.print();
-    if (this.elseIfs) {
-        for (var i = 0; i < this.elseIfs.length; i++) {
-            var ei = this.elseIfs[i];
-            cond = ei.cond.toString();
-            out.write(" else if " + cond + " ");
-            ei.block.print();
+var New = (function (_super) {
+    __extends(New, _super);
+    function New(name, args) {
+        _super.call(this);
+        this.name = name;
+        this.args = args;
+        // Corresponding initializer Function for the class type it's initializing
+        this.initializer = null;
+    }
+    New.prototype.setInitializer = function (init) {
+        this.initializer = init;
+        assertPropertyIsInstanceOf(this, 'initializer', types.Function);
+    };
+    New.prototype.getInitializer = function () {
+        return this.initializer;
+    };
+    New.prototype.toString = function () {
+        var args = this.args.map(function (arg) {
+            return arg.toString();
+        }).join(', ');
+        return 'new ' + this.name + '(' + args + ')';
+    };
+    New.prototype.print = function () {
+        out.write(this.toString());
+    };
+    return New;
+})(_Node);
+var Identifier = (function (_super) {
+    __extends(Identifier, _super);
+    function Identifier(name) {
+        _super.call(this);
+        this.name = name;
+        this.parent = null;
+    }
+    Identifier.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Identifier.prototype.toString = function () {
+        return this.name;
+    };
+    return Identifier;
+})(_Node);
+var Call = (function (_super) {
+    __extends(Call, _super);
+    function Call(base, callArgs) {
+        _super.call(this);
+        this.base = base;
+        this.args = callArgs;
+        this.parent = null;
+        assertPropertyIsInstanceOf(this, 'base', _Node);
+        assertPropertyIsInstanceOf(this, 'args', Array);
+    }
+    Call.prototype.toString = function () {
+        var args = '(' + this.args.map(function (arg) {
+            return arg.toString();
+        }).join(', ') + ')';
+        return this.base + args;
+    };
+    Call.prototype.print = function () {
+        out.write(this.toString());
+    };
+    return Call;
+})(_Node);
+var Property = (function (_super) {
+    __extends(Property, _super);
+    function Property(base, property) {
+        _super.call(this);
+        this.base = base;
+        this.property = property;
+        this.parent = null;
+        assertPropertyIsInstanceOf(this, 'base', _Node);
+        assertPropertyIsInstanceOf(this, 'property', _Node);
+    }
+    Property.prototype.toString = function () {
+        return this.base + '.' + this.property.toString();
+    };
+    Property.prototype.print = function () {
+        out.write(this.toString());
+    };
+    return Property;
+})(_Node);
+var If = (function (_super) {
+    __extends(If, _super);
+    function If(cond, block, elseIfs, elseBlock) {
+        _super.call(this);
+        this.cond = cond;
+        this.block = block;
+        this.elseIfs = elseIfs ? elseIfs : null;
+        this.elseBlock = elseBlock ? elseBlock : null;
+    }
+    If.prototype.print = function () {
+        var cond = this.cond.toString();
+        out.write("if " + cond + " ");
+        this.block.print();
+        if (this.elseIfs) {
+            for (var i = 0; i < this.elseIfs.length; i++) {
+                var ei = this.elseIfs[i];
+                cond = ei.cond.toString();
+                out.write(" else if " + cond + " ");
+                ei.block.print();
+            }
         }
+        if (this.elseBlock) {
+            out.write(" else ");
+            this.elseBlock.print();
+        }
+    };
+    return If;
+})(_Node);
+var While = (function (_super) {
+    __extends(While, _super);
+    function While(expr, block) {
+        _super.call(this);
+        this.expr = expr; // Loop expression
+        this.block = block;
     }
-    if (this.elseBlock) {
-        out.write(" else ");
-        this.elseBlock.print();
+    While.prototype.print = function () {
+        out.write("while " + this.expr.toString() + " ");
+        this.block.print();
+    };
+    return While;
+})(_Node);
+var For = (function (_super) {
+    __extends(For, _super);
+    function For(init, cond, after, block) {
+        _super.call(this);
+        this.init = init; // Initialization
+        this.cond = cond; // Condition
+        this.after = after; // Afterthought
+        this.block = block;
     }
-};
-function While(expr, block) {
-    this.expr = expr; // Loop expression
-    this.block = block;
-}
-inherits(While, _Node);
-While.prototype.print = function () {
-    out.write("while " + this.expr.toString() + " ");
-    this.block.print();
-};
-function For(init, cond, after, block) {
-    this.init = init; // Initialization
-    this.cond = cond; // Condition
-    this.after = after; // Afterthought
-    this.block = block;
-}
-inherits(For, _Node);
-For.prototype.print = function () {
-    out.write("for ");
-    // Don't indent while we're writing out these statements
-    var i = _ind;
-    _ind = 0;
-    this.init.print();
-    out.write('; ');
-    this.cond.print();
-    out.write('; ');
-    this.after.print();
-    out.write(' ');
-    // Restore indent and print the block
-    _ind = i;
-    this.block.print();
-};
-function Chain(name, tail) {
-    this.name = name;
-    this.tail = tail;
-    // Added by the typesystem
-    this.headType = null;
-    this.type = null;
-}
-inherits(Chain, _Node);
-Chain.prototype.toString = function () {
-    var base = this.name;
-    this.tail.forEach(function (expr) {
-        base += expr.toString();
-    });
-    return base;
-};
-Chain.prototype.print = function () {
-    out.write(this.toString());
-};
-function Return(expr) {
-    this.expr = expr;
-}
-inherits(Return, _Node);
-Return.prototype.print = function () {
-    out.write(this.toString());
-};
-Return.prototype.toString = function () {
-    if (this.expr) {
-        return 'return ' + this.expr.toString();
+    For.prototype.print = function () {
+        out.write("for ");
+        // Don't indent while we're writing out these statements
+        var i = _ind;
+        _ind = 0;
+        this.init.print();
+        out.write('; ');
+        this.cond.print();
+        out.write('; ');
+        this.after.print();
+        out.write(' ');
+        // Restore indent and print the block
+        _ind = i;
+        this.block.print();
+    };
+    return For;
+})(_Node);
+var Chain = (function (_super) {
+    __extends(Chain, _super);
+    function Chain(name, tail) {
+        _super.call(this);
+        this.name = name;
+        this.tail = tail;
+        // Added by the typesystem
+        this.headType = null;
+        this.type = null;
     }
-    return 'return';
-};
-function Root(statements) {
-    this.statements = statements;
-    this.sourceMap = null;
-    this.scope = null;
-    // Lists of import and export nodes; the nodes add themselves during
-    // type-system walking
-    this.imports = [];
-    this.exports = [];
-}
-inherits(Root, _Node);
-Root.prototype.print = function (includeTypes) {
-    if (includeTypes !== undefined) {
-        _include_types = includeTypes;
+    Chain.prototype.toString = function () {
+        var base = this.name;
+        this.tail.forEach(function (expr) {
+            base += expr.toString();
+        });
+        return base;
+    };
+    Chain.prototype.print = function () {
+        out.write(this.toString());
+    };
+    return Chain;
+})(_Node);
+var Return = (function (_super) {
+    __extends(Return, _super);
+    function Return(expr) {
+        _super.call(this);
+        this.expr = expr;
     }
-    _win("root {\n");
-    this.statements.forEach(function (stmt) {
-        _w('');
-        stmt.print();
-        out.write("\n");
-    });
-    _wout("}\n");
-};
-Root.prototype.getRootScope = function () {
-    var rootScope = this.scope.parent;
-    if (!rootScope || !rootScope.isRoot) {
-        throw new TypeError('Missing root scope', this);
+    Return.prototype.print = function () {
+        out.write(this.toString());
+    };
+    Return.prototype.toString = function () {
+        if (this.expr) {
+            return 'return ' + this.expr.toString();
+        }
+        return 'return';
+    };
+    return Return;
+})(_Node);
+var Root = (function (_super) {
+    __extends(Root, _super);
+    function Root(statements) {
+        _super.call(this);
+        this.includeTypes = false;
+        this.statements = statements;
+        this.sourceMap = null;
+        this.scope = null;
+        // Lists of import and export nodes; the nodes add themselves during
+        // type-system walking
+        this.imports = [];
+        this.exports = [];
     }
-    return rootScope;
-};
+    Root.prototype.print = function () {
+        _include_types = this.includeTypes;
+        _win("root {\n");
+        this.statements.forEach(function (stmt) {
+            _w('');
+            stmt.print();
+            out.write("\n");
+        });
+        _wout("}\n");
+    };
+    Root.prototype.getRootScope = function () {
+        var rootScope = this.scope.parent;
+        if (!rootScope || !rootScope.isRoot) {
+            throw new TypeError('Missing root scope', this);
+        }
+        return rootScope;
+    };
+    return Root;
+})(_Node);
 var Block = (function (_super) {
     __extends(Block, _super);
     function Block(statements) {
