@@ -8,7 +8,7 @@ var inherits  = require('util').inherits,
 var SUPERTYPE_NONE = (new Date()).getTime()
 
 // Base class for the type of any expression in Hummingbird.
-class Type {
+export class Type {
   name:       string
   supertype:  Type
   intrinsic:  boolean
@@ -51,7 +51,7 @@ class Type {
 
 
 // Instance of a type (ie. all variables are Instances)
-class Instance {
+export class Instance {
   type: Type
 
   constructor(type: Type) {
@@ -78,7 +78,7 @@ var Flags = {
 
 // Types ----------------------------------------------------------------------
 
-class Object extends Type {
+export class Object extends Type {
   propertiesFlags: any
   initializers:    any[]
 
@@ -115,7 +115,7 @@ class Object extends Type {
 
 
 // Modules have no supertype
-class Module extends Object {
+export class Module extends Object {
   parent: Module
 
   constructor(name) {
@@ -150,7 +150,7 @@ class Module extends Object {
 }
 
 
-class Any extends Type {
+export class Any extends Type {
   constructor() {
     super(SUPERTYPE_NONE)
     this.intrinsic = true
@@ -159,8 +159,7 @@ class Any extends Type {
   equals(other) { return true }
 }
 
-
-class Void extends Type {
+export class Void extends Type {
   constructor() {
     super(SUPERTYPE_NONE)
     this.intrinsic = true
@@ -172,7 +171,7 @@ class Void extends Type {
 }
 
 
-class String extends Type {
+export class String extends Type {
   constructor(supertype) {
     super(supertype)
     this.intrinsic = true
@@ -186,7 +185,7 @@ class String extends Type {
 }
 
 
-class Integer extends Type {
+export class Integer extends Type {
   constructor(supertype) {
     super(supertype)
     this.intrinsic = true
@@ -199,7 +198,7 @@ class Integer extends Type {
 }
 
 
-class Boolean extends Type {
+export class Boolean extends Type {
   constructor(supertype) {
     super(supertype)
     this.intrinsic = true
@@ -212,7 +211,7 @@ class Boolean extends Type {
 }
 
 
-class Unknown extends Type {
+export class Unknown extends Type {
   known: any
 
   constructor() {
@@ -230,7 +229,7 @@ function isTrue (value) {
 }
 
 
-class Function extends Type {
+export class Function extends Type {
   args: Type[]
   ret:  Type
   isInstanceMethod: boolean
@@ -301,7 +300,7 @@ function assertPresent (recv, prop) {
   throw new Error('Missing property '+prop)
 }
 
-class Multi extends Type {
+export class Multi extends Type {
   functionNodes: AST.Function[]
   args: Type[]
   ret:  Type
