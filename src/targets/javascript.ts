@@ -1,25 +1,34 @@
 
+import errors = require('../errors')
+import types  = require('../types')
+
 var AST        = require('../ast'),
-    types      = require('../types'),
     repeat     = require('../util').repeat,
     sourcemap  = require('source-map'),
-    SourceNode = sourcemap.SourceNode
+    SourceNode = sourcemap.SourceNode,
+    TypeError  = errors.TypeError
 
 
 // Context of the compiler as it's generating code ----------------------------
 
-function Context () {
-  // Keeping track of names that conflict and need to be munged/aliased.
-  this.conflicts = {}
-  this._indent = 0
-  // Keep track of files that we've compiled
-  this.filesCompiled = []
-}
-Context.prototype.incrementIndent = function () { this._indent += 2 }
-Context.prototype.decrementIndent = function () { this._indent -= 2 }
-Context.prototype.indent = function (additionalIndent) {
-  if (additionalIndent === undefined) { additionalIndent = 0 }
-  return repeat(' ', this._indent + additionalIndent)
+class Context {
+  conflicts: any
+  filesCompiled: any[]
+  private _indent: number
+
+  constructor() {
+    // Keeping track of names that conflict and need to be munged/aliased.
+    this.conflicts = {}
+    this._indent = 0
+    // Keep track of files that we've compiled
+    this.filesCompiled = []
+  }
+  incrementIndent() { this._indent += 2 }
+  decrementIndent() { this._indent -= 2 }
+  indent(additionalIndent) {
+    if (additionalIndent === undefined) { additionalIndent = 0 }
+    return repeat(' ', this._indent + additionalIndent)
+  }
 }
 
 function wrapContextIndent (context, func) {
@@ -32,7 +41,7 @@ function wrapContextNoop (context, func) {
   return func.call(this, context)
 }
 
-function compileStatement (context, stmt, opts) {
+function compileStatement (context: Context, stmt, opts = null) {
   opts = (opts ? opts : {})
   // if (stmt instanceof AST.Binary || stmt instanceof AST.Chain) {
   if (stmt instanceof AST.Binary) {
@@ -280,7 +289,11 @@ function interpose (arr, sep) {
   }
   return newArr
 }
-Array.prototype.extend = function (other) {
+
+interface Array<T> {
+  extend: (other: Array<any>) => void;
+}
+Array.prototype['extend'] = function (other) {
   var len = other.length
   for (var i = 0; i < len; i++) {
     this.push(other[i])
@@ -297,7 +310,7 @@ AST.Multi.prototype.compile = function (context) {
   context.incrementIndent()
 
   // Figure out the branches for the dispatcher
-  var def = [], cond = []
+  var definitions = [], cond = []
   for (var i = this.type.functionNodes.length - 1; i >= 0; i--) {
     var fn = this.type.functionNodes[i]
     fn.childName = name+'_'+(i+1)
@@ -305,15 +318,15 @@ AST.Multi.prototype.compile = function (context) {
       cond.push(fn)
     } else {
       // If there's no `when` condition then it's a default
-      def.push(fn)
+      definitions.push(fn)
     }
   }
-  if (def.length > 1) {
-    var n = def.length
+  if (definitions.length > 1) {
+    var n = definitions.length
     throw new TypeError('Multi has more than 1 default branch (has '+n+')', this)
   }
   // De-array default to just the node or null
-  def = (def.length === 0) ? null : def[0]
+  var def = (definitions.length === 0) ? null : definitions[0]
 
   // Build the dispatcher
   var ind = context.indent()
@@ -414,7 +427,7 @@ AST.Class.prototype.compileInitializers = function (context, initializers) {
   initializers.forEach(function (init) {
     var argsLength = init.args.length
     if (branches[argsLength]) {
-      throw new Error('Multiple initializers taking '+argLength+' arguments')
+      throw new Error('Multiple initializers taking '+argsLength+' arguments')
     }
     branches[argsLength] = init
   })
@@ -424,14 +437,16 @@ AST.Class.prototype.compileInitializers = function (context, initializers) {
   branchLengths.forEach(function (branchLength) {
     ret.push(ind+'  case '+branchLength+":\n")
     // Build the arguments for the branch
-    var args = []
-    for (var i = 0; i < branchLength; i++) {
+    var args   = [],
+        length = parseInt(branchLength, 10)
+    for (var i = 0; i < length; i++) {
       args.push('arguments['+i+']')
     }
+    var argsString = ''
     if (args.length > 0) {
-      args = ', '+args.join(', ')
-    } else { args = '' }
-    ret.push(ind+'    init'+branchLength+".call(this"+args+"); break;\n")
+      argsString = ', '+args.join(', ')
+    }
+    ret.push(ind+'    init'+branchLength+".call(this"+argsString+"); break;\n")
   })
   ret.push(ind+"  default:\n")
   ret.push(ind+"    throw new Error('No initializer found');\n")
@@ -547,7 +562,7 @@ AST.Chain.prototype.compile = function (context, opts) {
 */
 
 AST.Return.prototype.compile  = function (context) {
-  var ret = "return;\n"
+  var ret = ["return;\n"]
   if (this.expr) {
     ret = ['return ', this.expr.compile(context, {omitTerminator: true}), ";\n"]
   }
