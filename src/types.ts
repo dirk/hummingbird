@@ -82,6 +82,10 @@ export class Object extends Type {
   propertiesFlags: any
   initializers:    any[]
 
+  static createRootObject() {
+    return new Object(SUPERTYPE_NONE)
+  }
+
   constructor(supertype) {
     super(supertype)
     this.intrinsic = true
