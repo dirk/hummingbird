@@ -1,24 +1,27 @@
 import errors = require('./errors')
+import AST    = require('./ast')
 
 var inherits  = require('util').inherits,
     inspect   = require('util').inspect,
     TypeError = errors.TypeError
 
-var _super = function (self) {
-  return self.constructor.super_
-}
+var SUPERTYPE_NONE = (new Date()).getTime()
 
 // Base class for the type of any expression in Hummingbird.
 class Type {
   name:       string
   supertype:  Type
   intrinsic:  boolean
+  primitive:  boolean
   isRoot:     boolean
   properties: any
 
   constructor(supertype, isRoot = false) {
     if (!supertype) {
       throw new TypeError('Missing supertype')
+    }
+    if (supertype === SUPERTYPE_NONE) {
+      supertype = null
     }
     // Whether or not the type is intrinsic to the language
     this.intrinsic  = false
@@ -51,10 +54,10 @@ class Type {
 class Instance {
   type: Type
 
-  constructor(type) {
+  constructor(type: Type) {
     this.type = type
   }
-  getTypeOfProperty(name, fromNode) {
+  getTypeOfProperty(name: string, fromNode = null) {
     return this.type.getTypeOfProperty(name, fromNode)
   }
   equals(other) {
@@ -67,6 +70,8 @@ class Instance {
 }
 
 
+type TypeFlags = string
+
 var Flags = {
   ReadOnly: 'r'
 }
@@ -74,9 +79,6 @@ var Flags = {
 // Types ----------------------------------------------------------------------
 
 class Object extends Type {
-  name:            string
-  intrinsic:       boolean
-  primitive:       boolean
   propertiesFlags: any
   initializers:    any[]
 
@@ -90,19 +92,19 @@ class Object extends Type {
     // List of initializers (Function) for the type
     this.initializers = []
   }
-  getFlagsOfProperty(name) {
+  getFlagsOfProperty(name: string): TypeFlags {
     var flags = this.propertiesFlags[name]
     return (flags ? flags : null)
   }
-  setFlagsOfProperty(name, flags) {
+  setFlagsOfProperty(name: string, flags: TypeFlags): void {
     this.propertiesFlags[name] = flags
   }
   // Checks if a given property has a certain flag set
-  hasPropertyFlag(name, flag) {
+  hasPropertyFlag(name: string, flag: TypeFlags) {
     var flags = this.getFlagsOfProperty(name)
     return (flags && flags.indexOf(flag) !== -1)
   }
-  addInitializer(initFunction) {
+  addInitializer(initFunction: Function) {
     if (!(initFunction instanceof Function)) {
       throw new TypeError('Initializer must be a Function')
     }
@@ -113,99 +115,113 @@ class Object extends Type {
 
 
 // Modules have no supertype
-function Module (name) {
-  _super(this).call(this, 'fake')
-  this.intrinsic = true
-  this.supertype = null
-  this.name      = (name ? name : null)
-  // Parent module (if present)
-  this.parent    = null
-}
-inherits(Module, Object)
-Module.prototype.setParent = function (parent) {
-  if (!(parent instanceof Module)) {
-    throw new TypeError('Expected parent to be a Module')
+class Module extends Object {
+  parent: Module
+
+  constructor(name) {
+    super(SUPERTYPE_NONE)
+    this.intrinsic = true
+    this.name      = (name ? name : null)
+    // Parent module (if present)
+    this.parent    = null
   }
-  this.parent = parent
-}
-Module.prototype.addChild = function (child) {
-  var childName = child.name
-  this.setTypeOfProperty(childName, child)
-}
-Module.prototype.getChild = function (name) {
-  return this.getTypeOfProperty(name)
-}
-Module.prototype.inspect = function () { return '.'+this.name }
-
-
-function Any () {
-  _super(this).call(this, 'fake')
-  this.intrinsic = true
-  this.supertype = null
-}
-inherits(Any, Type)
-// Any always equals another type
-Any.prototype.equals = function (other) { return true }
-
-
-function Void () {
-  _super(this).call(this, 'fake')
-  this.intrinsic = true
-  this.supertype = null
-}
-inherits(Void, Type)
-Void.prototype.equals = function (other) {
-  // There should never be more than 1 instance of Void
-  return this === other
+  setParent(parent: Module) {
+    if (!(parent instanceof Module)) {
+      throw new TypeError('Expected parent to be a Module')
+    }
+    this.parent = parent
+  }
+  addChild(child: Module) {
+    if (!(child instanceof Module)) {
+      throw new TypeError('Expected child to be a Module')
+    }
+    var childName = child.name
+    this.setTypeOfProperty(childName, child)
+  }
+  getChild(name: string): Module {
+    var child = this.getTypeOfProperty(name)
+    if (child instanceof Module) {
+      return child
+    } else {
+      throw new TypeError('Unexpected non-Module child: '+name)
+    }
+  }
+  inspect() { return '.'+this.name }
 }
 
 
-function String (supertype) {
-  _super(this).call(this, supertype)
-  this.intrinsic = true
-  this.primitive = true
-}
-inherits(String, Type)
-String.prototype.toString = function () { return 'String' }
-String.prototype.inspect  = String.prototype.toString
-String.prototype.equals   = function (other) {
-  // Check that they're both strings
-  return (other.constructor === String)
+class Any extends Type {
+  constructor() {
+    super(SUPERTYPE_NONE)
+    this.intrinsic = true
+  }
+  // Any always equals another type
+  equals(other) { return true }
 }
 
 
-function Integer (supertype) {
-  _super(this).call(this, supertype)
-  this.intrinsic = true
-  this.primitive = true
-}
-inherits(Integer, Type)
-Integer.prototype.inspect = function () { return 'Integer' }
-Integer.prototype.equals = function (other) {
-  return (other.constructor === Integer)
-}
-
-
-function Boolean (supertype) {
-  _super(this).call(this, supertype)
-  this.intrinsic = true
-  this.primitive = true
-}
-inherits(Boolean, Type)
-Boolean.prototype.inspect = function () { return 'Boolean' }
-Boolean.prototype.equals = function (other) {
-  return (other.constructor === Boolean)
+class Void extends Type {
+  constructor() {
+    super(SUPERTYPE_NONE)
+    this.intrinsic = true
+  }
+  equals(other) {
+    // There should never be more than 1 instance of Void
+    return this === other
+  }
 }
 
 
-function Unknown () {
-  _super(this).call(this, 'fake')
-  this.intrinsic = true
-  this.supertype = null
-  this.known     = null
+class String extends Type {
+  constructor(supertype) {
+    super(supertype)
+    this.intrinsic = true
+    this.primitive = true
+  }
+  inspect() { return 'String' }
+  equals(other) {
+    // Check that they're both strings
+    return (other.constructor === String)
+  }
 }
-inherits(Unknown, Type)
-Unknown.prototype.inspect = function () { return 'Unknown' }
+
+
+class Integer extends Type {
+  constructor(supertype) {
+    super(supertype)
+    this.intrinsic = true
+    this.primitive = true
+  }
+  inspect() { return 'Integer' }
+  equals(other) {
+    return (other.constructor === Integer)
+  }
+}
+
+
+class Boolean extends Type {
+  constructor(supertype) {
+    super(supertype)
+    this.intrinsic = true
+    this.primitive = true
+  }
+  inspect() { return 'Boolean' }
+  equals(other) {
+    return (other.constructor === Boolean)
+  }
+}
+
+
+class Unknown extends Type {
+  known: any
+
+  constructor() {
+    super(SUPERTYPE_NONE)
+    this.intrinsic = true
+    this.known     = null
+  }
+  inspect() { return 'Unknown' }
+}
 
 
 // Utility function used by the Function type
@@ -285,19 +301,24 @@ function assertPresent (recv, prop) {
   throw new Error('Missing property '+prop)
 }
 
-function Multi (supertype, args, ret) {
-  _super(this).call(this, supertype)
-  this.args = args
-  this.ret  = ret
-  assertPresent(this, 'args')
-  assertPresent(this, 'ret')
-  // Set up an array to point to all the function implementations to which
-  // we'll multiple dispatch
-  this.functionNodes = []
-}
-inherits(Multi, Type)
-Multi.prototype.addFunctionNode = function (functionNode) {
-  this.functionNodes.push(functionNode)
+class Multi extends Type {
+  functionNodes: AST.Function[]
+  args: Type[]
+  ret:  Type
+
+  constructor(supertype, args, ret) {
+    super(supertype)
+    this.args = args
+    this.ret  = ret
+    assertPresent(this, 'args')
+    assertPresent(this, 'ret')
+    // Set up an array to point to all the function implementations to which
+    // we'll multiple dispatch
+    this.functionNodes = []
+  }
+  addFunctionNode(functionNode: AST.Function) {
+    this.functionNodes.push(functionNode)
+  }
 }
 
 
@@ -316,3 +337,4 @@ module.exports = {
   Function: Function,
   Multi: Multi
 }
+
