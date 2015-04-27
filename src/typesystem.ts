@@ -4,10 +4,10 @@ import util   = require('util')
 import AST    = require('./ast')
 import errors = require('./errors')
 import scope  = require('./typesystem/scope')
+import types  = require('./types')
 
 var inherits     = util.inherits,
     inspect      = util.inspect,
-    types        = require('./types'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
     TypeError    = errors.TypeError
@@ -177,9 +177,8 @@ TypeSystem.prototype.visitImport = function (node: AST.Import, scope, parentNode
   this.file = currentFile
   this.file.dependencies.push(importedFile)
   // Then build a module object for it
-  var module = new types.Module()
-  module.name = moduleName
-  var exportedNames = Object.keys(importedFile.exports)
+  var module        = new types.Module(moduleName.toString()),
+      exportedNames = Object.keys(importedFile.exports)
   for (var i = exportedNames.length - 1; i >= 0; i--) {
     var name = exportedNames[i],
         type = importedFile.exports[name]
@@ -279,7 +278,7 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
         self.visitClassFunction(stmt, scope, klass)
         break
       case AST.Init:
-        var initType = new types.Function(self.rootObject),
+        var initType  = new types.Function(self.rootObject),
             initScope = new Scope(scope)
         // Add an instance of 'this' for the initializer's scope
         setupThisInScope(klass, initScope)
@@ -470,8 +469,8 @@ TypeSystem.prototype.resolveType = function (node, scope) {
 }
 
 TypeSystem.prototype.visitLet = function (node, scope) {
-  var lvalueType = new types.Unknown()
-  var name       = node.lvalue.name
+  var lvalueType: any = new types.Unknown()
+  var name            = node.lvalue.name
 
   // If we have an explicit type then look it up
   if (node.lvalue.immediateType) {

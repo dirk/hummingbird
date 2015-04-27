@@ -6,6 +6,7 @@ var inherits  = require('util').inherits,
     TypeError = errors.TypeError
 
 var SUPERTYPE_NONE = (new Date()).getTime()
+type NoneType = number
 
 // Base class for the type of any expression in Hummingbird.
 export class Type {
@@ -16,17 +17,22 @@ export class Type {
   isRoot:     boolean
   properties: any
 
-  constructor(supertype, isRoot = false) {
+  constructor(supertype: Type|NoneType, isRoot = false) {
     if (!supertype) {
       throw new TypeError('Missing supertype')
     }
-    if (supertype === SUPERTYPE_NONE) {
-      supertype = null
+    if (typeof supertype === 'number') {
+      if (supertype === SUPERTYPE_NONE) {
+        supertype = null
+      } else {
+        throw new TypeError('Invalid supertype')
+      }
     }
     // Whether or not the type is intrinsic to the language
     this.intrinsic  = false
     this.name       = this.constructor['name']
-    this.supertype  = supertype
+    // Set the supertype; coercing it since we know it will be a Type or null
+    this.supertype  = <Type>supertype
     // Maps property names (strings) to Types
     this.properties = {}
     // Whether or not the type is a root type in the type hierarchy
@@ -72,7 +78,7 @@ export class Instance {
 
 type TypeFlags = string
 
-var Flags = {
+export var Flags = {
   ReadOnly: 'r'
 }
 
@@ -122,10 +128,10 @@ export class Object extends Type {
 export class Module extends Object {
   parent: Module
 
-  constructor(name) {
+  constructor(name: string = null) {
     super(SUPERTYPE_NONE)
     this.intrinsic = true
-    this.name      = (name ? name : null)
+    this.name      = name
     // Parent module (if present)
     this.parent    = null
   }
@@ -241,7 +247,7 @@ export class Function extends Type {
   // this points to that module method to call in place of this shim.
   shimFor: any
 
-  constructor(supertype, args, ret) {
+  constructor(supertype, args?: Type[], ret?: Type) {
     super(supertype)
     this.intrinsic        = true
     this.isInstanceMethod = false
@@ -324,7 +330,7 @@ export class Multi extends Type {
   }
 }
 
-
+/*
 module.exports = {
   Flags: Flags,
   Type: Type,
@@ -340,4 +346,5 @@ module.exports = {
   Function: Function,
   Multi: Multi
 }
+*/
 
