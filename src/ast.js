@@ -273,9 +273,9 @@ function assertSaneArgs(args) {
         }
     } // for
 } // assertSaneArgs
-var _Function = (function (_super) {
-    __extends(_Function, _super);
-    function _Function(args, ret, block) {
+var Function = (function (_super) {
+    __extends(Function, _super);
+    function Function(args, ret, block) {
         _super.call(this);
         // Statement properties
         this.name = null;
@@ -294,7 +294,7 @@ var _Function = (function (_super) {
         assertPropertyIsInstanceOf(this, 'args', Array);
         assertSaneArgs(this.args);
     }
-    _Function.prototype.print = function () {
+    Function.prototype.print = function () {
         var args = this.args.map(function (arg) {
             var ret = arg.name;
             if (arg.type) {
@@ -313,15 +313,15 @@ var _Function = (function (_super) {
         }
         this.block.print();
     };
-    _Function.prototype.setParentMultiType = function (multi) {
+    Function.prototype.setParentMultiType = function (multi) {
         this.parentMultiType = multi;
     };
-    _Function.prototype.isChildOfMulti = function () {
+    Function.prototype.isChildOfMulti = function () {
         return this.parentMultiType ? true : false;
     };
-    return _Function;
+    return Function;
 })(_Node);
-exports._Function = _Function;
+exports.Function = Function;
 var Multi = (function (_super) {
     __extends(Multi, _super);
     function Multi(name, args, ret) {

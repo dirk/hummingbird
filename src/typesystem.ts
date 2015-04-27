@@ -110,7 +110,7 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
     case AST.Multi:
       this.visitMulti(node, scope)
       break
-    case AST._Function:
+    case AST.Function:
       // Create the searcher in this parent node
       // TODO: Maybe just pass along the parent node rather than generating
       //       a whole new anonymous function every time we encounter a
@@ -274,7 +274,7 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
           klass.setFlagsOfProperty(propertyName, 'r')
         }
         break
-      case AST._Function:
+      case AST.Function:
         self.visitClassFunction(stmt, scope, klass)
         break
       case AST.Init:
@@ -535,7 +535,7 @@ TypeSystem.prototype.resolveExpression = function (expr, scope, immediate) {
 
 TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
   switch (node.constructor) {
-    case AST._Function:
+    case AST.Function:
       // Sanity checks to make sure the name and when are not present
       if (node.name) {
         throw new TypeError('Function expression cannot have a `name`', node)
@@ -670,7 +670,7 @@ function getAllReturnTypes (block) {
   return returnTypes
 }
 
-TypeSystem.prototype.visitFunction = function (node: AST._Function, parentScope, immediate) {
+TypeSystem.prototype.visitFunction = function (node: AST.Function, parentScope, immediate) {
   if (node.type) { return node.type }
   var self = this
   var type = new types.Function(this.rootObject)
@@ -825,7 +825,7 @@ TypeSystem.prototype.visitNamedFunction = function (node, scope) {
   scope.setLocal(node.name, node.type)
 }
 
-TypeSystem.prototype.visitFunctionStatement = function (node: AST._Function, scope, searchInParent) {
+TypeSystem.prototype.visitFunctionStatement = function (node: AST.Function, scope, searchInParent) {
   var name = node.name
   // Now look up the parent `multi` in the containing block
   var multiNode = searchInParent(function (stmt) {

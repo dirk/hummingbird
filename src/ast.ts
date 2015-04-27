@@ -301,7 +301,7 @@ interface FunctionArgument {
   def?:  _Node
 }
 
-export class _Function extends _Node {
+export class Function extends _Node {
   args:  FunctionArgument[]
   ret:   any
   block: Block
@@ -393,7 +393,7 @@ export class Init extends _Node {
 export class New extends _Node {
   name:            any
   args:            any
-  initializer:     _Function
+  initializer:     Function
   // Type of the class that's going to be constructed
   constructorType: any
   // Type of the object once it's been constructed

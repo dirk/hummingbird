@@ -912,7 +912,7 @@ function predefineTypes (ctx, block) {
         if (stmt.type !== 'var' && stmt.type !== 'let') {
           return
         }
-        if (stmt.rvalue instanceof AST._Function) {
+        if (stmt.rvalue instanceof AST.Function) {
           var rvalueInstanceType = stmt.rvalue.type,
               rvalueType         = unboxInstanceType(rvalueInstanceType)
           // If the native function hasn't been typed
@@ -989,7 +989,7 @@ function genericCompileFunction (ctx, nativeFn, node) {
 
 var nativeFunctionCounter = 1
 
-AST._Function.prototype.getAnonymousNativeFunction = function (ctx) {
+AST.Function.prototype.getAnonymousNativeFunction = function (ctx) {
   if (this.name) {
     throw new ICE('Trying to set up named function as anonymous native function')
   }
@@ -1012,7 +1012,7 @@ AST._Function.prototype.getAnonymousNativeFunction = function (ctx) {
   return fn
 }
 
-AST._Function.prototype.compile = function(ctx, blockCtx) {
+AST.Function.prototype.compile = function(ctx, blockCtx) {
   var instance = this.type,
       type     = unboxInstanceType(instance, types.Function)
   if (type.parentMultiType) {
@@ -1034,7 +1034,7 @@ AST._Function.prototype.compile = function(ctx, blockCtx) {
   }
 }
 
-AST._Function.prototype.compileToValue = function (ctx, blockCtx) {
+AST.Function.prototype.compileToValue = function (ctx, blockCtx) {
   var self = this,
       fn   = this.getAnonymousNativeFunction(ctx)
   genericCompileFunction(ctx, fn, this)
@@ -1106,7 +1106,7 @@ AST.Class.prototype.compileInstanceMethods = function (ctx, blockCtx, nativeObje
   for (var i = 0; i < statements.length; i++) {
     var stmt = statements[i]
     // Skip over non-functions
-    if (!(stmt instanceof AST._Function)) { continue }
+    if (!(stmt instanceof AST.Function)) { continue }
     var instance = stmt.type
     // Mark the type as an instance method
     var type = unboxInstanceType(instance)

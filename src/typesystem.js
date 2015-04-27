@@ -97,7 +97,7 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
         case AST.Multi:
             this.visitMulti(node, scope);
             break;
-        case AST._Function:
+        case AST.Function:
             // Create the searcher in this parent node
             // TODO: Maybe just pass along the parent node rather than generating
             //       a whole new anonymous function every time we encounter a
@@ -248,7 +248,7 @@ TypeSystem.prototype.visitClassDefinition = function (node, scope, klass) {
                     klass.setFlagsOfProperty(propertyName, 'r');
                 }
                 break;
-            case AST._Function:
+            case AST.Function:
                 self.visitClassFunction(stmt, scope, klass);
                 break;
             case AST.Init:
@@ -483,7 +483,7 @@ TypeSystem.prototype.resolveExpression = function (expr, scope, immediate) {
 };
 TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
     switch (node.constructor) {
-        case AST._Function:
+        case AST.Function:
             // Sanity checks to make sure the name and when are not present
             if (node.name) {
                 throw new TypeError('Function expression cannot have a `name`', node);
