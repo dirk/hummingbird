@@ -25,24 +25,37 @@ class Context {
   }
   incrementIndent() { this._indent += 2 }
   decrementIndent() { this._indent -= 2 }
-  indent(additionalIndent) {
+  indent(additionalIndent: number = 0): string {
     if (additionalIndent === undefined) { additionalIndent = 0 }
     return repeat(' ', this._indent + additionalIndent)
   }
 }
 
-function wrapContextIndent (context, func) {
+function wrapContextIndent (context: Context, func: (Context) => void) {
   context.incrementIndent()
   var ret = func.call(this, context)
   context.decrementIndent()
   return ret
 }
-function wrapContextNoop (context, func) {
+function wrapContextNoop (context: Context, func: (Context) => void) {
   return func.call(this, context)
 }
 
-function compileStatement (context: Context, stmt, opts = null) {
-  opts = (opts ? opts : {})
+interface CompileOptions {
+  // If we're compiling a single file without imports and exports
+  singleFile: boolean
+  // If it's being compiled as a statement
+  statement?: boolean
+  // List of imported and exported
+  imported?: any[]
+  exported?: any[]
+}
+function getDefaultCompileOptions(): CompileOptions {
+  return {singleFile: false, statement: false}
+}
+
+function compileStatement (context: Context, stmt, opts?: CompileOptions) {
+  opts = (opts ? opts : getDefaultCompileOptions())
   // if (stmt instanceof AST.Binary || stmt instanceof AST.Chain) {
   if (stmt instanceof AST.Binary) {
     opts.statement = true
@@ -87,7 +100,7 @@ AST.Root.prototype.compile = function (opts) {
     nodes.push("requirejs("+entryName+");\n")
   } else {
     // Just got a plain tree to compile
-    nodes = this.compileStatements(context, {single: true})
+    nodes = this.compileStatements(context, {singleFile: true})
   }
   // And build the big output node
   var compiled = new SourceNode(1, 0, null, nodes).toStringWithSourceMap()
@@ -115,16 +128,16 @@ AST.Root.prototype.compileAsDependency = function (context) {
 // TODO: Cleanup this function! Way too much messy indent stuff.
 // TODO: If no imports or exports detected and it's the root then just skip
 //       the RequireJS stuff altogether
-AST.Root.prototype.compileStatements = function (context, compileOpts) {
-  compileOpts = (compileOpts ? compileOpts : {})
-  var isSingle = compileOpts.single,
-      self     = this
+AST.Root.prototype.compileStatements = function (context: Context, compileOpts?: CompileOptions) {
+  if (!compileOpts) { compileOpts = getDefaultCompileOptions() }
+  var isSingle: boolean = compileOpts.singleFile,
+      self = this
   // Set up the return buffer
   var ret = []
   // TODO: Just use `root.imports` and `root.exports` for handling imports
   //       and exports rather than rescanning for them
   // Setup the root options
-  var opts = {imported: [], exported: []},
+  var opts = {imported: [], exported: [], singleFile: isSingle},
       ind  = null
 
   // Set the wrapping function based on whether or not to indent
@@ -300,7 +313,7 @@ Array.prototype['extend'] = function (other) {
   }
 }
 
-AST.Multi.prototype.compile = function (context) {
+AST.Multi.prototype.compile = function (context: Context) {
   // console.log(this)
   var args = this.args.map(function (arg) { return arg.name }),
       joinedArgs = args.join(', '),// joinedArgs = interpose(args, ', ')
