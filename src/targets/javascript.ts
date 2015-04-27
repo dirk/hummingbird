@@ -46,6 +46,7 @@ interface CompileOptions {
   singleFile: boolean
   // If it's being compiled as a statement
   statement?: boolean
+  omitTerminator?: boolean
   // List of imported and exported
   imported?: any[]
   exported?: any[]
@@ -157,7 +158,7 @@ AST.Root.prototype.compileStatements = function (context: Context, compileOpts?:
   }
   return ret
 }
-AST.Root.prototype.wrapInDefine = function (context, opts, ret) {
+AST.Root.prototype.wrapInDefine = function (context: Context, opts: CompileOptions, ret: any[]) {
   // Build the "define(...)" for this module
   var name = JSON.stringify(this.file.path),
       ind  = context.indent(2),
@@ -197,13 +198,13 @@ AST.Root.prototype.wrapInDefine = function (context, opts, ret) {
 }
 
 
-function importExportPreCheck (opts) {
+function importExportPreCheck (opts: CompileOptions) {
   if (!opts.imported || !opts.exported) {
     throw new Error('Missing import and/or exported lists for statement')
   }
 }
 
-AST.Import.prototype.compile = function (context, opts) {
+AST.Import.prototype.compile = function (context: Context, opts: CompileOptions) {
   importExportPreCheck(opts)
   opts.imported.push([this.file, this.name.value])
   // We need to output something; so let's just leave a nice little comment
@@ -212,14 +213,14 @@ AST.Import.prototype.compile = function (context, opts) {
 }
 
 
-AST.Export.prototype.compile = function (context, opts) {
+AST.Export.prototype.compile = function (context: Context, opts: CompileOptions) {
   importExportPreCheck(opts)
   opts.exported.push(this.name)
   return '// '+this.toString()+"\n"
 }
 
 
-AST.Binary.prototype.compile = function (context, opts) {
+AST.Binary.prototype.compile = function (context: Context, opts: CompileOptions) {
   var lexpr = this.lexpr.compile(context, {omitTerminator: true})
   var rexpr = this.rexpr.compile(context, {omitTerminator: true})
   var ret   = [lexpr, ' '+this.op+' ', rexpr]
@@ -227,14 +228,14 @@ AST.Binary.prototype.compile = function (context, opts) {
   return asSourceNode(this, ret)
 }
 
-AST.Literal.prototype.compile = function (context) {
+AST.Literal.prototype.compile = function (context: Context) {
   if (this.typeName === 'String') {
     return JSON.stringify(this.value)
   }
   return this.value.toString()
 }
 
-AST.Assignment.prototype.compile = function (context, opts) {
+AST.Assignment.prototype.compile = function (context: Context, opts: CompileOptions) {
   var term = ";\n",
       ret  = null
   if (opts && opts.omitTerminator === true) { term = '' }
@@ -261,7 +262,7 @@ AST.Assignment.prototype.compile = function (context, opts) {
   return asSourceNode(this, ret)
 }
 
-AST.Function.prototype.compile = function (context) {
+AST.Function.prototype.compile = function (context: Context) {
   // Skip compilation for functions that are children of multi types
   if (this.isChildOfMulti()) { return "" }
 
@@ -290,7 +291,7 @@ AST.Function.prototype.compile = function (context) {
   return asSourceNode(this, ret)
 }
 
-function interpose (arr, sep) {
+function interpose (arr: any[], sep: string) {
   var newArr  = [],
       len     = arr.length,
       lastIdx = len - 1
@@ -377,7 +378,7 @@ AST.Multi.prototype.compile = function (context: Context) {
 }
 
 
-AST.Class.prototype.compile = function (context) {
+AST.Class.prototype.compile = function (context: Context) {
   var klass = this.type,
       name  = this.name
   // Generate the simple class function
@@ -409,7 +410,7 @@ AST.Class.prototype.compile = function (context) {
   })
   return asSourceNode(this, ret)
 }
-AST.Class.prototype.compilePreamble = function (context) {
+AST.Class.prototype.compilePreamble = function (context: Context) {
   var letProperties = [],
       varProperties = []
   this.definition.statements.forEach(function (node) {
@@ -432,7 +433,7 @@ AST.Class.prototype.compilePreamble = function (context) {
   })
   return ret
 }
-AST.Class.prototype.compileInitializers = function (context, initializers) {
+AST.Class.prototype.compileInitializers = function (context: Context, initializers: any[]) {
   context.incrementIndent()
   var ind = context.indent()
   // Compute the length branches
@@ -478,7 +479,7 @@ AST.Class.prototype.compileInitializers = function (context, initializers) {
   return ret
 }
 
-AST.New.prototype.compile = function (context) {
+AST.New.prototype.compile = function (context: Context) {
   var name = this.name,
       args = this.args.map(function (arg) {
         return arg.compile(context)
@@ -489,11 +490,11 @@ AST.New.prototype.compile = function (context) {
   return asSourceNode(this, ret)
 }
 
-AST.Identifier.prototype.compile = function (context, opts) {
+AST.Identifier.prototype.compile = function (context: Context) {
   return asSourceNode(this, this.name)
 }
 
-AST.Call.prototype.compile = function (context, opts) {
+AST.Call.prototype.compile = function (context: Context, opts: CompileOptions) {
   var args = this.args.map(function (arg) {
     return arg.compile(context, {omitTerminator: true})
   })
@@ -510,7 +511,7 @@ AST.Call.prototype.compile = function (context, opts) {
   return asSourceNode(this, ret)
 }
 
-AST.Property.prototype.compile = function (context, opts) {
+AST.Property.prototype.compile = function (context: Context, opts: CompileOptions) {
   var term = ";\n"
   if (opts && opts.omitTerminator === true) { term = '' }
 
@@ -522,7 +523,7 @@ AST.Property.prototype.compile = function (context, opts) {
   return asSourceNode(this, ret)
 }
 
-AST.If.prototype.compile = function (context) {
+AST.If.prototype.compile = function (context: Context) {
   var ind = context.indent()
   var ret = ['if (', this.cond.compile(), ") {\n"]
   ret.push(this.block.compile(context))
@@ -539,7 +540,7 @@ AST.If.prototype.compile = function (context) {
   return asSourceNode(this, ret)
 }
 
-AST.While.prototype.compile = function (context) {
+AST.While.prototype.compile = function (context: Context) {
   var ind = context.indent()
   var ret = [
     'while (',
@@ -574,7 +575,7 @@ AST.Chain.prototype.compile = function (context, opts) {
 }
 */
 
-AST.Return.prototype.compile  = function (context) {
+AST.Return.prototype.compile  = function (context: Context) {
   var ret = ["return;\n"]
   if (this.expr) {
     ret = ['return ', this.expr.compile(context, {omitTerminator: true}), ";\n"]
@@ -582,7 +583,7 @@ AST.Return.prototype.compile  = function (context) {
   return asSourceNode(this, ret)
 }
 
-AST.Block.prototype.compile = function (context) {
+AST.Block.prototype.compile = function (context: Context) {
   var self = this
   return wrapContextIndent(context, function () {
     var ret = []
