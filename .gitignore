@@ -8,6 +8,12 @@ dist
 _site
 coverage.html
 
+# TypeScript-generated files
+src/errors.js
+src/ast.js
+src/types.js
+src/typesystem.js
+
 # Compiler-generated files
 out*
 a.out
