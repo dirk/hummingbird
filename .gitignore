@@ -13,6 +13,7 @@ src/errors.js
 src/ast.js
 src/types.js
 src/typesystem.js
+src/typesystem/scope.js
 src/targets/javascript.js
 
 # Compiler-generated files

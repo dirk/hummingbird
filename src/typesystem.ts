@@ -1,20 +1,20 @@
 /// <reference path="typescript/node-0.12.0.d.ts" />
 
 import util   = require('util')
-import errors = require('./errors')
 import AST    = require('./ast')
+import errors = require('./errors')
+import scope  = require('./typesystem/scope')
 
 var inherits     = util.inherits,
     inspect      = util.inspect,
     types        = require('./types'),
-    scope        = require('./typesystem/scope'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
     TypeError    = errors.TypeError
 
 
 function TypeSystem () {
-  this.root = new Scope()
+  this.root = new Scope(null)
   this.root.isRoot = true
   this.bootstrap()
   // File and compiler will be null when not actively walking a tree
@@ -236,8 +236,8 @@ TypeSystem.prototype.visitClass = function (node: AST.Class, scope) {
   scope.setLocal(klass.name, klass)
   scope.setFlagsForLocal(klass.name, Scope.Flags.Constant)
   // Now create a new scope and visit the definition in that scope
-  var scope = new Scope(scope)
-  this.visitClassDefinition(node.definition, scope, klass)
+  var classScope = new Scope(scope)
+  this.visitClassDefinition(node.definition, classScope, klass)
   // Set the class as the node's type
   node.type = klass
 }
