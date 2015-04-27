@@ -1,4 +1,4 @@
-var types = require('../types')
+import types = require('../types')
 
 module.exports = function (TypeSystem) {
 
@@ -26,7 +26,7 @@ module.exports = function (TypeSystem) {
     this.root.setLocal('String',  new types.String(rootObject))
     this.root.setLocal('Integer', Integer)
     this.root.setLocal('Boolean', new types.Boolean(rootObject))
-    this.root.setLocal('Void',    new types.Void(rootObject))
+    this.root.setLocal('Void',    new types.Void())
   }
 
   TypeSystem.prototype.bootstrapConsole = function (rootObject) {
