@@ -131,8 +131,10 @@ var commands = {
       targetOpts.single = true
     }
     // Load the JavaScript compile target and print the compiled source
-    require('./targets/javascript')
-    process.stdout.write(file.tree.compile(targetOpts))
+    var javascript = require('./targets/javascript'),
+        compiler   = new javascript.JSCompiler(),
+        compiled   = compiler.compileRoot(file.tree, targetOpts)
+    process.stdout.write(compiled)
     // Check whether we should also print the source-map
     var includeMap = argv.map
     if (includeMap) {

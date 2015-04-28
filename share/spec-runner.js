@@ -1,8 +1,9 @@
-var _       = require('lodash'),
-    fs      = require('fs'),
-    expect  = require('expect.js'),
-    esprima = require('esprima'),
-    parseAndWalk = require('../helper').parseAndWalk
+var _            = require('lodash'),
+    fs           = require('fs'),
+    expect       = require('expect.js'),
+    esprima      = require('esprima'),
+    parseAndWalk = require('../helper').parseAndWalk,
+    JSCompiler   = require('../../src/targets/javascript').JSCompiler
 
 describe('NAME spec', function () {
   var hbSource, jsSource
@@ -26,12 +27,11 @@ describe('NAME spec', function () {
     tree = parseAndWalk(hbSource)
     expect(tree).to.be.ok()
   })
-  // Pull in the JavaScript target
-  require('../../src/targets/javascript')
 
   var compiledSource
   it('should compile', function () {
-    compiledSource = tree.compile()
+    var compiler = new JSCompiler()
+    compiledSource = compiler.compileRoot(tree)
     expect(compiledSource).to.be.ok()
   })
 
