@@ -12,14 +12,57 @@ var inherits     = util.inherits,
     ClosingScope = scope.ClosingScope,
     TypeError    = errors.TypeError
 
+class TypeSystem {
+  root:     scope.Scope
+  file:     any
+  compiler: any
+  constructor() {
+    this.root = new Scope(null)
+    this.root.isRoot = true
+    this.bootstrap()
+    // File and compiler will be null when not actively walking a tree
+    this.file     = null
+    this.compiler = null
+  }
 
-function TypeSystem () {
-  this.root = new Scope(null)
-  this.root.isRoot = true
-  this.bootstrap()
-  // File and compiler will be null when not actively walking a tree
-  this.file     = null
-  this.compiler = null
+  // Mixed in by `./typesystem/bootstrap`
+  bootstrap: () => void
+
+  // Forward definitions for prototyped utility
+  findByName: (string) => types.Type
+  resolveType: (node: AST._Node, scope: scope.Scope) => types.Type
+  resolveExpression: (expr: any, scope: scope.Scope, immediate: any) => types.Type
+  getTypeOfTypesProperty: (type: any, name: string) => types.Type
+
+  // Forward definitions for prototyped walking functions
+  walk: (rootNode: AST.Root, file: any, compiler: any) => void
+  visitBlock:             (node: AST.Block,      scope: scope.Scope) => void
+  visitStatement:         (node,                 scope, parentNode) => void
+  visitImport:            (node: AST.Import,     scope: scope.Scope, parentNode: AST._Node) => void
+  visitExport:            (node: AST.Export,     scope: scope.Scope, parentNode: AST._Node) => void
+  visitClass:             (node: AST.Class,      scope: scope.Scope) => void
+  visitClassDefinition:   (node: AST.Block,      scope: scope.Scope, klass: types.Object) => void
+  visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object) => void
+  visitFor:               (node: AST.For,        scope: scope.Scope) => void
+  visitIf:                (node: AST.If,         scope: scope.Scope) => void
+  visitWhile:             (node: AST.While,      scope: scope.Scope) => void
+  visitReturn:            (node: AST.Return,     scope: scope.Scope, parentNode: AST._Node) => void
+  visitPath:              (node: AST.Assignment, scope: scope.Scope) => void
+  visitLet:               (node: AST.Assignment, scope: scope.Scope) => void
+  visitVar:               (node: AST.Assignment, scope: scope.Scope) => void
+  visitExpression:        (node: AST._Node,      scope: scope.Scope, immediate: any) => void
+  visitLiteral:           (node: AST.Literal,    scope: scope.Scope) => void
+  visitNew:               (node: AST.New,        scope: scope.Scope) => void
+  visitBinary:            (node: AST.Binary,     scope: scope.Scope) => void
+  visitMulti:             (node: AST.Multi,      scope: scope.Scope) => void
+  visitFunction:          (node: AST.Function,   parentScope: scope.Scope, immediate: any) => void
+  visitMultiFunction:     (node: AST.Function,   scope: scope.Scope, multiNode: AST.Multi) => void
+  visitNamedFunction:     (node: AST.Function,   scope: scope.Scope) => void
+  visitFunctionStatement: (node: AST.Function,   scope: scope.Scope, searchInParent: any) => void
+  visitIdentifier:        (node: AST.Identifier, scope: scope.Scope) => void
+  visitProperty:          (node: AST.Property,   scope: scope.Scope, parentNode: AST._Node) => void
+  visitCall:              (node: AST.Call,       scope: scope.Scope) => void
+  // visitChain:          (node, scope) => void
 }
 // Add the bootstrap methods to the TypeSystem
 require('./typesystem/bootstrap')(TypeSystem)
@@ -388,7 +431,7 @@ TypeSystem.prototype.visitReturn = function (node: AST.Return, scope, parentNode
   if (node.expr === undefined) {
     throw new TypeError('Cannot handle undefined expression in Return')
   }
-  var exprType = null
+  var exprType: types.Instance = null
   if (node.expr === null) {
     var voidType = this.root.getLocal('Void')
     exprType = new types.Instance(voidType)
@@ -456,15 +499,17 @@ TypeSystem.prototype.resolveType = function (node, scope) {
   var self = this
   switch (node.constructor) {
     case AST.FunctionType:
-      var args = node.args.map(function (arg) { return self.resolveType(arg, scope) }),
-          ret  = this.resolveType(node.ret, scope)
+      var functionTypeNode = <AST.FunctionType>node
+      var args = functionTypeNode.args.map(function (arg) { return self.resolveType(arg, scope) }),
+          ret  = this.resolveType(functionTypeNode.ret, scope)
       // Build the type and return it
       return new types.Function(this.rootObject, args, ret)
     case AST.NameType:
       // TODO: Improve the handling and look-ups of these; right now they're way too naive
-      return this.findByName(node.name)
+      var nameTypeNode = <AST.NameType>node
+      return this.findByName(nameTypeNode.name)
     default:
-      throw new Error("Can't walk: "+node.constructor.name)
+      throw new Error("Can't walk: "+node.constructor['name'])
   }
 }
 
@@ -536,11 +581,12 @@ TypeSystem.prototype.resolveExpression = function (expr, scope, immediate) {
 TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
   switch (node.constructor) {
     case AST.Function:
+      var functionNode = <AST.Function>node
       // Sanity checks to make sure the name and when are not present
-      if (node.name) {
+      if (functionNode.name) {
         throw new TypeError('Function expression cannot have a `name`', node)
       }
-      if (node.when) {
+      if (functionNode.when) {
         throw new TypeError('Function expression cannot have a `when` condition', node)
       }
       // Then run the visitor
@@ -568,7 +614,7 @@ TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
       this.visitCall(node, scope)
       break
     default:
-      throw new Error("Can't visit expression: "+node.constructor.name)
+      throw new Error("Can't visit expression: "+node.constructor['name'])
   }
 }
 
@@ -936,6 +982,7 @@ TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {
   node.type = new types.Instance(functionType.ret)
 }
 
+/*
 TypeSystem.prototype.visitChain = function (node, scope) {
   var self = this,
       headType = know(node, scope.get(node.name))
@@ -996,6 +1043,7 @@ TypeSystem.prototype.visitChain = function (node, scope) {
   }
   node.type = type
 }
+*/
 
 
 // Utility function for resolving the type of a type's property. Handles
@@ -1008,7 +1056,7 @@ TypeSystem.prototype.getTypeOfTypesProperty = function (type, name) {
   } else {
     var typeName = (type ? type.inspect() : String(type))
     assertInstanceOf(type, types.Instance, 'Trying to get property of non-Instance: '+typeName)
-    var instance = type
+    var instance: types.Instance = type
     // Unbox the instance
     type = instance.type
   }
