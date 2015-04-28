@@ -1,3 +1,9 @@
+var fs        = require('fs'),
+    llvm2Path = '../../../llvm2'
+// Look for llvm2 as a sibling of the top-level Hummingbird directory
+if (!fs.existsSync(llvm2Path)) {
+  llvm2Path = 'llvm2'
+}
 
 var _            = require('lodash'),
     AST          = require('../ast'),
@@ -5,7 +11,7 @@ var _            = require('lodash'),
     scope        = require('../typesystem/scope'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
-    LLVM         = require('../../../llvm2'),
+    LLVM         = require(llvm2Path),
     Builtins     = require('./llvm/builtins'),
     slots        = require('./llvm/slots'),
     Errors       = require('../errors'),
