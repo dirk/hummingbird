@@ -3,7 +3,7 @@ node_js:
   - "0.12"
   - "iojs"
 before_script:
-  - "node_modules/.bin/gulp default"
+  - "node_modules/.bin/jake ts:compile"
   - "npm run grammar"
   - "npm run gen-spec"
 script: "npm run test && npm run test-spec"

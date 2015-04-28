@@ -1,8 +1,9 @@
+import util   = require('util')
 import errors = require('./errors')
 import AST    = require('./ast')
 
-var inherits  = require('util').inherits,
-    inspect   = require('util').inspect,
+var inherits  = util.inherits,
+    inspect   = util.inspect,
     TypeError = errors.TypeError
 
 var SUPERTYPE_NONE = (new Date()).getTime()

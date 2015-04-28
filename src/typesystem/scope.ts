@@ -1,4 +1,6 @@
-var inherits = require('util').inherits
+import util = require('util')
+
+var inherits = util.inherits
 
 var scopeIDCounter = 1
 

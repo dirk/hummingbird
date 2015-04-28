@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "typescript": "~1.5.0-alpha",
+    "jake": "~8.0.12",
     "mocha": "~2.2.1",
     "esprima": "~2.1.0",
     "expect.js": "~0.3.1",
@@ -22,6 +23,8 @@
     "blanket": "~1.1.6",
     "mocha-lcov-reporter": "~0.0.2",
     "coveralls": "~2.11.2",
+    "glob": "~5.0.5",
+    "chokidar": "~1.0.1",
     "gulp": "~3.8.11",
     "gulp-typescript": "~2.6.0",
     "gulp-util": "~3.0.4",

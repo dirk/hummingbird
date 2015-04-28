@@ -1,13 +1,13 @@
 /// <reference path="typescript/node-0.12.0.d.ts" />
+
 import util   = require('util')
 import errors = require('./errors')
+import types  = require('./types')
 
 var inherits  = util.inherits,
     inspect   = util.inspect,
     TypeError = errors.TypeError,
     out       = process.stdout
-
-var types = require('./types')
 
 // http://stackoverflow.com/a/5450113
 function repeat(pattern: string, count: number): string {
