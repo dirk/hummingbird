@@ -291,6 +291,7 @@ TypeSystem.prototype.visitClass = function (node: AST.Class, scope) {
   // Create a new Object type with the root object as the supertype
   var klass = new types.Object(rootObject)
   klass.name = node.name
+  klass.intrinsic = false
   scope.setLocal(klass.name, klass)
   scope.setFlagsForLocal(klass.name, Scope.Flags.Constant)
   // Now create a new scope and visit the definition in that scope
@@ -914,36 +915,34 @@ TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
 }
 
 TypeSystem.prototype.visitProperty = function (node: AST.Property, scope, parentNode) {
-  var property = node.property,
-      base     = node.base
-
   // Set up the parents
   if (node.parent) {
-    base.parent = node.parent
+    node.base.parent = node.parent
   }
-  property.parent = node
+  node.property.parent = node
 
   // Then visit the base and the child
   this.visitExpression(node.base, scope)
   node.baseType = node.base.type
 
-  if (typeof property === 'string') {
+  if (typeof node.property === 'string') {
     throw new Error('Unreachable')
     // If it's just basic string then look up the property on ourselves
-    var propertyType = this.getTypeOfTypesProperty(node.baseType, property)
+    var propertyType = this.getTypeOfTypesProperty(node.baseType, node.property)
     node.type = propertyType
 
   } else {
     // Otherwise visit the property as a full expression
-    this.visitExpression(property, scope)
+    this.visitExpression(node.property, scope)
     // Update from the child's type
-    node.type = property.type
+    node.type = node.property.type
   }
 }
 
 TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {
   // Make our base identifier point to our parent so it will resolve correctly
   // when we visit it
+  // node.base.parent = node.parent
   node.base.parent = node.parent
   this.visitExpression(node.base, scope)
   node.baseType = node.base.type
