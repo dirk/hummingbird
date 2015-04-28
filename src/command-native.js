@@ -1,6 +1,8 @@
 var fs            = require('fs'),
+    os            = require('os'),
     path          = require('path'),
     child_process = require('child_process'),
+    concat_stream = require('concat-stream'),
     reportError   = require('./util').reportError,
     TypeSystem    = require('./typesystem').TypeSystem,
     Parser        = require('./parser'),
@@ -64,6 +66,15 @@ if (argv._.length === 0 || argv._[0] === 'help') {
 
 var entryFile = argv._[0],
     binFile   = 'a.out' // entryFile.replace(/\.hb$/i, '')
+
+if (entryFile === '-') {
+  var data = fs.readFileSync('/dev/stdin', 'utf8').toString()
+  // Write it to a temporary file
+  var tempPath = path.join(os.tmpdir(), 'input.hb')
+  fs.writeFileSync(tempPath, data)
+  // Then use that as the entry file
+  entryFile = tempPath
+}
 
 var parser     = new Parser(),
     compiler   = new Compiler()

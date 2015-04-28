@@ -12,7 +12,8 @@
     "source-map": "~0.4.2",
     "inline-source-map-comment": "~1.0.5",
     "source-map-support": "~0.2.10",
-    "winston": "~1.0.0"
+    "winston": "~1.0.0",
+    "concat-stream": "~1.4.8"
   },
   "devDependencies": {
     "typescript": "~1.5.0-alpha",
