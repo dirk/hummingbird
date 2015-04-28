@@ -1,14 +1,15 @@
+/// <reference path="../typescript/source-map-0.1.38.d.ts" />
 
-import AST    = require('../ast')
-import errors = require('../errors')
-import types  = require('../types')
+import AST       = require('../ast')
+import errors    = require('../errors')
+import types     = require('../types')
+import sourcemap = require('source-map')
+
+type SourceNode = sourcemap.SourceNode
 
 var repeat     = require('../util').repeat,
-    sourcemap  = require('source-map'),
     SourceNode = sourcemap.SourceNode,
     TypeError  = errors.TypeError
-
-interface SourceNode {}
 
 // Context of the compiler as it's generating code ----------------------------
 
@@ -379,7 +380,7 @@ export class JSCompiler {
 
   compileFunction(func: AST.Function, opts: CompileOptions) {
     // Skip compilation for functions that are children of multi types
-    if (func.isChildOfMulti()) { return "" }
+    if (func.isChildOfMulti()) { return asSourceNode(func, [""]) }
 
     var args = func.args.map(function (arg) { return arg.name }),
         ret  = ['function ', (func.name ? func.name : ''), ' (', args.join(', '), ") {\n"],
