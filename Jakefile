@@ -44,6 +44,10 @@ function logDiagnostics (diagnostics) {
   }
 }
 
+function isDefinition (fileName) {
+  return /\.d\.ts$/.test(fileName)
+}
+
 namespace('ts', function () {
   desc('Compile TypeScript source')
   task('compile', function () {
@@ -57,7 +61,7 @@ namespace('ts', function () {
     var files = glob.sync(paths.typescriptSrc)
     // Skip definition files
     files = files.filter(function (name) {
-      return !(/\.d\.ts$/.test(name))
+      return !isDefinition(name)
     })
     var program = typescript.createProgram(files, {
       target: typescript.ScriptTarget.ES5,
@@ -67,20 +71,26 @@ namespace('ts', function () {
     logDiagnostics(typescript.getPreEmitDiagnostics(program))
 
     program.getSourceFiles().forEach(function (sourceFile) {
-      var start  = new Date()
-      // Passing WriteFileCallback as second argument
-      var result = program.emit(sourceFile, function (fileName, data) {
-        fs.writeFileSync(fileName, data)
-        var durationMs = (new Date() - start)
-        console.log("Compiled file '"+chalk.cyan(fileName)+"' in "+chalk.magenta(durationMs+' ms'))
-      })
+      var start    = new Date(),
+          result   = program.emit(sourceFile),
+          fileName = sourceFile.fileName
+      // Report diagnostics before logging time
       if (result.diagnostics.length > 0) {
         logDiagnostics(result.diagnostics)  
+      }
+      if (isDefinition(fileName)) { return }
+
+      if (!result.emitSkipped) {
+        var durationMs = (new Date() - start)
+        console.log("Compiled file '"+chalk.cyan(fileName)+"' in "+chalk.magenta(durationMs+' ms'))
+      } else {
+        // TODO: Make the message red
+        console.log("Failed to compile file '"+chalk.red(fileName)+"'")
       }
     })
     var totalSeconds = (new Date() - compileStart) / 1000,
         formattedSeconds = Math.round(totalSeconds * 100) / 100;
-    console.log('Finished in '+chalk.magenta(totalSeconds+' s'))
+    console.log('Finished in '+chalk.magenta(formattedSeconds+' s'))
   })
 
   desc('Watch for changes')

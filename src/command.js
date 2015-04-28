@@ -3,6 +3,9 @@ var stderr                 = process.stderr,
     path                   = require('path'),
     inlineSourceMapComment = require('inline-source-map-comment')
 
+// Make source maps work with TypeScript source
+require('source-map-support').install()
+
 var TypeSystem  = require('./typesystem').TypeSystem,
     Parser      = require('./parser'),
     reportError = require('./util').reportError,

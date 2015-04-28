@@ -11,6 +11,7 @@
     "lodash": "~3.7.0",
     "source-map": "~0.4.2",
     "inline-source-map-comment": "~1.0.5",
+    "source-map-support": "~0.2.10",
     "winston": "~1.0.0"
   },
   "devDependencies": {
@@ -25,12 +26,7 @@
     "coveralls": "~2.11.2",
     "glob": "~5.0.5",
     "chokidar": "~1.0.1",
-    "gulp": "~3.8.11",
-    "gulp-typescript": "~2.6.0",
-    "gulp-util": "~3.0.4",
-    "gulp-watch": "~4.2.4",
-    "chalk": "~1.0.0",
-    "through2": "~0.6.5"
+    "chalk": "~1.0.0"
   },
   "scripts": {
     "grammar": "node_modules/.bin/pegjs --cache src/grammar.pegjs",
