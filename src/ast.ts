@@ -646,6 +646,7 @@ export class Root extends _Node {
 export class Block extends _Node {
   statements: any[]
   scope:      any
+  returnType: any
 
   constructor(statements) {
     super()
