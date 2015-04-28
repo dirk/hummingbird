@@ -6,7 +6,7 @@
     "pegjs": "~0.8.0",
     "optimist": "~0.6.1",
     "xregexp": "~2.0.0",
-    "llvm2": "0.2.7",
+    "llvm2": "0.2.8",
     "requirejs": "~2.1.17",
     "lodash": "~3.7.0",
     "source-map": "~0.4.2",
