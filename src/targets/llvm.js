@@ -124,7 +124,7 @@ AST.Root.prototype.emitToFile = function (opts) {
   var outFile = bitcodeFileForSourceFile(this.file.path)
   ctx.outputs.push(outFile)
 
-  var mainType = new LLVM.FunctionType(VoidType, [], false),
+  var mainType = new LLVM.FunctionType(Int32Type, [], false),
       mainFunc = null
   if (ctx.isMain) {
     var initName = ctx.targetModule.getNativeName()+'_init'
@@ -170,10 +170,10 @@ AST.Root.prototype.emitToFile = function (opts) {
 AST.Root.prototype.buildMain = function (ctx, mainFunc, mainEntry) {
   // Compile ourselves now that setup is done
   compileBlock(ctx, this, mainFunc)
+  ctx.builder.buildRet(Int32Zero)
 
   // var str = ctx.builder.buildGlobalStringPtr("Hello world!\n", 'greeting')
   // ctx.builder.buildCall(ctx.funcs.puts, [str], '')
-  ctx.builder.buildRetVoid()
 }
 
 function compileBlock (ctx, block, parentFn, preStatementsCb) {
