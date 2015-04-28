@@ -1,25 +1,8 @@
-var fs = require('fs'),
-    expect = require('expect.js'),
-    child_process = require('child_process')
+var helper = require('./helper'),
+    expect = require('expect.js')
 
-function spawnSync (cmd, args, input) {
-  var opts = {}
-  if (input !== undefined) {
-    opts.input = input
-  }
-  if (args === undefined) { args = [] }
-  return child_process.spawnSync(cmd, args, opts)
-}
-
-function checkResult (result) {
-  // Print out the output streams if the status wasn't what we expected
-  if (result.status !== 0) {
-    console.log(result.stderr.toString())
-    console.log(result.stdout.toString())
-  }
-  expect(result.status).to.eql(0)
-  expect(result.stderr.length).to.eql(0)
-}
+var checkResult = helper.checkResult,
+    spawnSync   = helper.spawnSync
 
 describe('LLVM compiler', function () {
   describe('given a trivial program', function () {
@@ -34,6 +17,25 @@ describe('LLVM compiler', function () {
           out    = result.stdout.toString()
       expect(result.status).to.eql(0)
       expect(out.trim()).to.eql('1')
+    })
+  })
+
+  describe('given a class', function () {
+    var source = "class A {\n"+
+                 "  var b: String\n"+
+                 "  init () { this.b = \"Hello world!\" }\n"+
+                 "  func c () { return this.b }\n"+
+                 "}\n"+
+                 "var a = new A()\n"+
+                 "console.log(a.c())"
+    it('should compile', function () {
+      checkResult(spawnSync('bin/hbn', ['-'], source))
+    })
+    it('should run', function () {
+      var result = spawnSync('./a.out'),
+          out    = result.stdout.toString()
+      expect(result.status).to.eql(0)
+      expect(out).to.eql("Hello world!\n")
     })
   })
 })
