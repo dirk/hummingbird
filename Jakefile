@@ -1,5 +1,6 @@
 var fs       = require('fs'),
     util     = require('util'),
+    child_process = require('child_process'),
     glob     = require('glob'),
     chalk    = require('chalk')
 
@@ -7,31 +8,24 @@ var paths = {
   typescriptSrc: 'src/**/*.ts'
 }
 
-var exec = function (cmd, opts, cb) {
-  if (typeof cmd === 'string') { cmd = [cmd] }
-  if (!opts) { opts = {} }
-  opts.printStdout = true
-  opts.printStderr = true
-  // Print the commands we're going to run
-  cmd.forEach(function (c) {
-    console.log(c)
-  })
-  jake.exec(cmd, opts, cb)
+function exec (cmd, opts) {
+  console.log(cmd)
+  child_process.execSync(cmd)
 }
 
 desc('Build the standard library')
-file('lib/std.o', ['ext/std.c'], function (a, b, c) {
+file('lib/std.o', ['ext/std.c'], function () {
   var outfile = this.name,
       infile  = this.prereqs[0]
-  exec("clang -c ext/std.c -o lib/std.o")
+  exec("clang -c "+infile+" -o "+outfile)
 })
 
 desc('Default building actions')
 task('default', ['lib/std.o'])
 
-var typescript = null
+// TypeScript ----------------------------------------------------------------
 
-// WriteFileCallback(fileName: string, data: string, writeByteOrderMark: boolean, onError?: (message: string) => void): void;
+var typescript = null
 
 function logDiagnostics (diagnostics) {
   for (var i = 0; i < diagnostics.length; i++) {
