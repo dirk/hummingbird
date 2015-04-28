@@ -30,7 +30,7 @@ class TypeSystem {
 
   // Forward definitions for prototyped utility
   findByName: (string) => types.Type
-  resolveType: (node: AST._Node, scope: scope.Scope) => types.Type
+  resolveType: (node: AST.Node, scope: scope.Scope) => types.Type
   resolveExpression: (expr: any, scope: scope.Scope, immediate: any) => types.Type
   getAllReturnTypes: (block: AST.Block) => any[]
   getTypeOfTypesProperty: (type: any, name: string) => types.Type
@@ -40,19 +40,19 @@ class TypeSystem {
   walk: (rootNode: AST.Root, file: any, compiler: any) => void
   visitBlock:             (node: AST.Block,      scope: scope.Scope) => void
   visitStatement:         (node,                 scope, parentNode) => void
-  visitImport:            (node: AST.Import,     scope: scope.Scope, parentNode: AST._Node) => void
-  visitExport:            (node: AST.Export,     scope: scope.Scope, parentNode: AST._Node) => void
+  visitImport:            (node: AST.Import,     scope: scope.Scope, parentNode: AST.Node) => void
+  visitExport:            (node: AST.Export,     scope: scope.Scope, parentNode: AST.Node) => void
   visitClass:             (node: AST.Class,      scope: scope.Scope) => void
   visitClassDefinition:   (node: AST.Block,      scope: scope.Scope, klass: types.Object) => void
   visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object) => void
   visitFor:               (node: AST.For,        scope: scope.Scope) => void
   visitIf:                (node: AST.If,         scope: scope.Scope) => void
   visitWhile:             (node: AST.While,      scope: scope.Scope) => void
-  visitReturn:            (node: AST.Return,     scope: scope.Scope, parentNode: AST._Node) => void
+  visitReturn:            (node: AST.Return,     scope: scope.Scope, parentNode: AST.Node) => void
   visitPath:              (node: AST.Assignment, scope: scope.Scope) => void
   visitLet:               (node: AST.Assignment, scope: scope.Scope) => void
   visitVar:               (node: AST.Assignment, scope: scope.Scope) => void
-  visitExpression:        (node: AST._Node,      scope: scope.Scope, immediate: any) => void
+  visitExpression:        (node: AST.Node,      scope: scope.Scope, immediate: any) => void
   visitLiteral:           (node: AST.Literal,    scope: scope.Scope) => void
   visitNew:               (node: AST.New,        scope: scope.Scope) => void
   visitBinary:            (node: AST.Binary,     scope: scope.Scope) => void
@@ -62,7 +62,7 @@ class TypeSystem {
   visitNamedFunction:     (node: AST.Function,   scope: scope.Scope) => void
   visitFunctionStatement: (node: AST.Function,   scope: scope.Scope, searchInParent: any) => void
   visitIdentifier:        (node: AST.Identifier, scope: scope.Scope) => void
-  visitProperty:          (node: AST.Property,   scope: scope.Scope, parentNode: AST._Node) => void
+  visitProperty:          (node: AST.Property,   scope: scope.Scope, parentNode: AST.Node) => void
   visitCall:              (node: AST.Call,       scope: scope.Scope) => void
   // visitChain:          (node, scope) => void
 }

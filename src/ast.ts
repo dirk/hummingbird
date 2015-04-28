@@ -35,14 +35,14 @@ var _ind = 0,
 
 // Nodes ----------------------------------------------------------------------
 
-export class _Node {
+export class Node {
   _file:           string
   _line:           number
   _column:         number
   isLastStatement: boolean = false
 
   print() { out.write(inspect(this)) }
-  compile() {
+  compile(...rest) {
     throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
   }
   setPosition(file, line, column) {
@@ -58,7 +58,7 @@ export class _Node {
 // }
 
 
-export class NameType extends _Node {
+export class NameType extends Node {
   name: string
   constructor(name: string) {
     super()
@@ -67,7 +67,7 @@ export class NameType extends _Node {
   toString(): string { return this.name }
 }
 
-export class FunctionType extends _Node {
+export class FunctionType extends Node {
   args: any
   ret:  any
   constructor(args, ret) {
@@ -83,7 +83,7 @@ export class FunctionType extends _Node {
 }
 
 
-export class Let extends _Node {
+export class Let extends Node {
   name:          string
   immediateType: any
 
@@ -106,7 +106,7 @@ export class Let extends _Node {
 // Quick and dirty clone of Let
 export class Var extends Let {}
 
-export class Import extends _Node {
+export class Import extends Node {
   name:  String
   using: any[]
   file:  any
@@ -126,7 +126,7 @@ export class Import extends _Node {
 }
 
 
-export class Export extends _Node {
+export class Export extends Node {
   name: string
   type: any = null
 
@@ -139,7 +139,7 @@ export class Export extends _Node {
 }
 
 
-export class Class extends _Node {
+export class Class extends Node {
   name:         any
   definition:   any
   initializers: any[]
@@ -162,10 +162,10 @@ export class Class extends _Node {
 }
 
 
-export class Expression extends _Node {}
+export class Expression extends Node {}
 
 
-export class Group extends _Node {
+export class Group extends Node {
   expr: any
   constructor(expr) {
     super()
@@ -175,7 +175,7 @@ export class Group extends _Node {
 }
 
 
-export class Binary extends _Node {
+export class Binary extends Node {
   lexpr: any
   op:    string
   rexpr: any
@@ -196,7 +196,7 @@ export class Binary extends _Node {
 }
 
 
-export class Literal extends _Node {
+export class Literal extends Node {
   value:    any
   typeName: string
   type:     any
@@ -212,7 +212,7 @@ export class Literal extends _Node {
 }
 
 
-export class Assignment extends _Node {
+export class Assignment extends Node {
   type:   any
   lvalue: any
   op:     string
@@ -244,7 +244,7 @@ export class Assignment extends _Node {
 }
 
 
-export class Path extends _Node {
+export class Path extends Node {
   name: any
   path: any
 
@@ -297,17 +297,17 @@ function assertSaneArgs (args) {
 
 interface FunctionArgument {
   name:  string
-  type?: _Node
-  def?:  _Node
+  type?: Node
+  def?:  Node
 }
 
-export class Function extends _Node {
+export class Function extends Node {
   args:  FunctionArgument[]
   ret:   any
   block: Block
   // Statement properties
   name: string = null
-  when: _Node  = null
+  when: Node  = null
   // Computed type (set by typesystem)
   type: any = null
   // Parent `multi` type (if this is present the Function will not
@@ -352,7 +352,7 @@ export class Function extends _Node {
 }
 
 
-export class Multi extends _Node {
+export class Multi extends Node {
   name: any
   args: any
   ret:  any
@@ -373,7 +373,7 @@ export class Multi extends _Node {
 }
 
 
-export class Init extends _Node {
+export class Init extends Node {
   args:  any
   block: Block
   constructor(args, block) {
@@ -390,7 +390,7 @@ export class Init extends _Node {
 }
 
 
-export class New extends _Node {
+export class New extends Node {
   name:            any
   args:            any
   initializer:     Function
@@ -421,7 +421,7 @@ export class New extends _Node {
 }
 
 
-export class Identifier extends _Node {
+export class Identifier extends Node {
   name:   any
   parent: any
   type:   any
@@ -436,7 +436,7 @@ export class Identifier extends _Node {
 }
 
 
-export class Call extends _Node {
+export class Call extends Node {
   base:     any
   args:     any
   parent:   any
@@ -448,7 +448,7 @@ export class Call extends _Node {
     this.base   = base
     this.args   = callArgs
     this.parent = null
-    assertPropertyIsInstanceOf(this, 'base', _Node)
+    assertPropertyIsInstanceOf(this, 'base', Node)
     assertPropertyIsInstanceOf(this, 'args', Array)
   }
   toString() {
@@ -461,7 +461,7 @@ export class Call extends _Node {
 }
 
 
-export class Property extends _Node {
+export class Property extends Node {
   base:     any
   property: any
   parent:   any
@@ -473,8 +473,8 @@ export class Property extends _Node {
     this.base     = base
     this.property = property
     this.parent   = null
-    assertPropertyIsInstanceOf(this, 'base', _Node)
-    assertPropertyIsInstanceOf(this, 'property', _Node)
+    assertPropertyIsInstanceOf(this, 'base', Node)
+    assertPropertyIsInstanceOf(this, 'property', Node)
   }
   toString() {
     return this.base+'.'+this.property.toString()
@@ -483,7 +483,7 @@ export class Property extends _Node {
 }
 
 
-export class If extends _Node {
+export class If extends Node {
   cond:      any
   block:     Block
   elseIfs:   If[]
@@ -516,7 +516,7 @@ export class If extends _Node {
 }
 
 
-export class While extends _Node {
+export class While extends Node {
   expr:  any
   block: any
 
@@ -532,7 +532,7 @@ export class While extends _Node {
 }
 
 
-export class For extends _Node {
+export class For extends Node {
   init:  any
   cond:  any
   after: any
@@ -561,7 +561,7 @@ export class For extends _Node {
 
 
 /*
-export class Chain extends _Node {
+export class Chain extends Node {
   name:     any
   tail:     any
   headType: any
@@ -587,7 +587,7 @@ export class Chain extends _Node {
 */
 
 
-export class Return extends _Node {
+export class Return extends Node {
   expr: any 
   type: any
   
@@ -605,10 +605,11 @@ export class Return extends _Node {
 }
 
 
-export class Root extends _Node {
+export class Root extends Node {
   statements:   any[]
-  sourceMap:    any
   scope:        any
+  sourceMap:    any
+  file:         any
   imports:      any[]
   exports:      any[]
   includeTypes: boolean = false
@@ -643,7 +644,7 @@ export class Root extends _Node {
 }
 
 
-export class Block extends _Node {
+export class Block extends Node {
   statements: any[]
   scope:      any
   returnType: any
@@ -674,7 +675,7 @@ export class Block extends _Node {
 
 /*
 var mod = {
-  Node: _Node,
+  Node: Node,
   NameType: NameType,
   FunctionType: FunctionType,
   Import: Import,
