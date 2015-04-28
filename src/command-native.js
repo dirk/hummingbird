@@ -6,6 +6,8 @@ var fs            = require('fs'),
     Parser        = require('./parser'),
     Compiler      = require('./compiler')
 
+// Load source map support and LLVM target
+require('source-map-support').install()
 require('./targets/llvm')
 
 // Command-line arguments ----------------------------------------------------

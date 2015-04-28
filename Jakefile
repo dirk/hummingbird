@@ -76,7 +76,7 @@ namespace('ts', function () {
           fileName = sourceFile.fileName
       // Report diagnostics before logging time
       if (result.diagnostics.length > 0) {
-        logDiagnostics(result.diagnostics)  
+        logDiagnostics(result.diagnostics)
       }
       if (isDefinition(fileName)) { return }
 
