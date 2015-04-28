@@ -1,4 +1,3 @@
-
 // Full-system tests of Hummingbird parser and compiler.
 
 var fs           = require('fs'),
