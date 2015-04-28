@@ -8,6 +8,7 @@ var repeat     = require('../util').repeat,
     SourceNode = sourcemap.SourceNode,
     TypeError  = errors.TypeError
 
+interface SourceNode {}
 
 // Context of the compiler as it's generating code ----------------------------
 
@@ -58,10 +59,10 @@ function getDefaultCompileOptions(): CompileOptions {
 var InternalFile = '(internal)'
 // Return a string as a SourceNode with position information copied from the
 // given node.
-function asSourceNode (node: AST.Node, ret: any[]) {
+function asSourceNode (node: AST.Node, ret: any[]): SourceNode {
   var name = node.constructor['name']
   if (node._file === InternalFile) {
-    return ret
+    return new SourceNode(1, 0, node._file, ret)
   }
   if (node._line === undefined)   { throw new Error('Missing line for '+name) }
   if (node._column === undefined) { throw new Error('Missing column for '+name) }
@@ -296,18 +297,24 @@ export class JSCompiler {
     return asSourceNode(stmt, ret)
   }
 
+  importExportPreCheck(opts: CompileOptions) {
+    if (!opts.imported || !opts.exported) {
+      throw new Error('Missing import and/or exported lists for statement')
+    }
+  }
+
   compileExport(exp: AST.Export, opts: CompileOptions) {
-    importExportPreCheck(opts)
+    this.importExportPreCheck(opts)
     opts.exported.push(exp.name)
-    return '// '+exp.toString()+"\n"
+    return asSourceNode(exp, ['// '+exp.toString()+"\n"])
   }// compileExport
 
   compileImport(imp: AST.Import, opts: CompileOptions) {
-    importExportPreCheck(opts)
+    this.importExportPreCheck(opts)
     opts.imported.push([imp.file, imp.name])
     // We need to output something; so let's just leave a nice little comment
     // about what's going on as it compiled this node.
-    return '// '+imp.toString()+"\n"
+    return asSourceNode(imp, ['// '+imp.toString()+"\n"])
   }// compileImport
 
   compileReturn(ret: AST.Return, opts: CompileOptions) {
@@ -320,9 +327,9 @@ export class JSCompiler {
   }
 
   compileBinary(bin: AST.Binary, opts: CompileOptions) {
-    var lexpr = this.compileExpression(bin.lexpr, {omitTerminator: true})
-    var rexpr = this.compileExpression(bin.rexpr, {omitTerminator: true})
-    var ret   = [lexpr, ' '+bin.op+' ', rexpr]
+    var lexpr: SourceNode = this.compileExpression(bin.lexpr, {omitTerminator: true})
+    var rexpr: SourceNode = this.compileExpression(bin.rexpr, {omitTerminator: true})
+    var ret = [lexpr, ' '+bin.op+' ', rexpr]
     if (opts && opts.statement === true) { ret.push(";\n") }
     return asSourceNode(bin, ret)
   }
@@ -375,7 +382,7 @@ export class JSCompiler {
     if (func.isChildOfMulti()) { return "" }
 
     var args = func.args.map(function (arg) { return arg.name }),
-        ret  = ['function (', args.join(', '), ") {\n"],
+        ret  = ['function ', (func.name ? func.name : ''), ' (', args.join(', '), ") {\n"],
         defs = []
     // Build assignments for any default arguments
     for (var i = args.length - 1; i >= 0; i--) {
@@ -498,7 +505,7 @@ export class JSCompiler {
     return ret
   }// compileClassPreamble
 
-  compileClassInitializers(initializers: any[]) {
+  compileClassInitializers(initializers: AST.Init[]) {
     this.context.incrementIndent()
     var self = this,
         ind  = this.context.indent()
@@ -624,12 +631,6 @@ export class JSCompiler {
 }// JSCompiler
 
 
-function importExportPreCheck (opts: CompileOptions) {
-  if (!opts.imported || !opts.exported) {
-    throw new Error('Missing import and/or exported lists for statement')
-  }
-}
-
 function interpose (arr: any[], sep: string) {
   var newArr  = [],
       len     = arr.length,
@@ -652,15 +653,4 @@ Array.prototype['extend'] = function (other) {
     this.push(other[i])
   }
 }
-
-/*
-AST.Chain.prototype.compile = function (context, opts) {
-  var ret = [this.name]
-  this.tail.forEach(function (item) {
-    ret.push(item.compile(context))
-  })
-  if (opts && opts.statement === true) { ret.push(";\n") }
-  return asSourceNode(this, ret)
-}
-*/
 
