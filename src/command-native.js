@@ -145,5 +145,5 @@ var platformFlags = ''
 if (process.platform === 'darwin') {
   platformFlags = '-macosx_version_min 10.9'
 }
-execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o '+platformFlags+' -o '+binFile)
+execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+binFile)
 
