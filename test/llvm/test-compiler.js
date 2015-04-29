@@ -19,6 +19,7 @@ describe('LLVM compiler', function () {
       console.log(binFile)
       console.log(fs.existsSync(binFile))
 
+      fs.chmodSync(binFile, '755')
       var result = spawnSync(binFile)
       checkResult(result)
       var out = result.stdout.toString()

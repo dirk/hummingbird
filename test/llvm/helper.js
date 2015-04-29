@@ -3,7 +3,8 @@ var expect        = require('expect.js'),
 
 function spawnSync (cmd, args, input) {
   var opts = {
-    stdio: 'pipe'
+    stdio: 'pipe',
+    env:   process.env
   }
   if (input !== undefined) {
     opts.input = input
