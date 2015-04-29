@@ -141,9 +141,15 @@ outputs.map(objectFileForBitcodeFile).forEach(function (obj) {
 })
 linkerObjs.push(stdFile)
 
-var platformFlags = ''
+var platformFlags = '',
+    crt           = '/usr/lib/crt1.o'
+
 if (process.platform === 'darwin') {
   platformFlags = '-macosx_version_min 10.9'
 }
+if (process.platform === 'linux') {
+  crt = '/usr/lib/x86_64-linux-gnu/crt1.o'
+}
+linkerObjs.unshift(crt)
 execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+binFile)
 

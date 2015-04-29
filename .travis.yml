@@ -16,7 +16,6 @@ before_install:
 before_script:
   # Add LLVM shared library
   - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.5/lib:$LD_LIBRARY_PATH"
-  # "export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
   # Setup library for development building
   - "node_modules/.bin/jake default ts:compile"
   - "npm run grammar"

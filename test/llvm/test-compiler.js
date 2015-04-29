@@ -1,10 +1,13 @@
 var helper = require('./helper'),
+    path   = require('path'),
     expect = require('expect.js')
 
 var checkResult = helper.checkResult,
     spawnSync   = helper.spawnSync
 
 describe('LLVM compiler', function () {
+  var binFile = path.join(process.cwd(), 'a.out')
+
   describe('given a trivial program', function () {
     var source = "var a = \"1\"\n"+
                  "console.log(a)";
@@ -13,10 +16,10 @@ describe('LLVM compiler', function () {
       checkResult(result)
     })
     it('should run', function () {
-      var result = spawnSync('./a.out'),
-          out    = result.stdout.toString()
+      var result = spawnSync(binFile)
+      checkResult(result)
+      var out = result.stdout.toString()
       expect(result.status).to.eql(0)
-      expect(out.trim()).to.eql('1')
     })
   })
 
@@ -32,9 +35,9 @@ describe('LLVM compiler', function () {
       checkResult(spawnSync('bin/hbn', ['-'], source))
     })
     it('should run', function () {
-      var result = spawnSync('./a.out'),
-          out    = result.stdout.toString()
-      expect(result.status).to.eql(0)
+      var result = spawnSync(binFile)
+      checkResult(result)
+      var out = result.stdout.toString()
       expect(out).to.eql("Hello world!\n")
     })
   })
