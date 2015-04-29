@@ -18,17 +18,27 @@ function checkResult (result) {
   if (result.error) {
     throw result.error
   }
-  if (result.status !== 0) {
-    console.log((result.stdout ? result.stdout : 'Missing STDOUT').toString())
-  }
   var err = (result.stderr ? result.stderr : 'Missing STDERR').toString().trim()
   if (err.length > 0) {
     console.error(err)
   }
+  // if (result.status !== 0) {
+  //   console.log((result.stdout ? result.stdout : 'Missing STDOUT').toString())
+  // }
   expect(result.status).to.eql(0)
+  return result
+}
+
+function runSync (cmd, input) {
+  var opts = {}
+  if (input !== undefined) {
+    opts.input = input
+  }
+  return child_process.execSync(cmd, opts)
 }
 
 module.exports = {
+  runSync:      runSync,
   spawnSync:    spawnSync,
   checkResult:  checkResult
 }
