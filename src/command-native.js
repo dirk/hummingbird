@@ -32,6 +32,7 @@ function hasArg (name) {
   return (process.argv.indexOf('-'+name) !== -1)
 }
 var Opts = {
+  outFile:     hasArg('o') ? getArg('o') : 'a.out',
   verbose:     hasArg('v'),
   veryVerbose: hasArg('vv'),
   gc:          getArg('gc')
@@ -64,8 +65,8 @@ if (argv._.length === 0 || argv._[0] === 'help') {
   process.exit(0)
 }
 
-var entryFile = argv._[0],
-    binFile   = 'a.out' // entryFile.replace(/\.hb$/i, '')
+var entryFile = argv._[0]
+// binFile = 'a.out' // entryFile.replace(/\.hb$/i, '')
 
 if (entryFile === '-') {
   var BUFFER_SIZE = 4096,
@@ -151,5 +152,5 @@ if (process.platform === 'linux') {
   crt = '/usr/lib/x86_64-linux-gnu/crt1.o'
 }
 linkerObjs.unshift(crt)
-execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+binFile)
+execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+Opts.outFile)
 
