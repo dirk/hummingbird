@@ -141,5 +141,9 @@ outputs.map(objectFileForBitcodeFile).forEach(function (obj) {
 })
 linkerObjs.push(stdFile)
 
-execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o -macosx_version_min 10.9 -o '+binFile)
+var platformFlags = ''
+if (process.platform === 'darwin') {
+  platformFlags = '-macosx_version_min 10.9'
+}
+execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o '+platformFlags+' -o '+binFile)
 
