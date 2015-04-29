@@ -68,7 +68,23 @@ var entryFile = argv._[0],
     binFile   = 'a.out' // entryFile.replace(/\.hb$/i, '')
 
 if (entryFile === '-') {
-  var data = fs.readFileSync('/dev/stdin', 'utf8').toString()
+  var BUFFER_SIZE = 4096,
+      buffer      = new Buffer(BUFFER_SIZE),
+      bytesRead   = null,
+      data        = ''
+  while (true) {
+    bytesRead = 0
+    try {
+      bytesRead = fs.readSync(process.stdin.fd, buffer, 0, BUFFER_SIZE)
+    } catch (err) {
+      if (err.code === 'EOF') { break }
+      throw err
+    }
+    // Break if we didn't read anything
+    if (bytesRead === 0) { break } 
+    // Add on the bytes we read from the `readBuffer`
+    data += buffer.toString(null, 0, bytesRead)
+  }
   // Write it to a temporary file
   var tempPath = path.join(os.tmpdir(), 'input.hb')
   fs.writeFileSync(tempPath, data)
