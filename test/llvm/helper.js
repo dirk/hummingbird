@@ -14,6 +14,9 @@ function spawnSync (cmd, args, input) {
 
 function checkResult (result) {
   // Print out the output streams if the status wasn't what we expected
+  if (result.error) {
+    console.error(result.error.toString())
+  }
   if (result.status !== 0) {
     console.log((result.stdout ? result.stdout : 'Missing STDOUT').toString())
   }
