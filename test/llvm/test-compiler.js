@@ -13,7 +13,7 @@ describe('LLVM compiler', function () {
 
   // Need to go through the spawn system since we want to pass it STDIN
   function buildSource (source) {
-    var result = runSync('bin/hbn - -v -o '+BinFile, source)
+    var result = runSync('bin/hbn - -o '+BinFile, source)
     console.log(result.toString().trim())
     return result
   }
@@ -29,10 +29,6 @@ describe('LLVM compiler', function () {
       buildSource(source)
     })
     it('should run', function () {
-      console.log(runSync('ls -l '+__dirname).toString().trim())
-      // console.log(binFile)
-      // console.log(fs.existsSync(binFile))
-      // var result = child_process.execSync(binFile)
       fs.chmodSync(BinFile, '755')
       var result = runBinary(),
           out    = result.toString()
