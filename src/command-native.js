@@ -149,6 +149,8 @@ if (process.platform === 'darwin') {
   platformFlags = '-macosx_version_min 10.9'
 }
 if (process.platform === 'linux') {
+  // Set the correct dynamic linker
+  linkerObjs.unshift('-dynamic-linker /lib64/ld-linux-x86-64.so.2')
   crt = '/usr/lib/x86_64-linux-gnu/crt1.o'
 }
 linkerObjs.unshift(crt)

@@ -10,7 +10,8 @@ before_install:
   # Setup packages and install LLVM
   - sudo apt-get update
   - sudo apt-get install -y --force-yes libstdc++6
-  - sudo apt-get install -y llvm-3.5 llvm-3.5-dev llvm-3.5-runtime libllvm3.5 libllvm3.5-dbg
+  - sudo apt-get install -y llvm-3.5 llvm-3.5-dev llvm-3.5-runtime libllvm3.5
+  # Originally had debugging stuff: libllvm3.5-dbg
   # BDW GC built dependency
   - sudo apt-get install libc6-dev libgc-dev
 before_script:
