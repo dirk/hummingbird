@@ -142,6 +142,7 @@ outputs.map(objectFileForBitcodeFile).forEach(function (obj) {
 })
 linkerObjs.push(stdFile)
 
+/*
 var platformFlags = '',
     crt           = '/usr/lib/crt1.o'
 
@@ -155,4 +156,7 @@ if (process.platform === 'linux') {
 }
 linkerObjs.unshift(crt)
 execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+Opts.outFile)
+*/
+  
+execSync('clang '+linkerObjs.join(' ')+' -lgc -o '+Opts.outFile)
 
