@@ -34,7 +34,17 @@ function runSync (cmd, input) {
   if (input !== undefined) {
     opts.input = input
   }
-  return child_process.execSync(cmd, opts)
+  try {
+    return child_process.execSync(cmd, opts)
+  } catch (err) {
+    if (err.stdout) {
+      console.error(err.stdout.toString())
+    }
+    if (err.stderr) {
+      console.error(err.stderr.toString())
+    }
+    throw err
+  }
 }
 
 module.exports = {
