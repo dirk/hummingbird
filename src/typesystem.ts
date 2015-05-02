@@ -313,25 +313,28 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
   node.statements.forEach(function (stmt) {
     switch (stmt.constructor) {
       case AST.Assignment:
-        if (stmt.type !== 'var' && stmt.type !== 'let') {
-          throw new TypeError('Unexpected assignment type: '+stmt.type, stmt)
+        var assg: AST.Assignment = stmt
+        if (assg.type !== 'var' && assg.type !== 'let') {
+          throw new TypeError('Unexpected assignment type: '+assg.type, assg)
         }
-        var propertyName = stmt.lvalue.name
+        var propertyName = assg.lvalue.name
         // Check that there's a type specified for this slot
-        if (!stmt.lvalue.immediateType) {
+        if (!assg.lvalue.immediateType) {
           throw new TypeError('Missing type for class slot: '+propertyName)
         }
-        var propertyType = self.resolveType(stmt.lvalue.immediateType, scope)
+        var propertyType = self.resolveType(assg.lvalue.immediateType, scope)
         // Visit and then check that the default (rvalue) is constant if present
-        self.visitExpression(stmt.rvalue, scope)
+        if (assg.rvalue !== false) {
+          self.visitExpression(assg.rvalue, scope)
+        }
         // TODO: Smarter checking of constant-ness of default values when it's "let"
-        if (stmt.rvalue && !(stmt.rvalue instanceof AST.Literal)) {
+        if (assg.rvalue && !(assg.rvalue instanceof AST.Literal)) {
           throw new TypeError('Cannot handle non-literal default for property: '+propertyName)
         }
         // Create the property on the object with the resolved type
         klass.setTypeOfProperty(propertyName, propertyType)
         // Add read-only flags for this property when the assignment .type is "let"
-        if (stmt.type === 'let') {
+        if (assg.type === 'let') {
           klass.setFlagsOfProperty(propertyName, 'r')
         }
         break

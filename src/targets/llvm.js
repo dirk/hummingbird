@@ -1095,6 +1095,8 @@ AST.Class.prototype.compilePreinitializer = function (ctx, blockCtx, nativeObjec
       var prop  = properties[i],
           name  = prop.lvalue.name,
           value = prop.rvalue
+      // Skip this property if there's no default value for it
+      if (value === false) { continue }
       // Set the value on the property of the new instance
       var ptr = nativeObject.buildStructGEPForProperty(ctx, recv, name)
       // Compile the value to a value
