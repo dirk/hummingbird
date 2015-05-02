@@ -322,7 +322,8 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
           throw new TypeError('Missing type for class slot: '+propertyName)
         }
         var propertyType = self.resolveType(stmt.lvalue.immediateType, scope)
-        // Check that the default (rvalue) is constant if present
+        // Visit and then check that the default (rvalue) is constant if present
+        self.visitExpression(stmt.rvalue, scope)
         // TODO: Smarter checking of constant-ness of default values when it's "let"
         if (stmt.rvalue && !(stmt.rvalue instanceof AST.Literal)) {
           throw new TypeError('Cannot handle non-literal default for property: '+propertyName)
