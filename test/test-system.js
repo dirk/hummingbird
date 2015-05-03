@@ -5,7 +5,8 @@ var fs           = require('fs'),
     expect       = require('expect.js'),
     AST          = require('../src/ast'),
     types        = require('../src/types'),
-    parseAndWalk = require('./helper').parseAndWalk
+    parseAndWalk = require('./helper').parseAndWalk,
+    JSCompiler   = require('../src/targets/javascript').JSCompiler
 
 var programs = {
   forLoop: fs.readFileSync(__dirname+'/system/for-loop.hb').toString(),
@@ -14,7 +15,9 @@ var programs = {
 
 function runCompiledCode (tree) {
   // Wrap the compiled code in an immediately-called function
-  return eval("(function(){\n"+tree.compile()+"\n})()")
+  var compiler = new JSCompiler(),
+      source   = compiler.compileRoot(tree)
+  return eval("(function(){\n"+source+"\n})()")
 }
 
 describe('System', function () {

@@ -19,10 +19,10 @@ module.exports = function (p) {
 
   p.parseDeclaration = function (lvalue, rvalue) {
     var type = null
-    if (lvalue instanceof AST.Let) {
-      type = 'let'
-    } else if (lvalue instanceof AST.Var) {
+    if (lvalue instanceof AST.Var) {
       type = 'var'
+    } else if (lvalue instanceof AST.Let) {
+      type = 'let'
     }
     if (type === null) {
       throw new Error('Can\'t figure out type of declaration')
@@ -88,9 +88,9 @@ module.exports = function (p) {
     return new AST.While(cond, block)
   }
 
-  p.parseChain = function (name, tail) {
-    return new AST.Chain(name, tail)
-  }
+  // p.parseChain = function (name, tail) {
+  //   return new AST.Chain(name, tail)
+  // }
 
   p.parseAssignment = function (path, op, expr) {
     return new AST.Assignment('path', path, op, expr)

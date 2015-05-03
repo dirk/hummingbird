@@ -445,7 +445,7 @@ AST.Call.prototype.compileToValue = function (ctx, blockCtx, exprCtx) {
     // Unbox the instance and check if it's an instace method
     methodType = methodType.type
     if (!methodType.isInstanceMethod) { break }
-    var receiverInstance = parent.type,
+    var receiverInstance = parent.baseType,
         receiverType     = receiverInstance.type
     if (receiverType.intrinsic === true) {
       // Need to do a little bit of special handling for intrinsics
@@ -649,7 +649,6 @@ function computeScopePath (blockCtx, outermostScope) {
   }
   return path
 }
-*/
 
 AST.Chain.prototype.compileInstanceMethodCall = function (ctx, blockCtx, receiver, receiverType, instanceMethod, callNode) {
   assertInstanceOf(receiver, Buffer)
@@ -672,97 +671,6 @@ AST.Chain.prototype.compileInstanceMethodCall = function (ctx, blockCtx, receive
   var returnValue = ctx.builder.buildCall(nativeFunction.getPtr(), args, ''),
       returnType  = new types.Instance(instanceMethod.ret)
   return [returnType, returnValue]
-}
-
-function buildPointerCastIfNecessary (ctx, value, desiredType) {
-  var valueType = TypeOf(value)
-  // Compare the type strings
-  var vts = PrintTypeToString(valueType),
-      dts = PrintTypeToString(desiredType),
-      typesAreEqual = (vts === dts)
-  // If the types aren't the same then we'll recast
-  if (!typesAreEqual) {
-    if (ctx.noCastValuePointers) {
-      throw new ICE('Value type different than the one desired and no-cast-value-pointers is true: '+vts+' -> '+dts)
-    }
-    // Re-cast the value
-    return ctx.builder.buildPointerCast(value, desiredType, '')
-  }
-  // Didn't need to re-cast the value
-  return value
-}
-
-function bitcodeFileForSourceFile (path) {
-  var outFile = path.replace(/\.hb$/i, '.bc')
-  if (outFile === path) {
-    throw new ICE('Couldn\'t compute path for module output file')
-  }
-  return outFile
-}
-
-AST.Import.prototype.compile = function (ctx, blockCtx) {
-  var moduleRoot = this.file.tree,
-      nativeName = this.file.module.getNativeName(),
-      outFile    = bitcodeFileForSourceFile(this.file.path)
-  moduleRoot.emitToFile({
-    module: this.file.module,
-    logger: ctx.logger,
-    outputs: ctx.outputs
-  })
-  // Find the external module initializer
-  var initName = nativeName+'_init',
-      initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
-  // And then call it so that the module gets initialized at the correct time
-  ctx.builder.buildCall(initFn, [], '')
-
-  var basePath = this.file.module.getNativeName()
-  if (this.using) {
-    var slots = blockCtx.slots
-    // Load items from the module into the local scope
-    for (var i = 0; i < this.using.length; i++) {
-      var use      = this.using[i],
-          instance = this.file.module.getTypeOfProperty(use),
-          type     = unboxInstanceType(instance),
-          path     = basePath+'_'+type.getNativePrefix()+use
-      // Sanity-check to make sure this is the first time this global has
-      // been set up
-      if (ctx.hasGlobal(path)) {
-        throw new ICE('Global already exists: '+path)
-      }
-      var global   = ctx.addGlobal(path, nativeTypeForType(instance)),
-          value    = ctx.buildGlobalLoad(path)
-      // Store the value in the local slot
-      slots.buildSet(ctx, use, value)
-    }
-  }
-}
-
-AST.Export.prototype.compile = function (ctx, blockCtx) {
-  if (!ctx.targetModule) {
-    throw new ICE('Missing target module')
-  }
-  var path = [ctx.targetModule.getNativeName()],
-      name = this.name,
-      type = this.type
-
-  function setupGlobal (name, exportName) {
-    var value = blockCtx.slots.buildGet(ctx, name),
-        type  = TypeOf(value),
-        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, exportName)
-    // Set the linkage and initializer
-    LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
-    var initialNull = LLVM.Library.LLVMConstPointerNull(type)
-    LLVM.Library.LLVMSetInitializer(global, initialNull)
-    // Store the value in the global
-    ctx.builder.buildStore(value, global, '')
-    return global
-  }
-  var exportableTypes = [types.Function, types.String]
-  if (exportableTypes.indexOf(type.constructor) === -1) {
-    throw new ICE('Cannot export something of type: '+type.inspect())
-  }
-  var exportName = path.concat(type.getNativePrefix()+name).join('_'),
-      global     = setupGlobal(name, exportName)
 }
 
 AST.Chain.prototype.compileModulePathToValue = function (ctx, blockCtx) {
@@ -890,6 +798,98 @@ AST.Chain.prototype.compileToValue = function (ctx, blockCtx) {
 
 AST.Chain.prototype.compile = function (ctx, blockCtx) {
   this.compileToValue(ctx, blockCtx)
+}
+*/
+
+function buildPointerCastIfNecessary (ctx, value, desiredType) {
+  var valueType = TypeOf(value)
+  // Compare the type strings
+  var vts = PrintTypeToString(valueType),
+      dts = PrintTypeToString(desiredType),
+      typesAreEqual = (vts === dts)
+  // If the types aren't the same then we'll recast
+  if (!typesAreEqual) {
+    if (ctx.noCastValuePointers) {
+      throw new ICE('Value type different than the one desired and no-cast-value-pointers is true: '+vts+' -> '+dts)
+    }
+    // Re-cast the value
+    return ctx.builder.buildPointerCast(value, desiredType, '')
+  }
+  // Didn't need to re-cast the value
+  return value
+}
+
+function bitcodeFileForSourceFile (path) {
+  var outFile = path.replace(/\.hb$/i, '.bc')
+  if (outFile === path) {
+    throw new ICE('Couldn\'t compute path for module output file')
+  }
+  return outFile
+}
+
+AST.Import.prototype.compile = function (ctx, blockCtx) {
+  var moduleRoot = this.file.tree,
+      nativeName = this.file.module.getNativeName(),
+      outFile    = bitcodeFileForSourceFile(this.file.path)
+  moduleRoot.emitToFile({
+    module: this.file.module,
+    logger: ctx.logger,
+    outputs: ctx.outputs
+  })
+  // Find the external module initializer
+  var initName = nativeName+'_init',
+      initFn   = NativeFunction.addExternalFunction(ctx, initName, VoidType, [])
+  // And then call it so that the module gets initialized at the correct time
+  ctx.builder.buildCall(initFn, [], '')
+
+  var basePath = this.file.module.getNativeName()
+  if (this.using) {
+    var slots = blockCtx.slots
+    // Load items from the module into the local scope
+    for (var i = 0; i < this.using.length; i++) {
+      var use      = this.using[i],
+          instance = this.file.module.getTypeOfProperty(use),
+          type     = unboxInstanceType(instance),
+          path     = basePath+'_'+type.getNativePrefix()+use
+      // Sanity-check to make sure this is the first time this global has
+      // been set up
+      if (ctx.hasGlobal(path)) {
+        throw new ICE('Global already exists: '+path)
+      }
+      var global   = ctx.addGlobal(path, nativeTypeForType(instance)),
+          value    = ctx.buildGlobalLoad(path)
+      // Store the value in the local slot
+      slots.buildSet(ctx, use, value)
+    }
+  }
+}
+
+AST.Export.prototype.compile = function (ctx, blockCtx) {
+  if (!ctx.targetModule) {
+    throw new ICE('Missing target module')
+  }
+  var path = [ctx.targetModule.getNativeName()],
+      name = this.name,
+      type = this.type
+
+  function setupGlobal (name, exportName) {
+    var value = blockCtx.slots.buildGet(ctx, name),
+        type  = TypeOf(value),
+        global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, exportName)
+    // Set the linkage and initializer
+    LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
+    var initialNull = LLVM.Library.LLVMConstPointerNull(type)
+    LLVM.Library.LLVMSetInitializer(global, initialNull)
+    // Store the value in the global
+    ctx.builder.buildStore(value, global, '')
+    return global
+  }
+  var exportableTypes = [types.Function, types.String]
+  if (exportableTypes.indexOf(type.constructor) === -1) {
+    throw new ICE('Cannot export something of type: '+type.inspect())
+  }
+  var exportName = path.concat(type.getNativePrefix()+name).join('_'),
+      global     = setupGlobal(name, exportName)
 }
 
 AST.Return.prototype.compile = function (ctx, blockCtx) {

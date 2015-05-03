@@ -1,10 +1,10 @@
-var types = require('../types')
+import types = require('../types')
 
 module.exports = function (TypeSystem) {
 
   TypeSystem.prototype.bootstrap = function () {
     // The root object is the base object from which all objects descend
-    var rootObject = new types.Object('fake')
+    var rootObject = types.Object.createRootObject()
     rootObject.supertype = null
     rootObject.isRoot    = true
 
@@ -20,13 +20,12 @@ module.exports = function (TypeSystem) {
   }// bootstrap()
 
   TypeSystem.prototype.bootstrapIntrinsicTypes = function (rootObject) {
-    var Integer = new types.Integer(rootObject)
     this.root.setLocal('Any',     new types.Any())
+    this.root.setLocal('Void',    new types.Void())
     this.root.setLocal('Object',  new types.Object(rootObject))
     this.root.setLocal('String',  new types.String(rootObject))
-    this.root.setLocal('Integer', Integer)
+    this.root.setLocal('Integer', new types.Integer(rootObject))
     this.root.setLocal('Boolean', new types.Boolean(rootObject))
-    this.root.setLocal('Void',    new types.Void(rootObject))
   }
 
   TypeSystem.prototype.bootstrapConsole = function (rootObject) {
@@ -58,21 +57,20 @@ module.exports = function (TypeSystem) {
     this.bootstrapStdCoreTypesString(typs)
   }
 
+  TypeSystem.prototype.addInstanceMethodAndShim = function (module: types.Module, receiverType, methodName: string, returnType) {
+    var moduleMethod = new types.Function(this.rootObject, [receiverType], returnType)
+    module.setTypeOfProperty(methodName, moduleMethod)
+    var instanceMethod = new types.Function(this.rootObject, [], returnType)
+    instanceMethod.isInstanceMethod = true
+    instanceMethod.shimFor          = moduleMethod
+    receiverType.setTypeOfProperty(methodName, instanceMethod)
+  }
+
   TypeSystem.prototype.bootstrapStdCoreTypesString = function (typs) {
     var stringModule = new types.Module('string'),
         StringType   = this.root.getLocal('String')
     stringModule.setParent(typs)
     typs.addChild(stringModule)
-
-    var self = this
-    function addInstanceMethodAndShim (module, receiverType, methodName, returnType) {
-      var moduleMethod = new types.Function(self.rootObject, [receiverType], returnType)
-      stringModule.setTypeOfProperty(methodName, moduleMethod)
-      var instanceMethod = new types.Function(self.rootObject, [], returnType)
-      instanceMethod.isInstanceMethod = true
-      instanceMethod.shimFor          = moduleMethod
-      StringType.setTypeOfProperty(methodName, instanceMethod)
-    }
 
     // Add function to module and the String type
     /*
@@ -83,9 +81,8 @@ module.exports = function (TypeSystem) {
     uppercaseMethod.shimFor          = uppercase
     StringType.setTypeOfProperty('uppercase', uppercaseMethod)
     */
-    addInstanceMethodAndShim(stringModule, StringType, 'uppercase', StringType)
-    addInstanceMethodAndShim(stringModule, StringType, 'lowercase', StringType)
-    
+    this.addInstanceMethodAndShim(stringModule, StringType, 'uppercase', StringType)
+    this.addInstanceMethodAndShim(stringModule, StringType, 'lowercase', StringType)
   }
 
 }// module.exports
