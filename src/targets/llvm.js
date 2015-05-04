@@ -1095,7 +1095,6 @@ AST.Class.prototype.compilePreinitializer = function (ctx, blockCtx, nativeObjec
       var prop  = properties[i],
           name  = prop.lvalue.name,
           value = prop.rvalue
-      // Skip this property if there's no default value for it
       if (value === false) { continue }
       // Set the value on the property of the new instance
       var ptr = nativeObject.buildStructGEPForProperty(ctx, recv, name)
@@ -1130,10 +1129,10 @@ AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject)
     // Need to add a call to the preinitializer
     genericCompileFunction(ctx, fn, init, function (blockCtx, slots) {
       var ptr  = preinitializer.getPtr(),
-          recv = slots.buildGet(ctx, 'this')
-      // Call the preinitializer
+          recv = GetParam(fn.getPtr(), 0)
       ctx.builder.buildCall(ptr, [recv], '')
     })
+
     // Add this native function to the native object's list of initializers
     // and to the initializer function type
     nativeObject.addInitializer(fn)
