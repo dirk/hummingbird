@@ -472,10 +472,12 @@ export class JSCompiler {
     ret.push(this.context.indent()+"}\n")
     // Now add all the instance methods
     klass.definition.statements.forEach(function (node) {
-      if (!(node instanceof AST.Function)) { return }
+      if ([AST.Function, AST.Multi].indexOf(node.constructor) === -1) { return }
       var methodName       = node.name,
-          methodDefinition = self.compileExpression(node, opts)
-      ret.push(name+".prototype."+methodName+" = ", methodDefinition)
+          methodDefinition = self.compileStatement(node, opts)
+      if (methodDefinition.children.length > 0) {
+        ret.push(name+".prototype."+methodName+" = ", methodDefinition)
+      }
     })
     return asSourceNode(klass, ret)
   }// compileClass
