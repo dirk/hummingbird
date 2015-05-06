@@ -344,7 +344,11 @@ export class Function extends Node {
       }
       return ret
     }).join(', ')
-    out.write('func ('+args+') ')
+    out.write('func ')
+    if (this.name) {
+      out.write(this.name+' ')
+    }
+    out.write('('+args+') ')
     var instance = this.type
     if (this.ret) {
       out.write('-> '+this.ret+' ')
@@ -379,7 +383,7 @@ export class Multi extends Node {
     var args = this.args.map(function (arg) {
       return arg.name+(arg.type ? (': '+arg.type) : '')
     }).join(', ')
-    out.write('multi '+this.name+'('+args+")\n")
+    out.write('multi '+this.name+' ('+args+")\n")
   }
 }
 
