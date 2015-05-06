@@ -1,4 +1,4 @@
-var LLVM = require('../../../../llvm2')
+var LLVM = require('./library')
 
 function initializeTarget (ctx) {
   // Get the current native target and update the module with it

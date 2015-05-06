@@ -1,11 +1,15 @@
 var fs            = require('fs'),
+    os            = require('os'),
     path          = require('path'),
     child_process = require('child_process'),
+    concat_stream = require('concat-stream'),
     reportError   = require('./util').reportError,
     TypeSystem    = require('./typesystem').TypeSystem,
     Parser        = require('./parser'),
     Compiler      = require('./compiler')
 
+// Load source map support and LLVM target
+require('source-map-support').install()
 require('./targets/llvm')
 
 // Command-line arguments ----------------------------------------------------
@@ -28,6 +32,7 @@ function hasArg (name) {
   return (process.argv.indexOf('-'+name) !== -1)
 }
 var Opts = {
+  outFile:     hasArg('o') ? getArg('o') : 'a.out',
   verbose:     hasArg('v'),
   veryVerbose: hasArg('vv'),
   gc:          getArg('gc')
@@ -60,8 +65,33 @@ if (argv._.length === 0 || argv._[0] === 'help') {
   process.exit(0)
 }
 
-var entryFile = argv._[0],
-    binFile   = 'a.out' // entryFile.replace(/\.hb$/i, '')
+var entryFile = argv._[0]
+// binFile = 'a.out' // entryFile.replace(/\.hb$/i, '')
+
+if (entryFile === '-') {
+  var BUFFER_SIZE = 4096,
+      buffer      = new Buffer(BUFFER_SIZE),
+      bytesRead   = null,
+      data        = ''
+  while (true) {
+    bytesRead = 0
+    try {
+      bytesRead = fs.readSync(process.stdin.fd, buffer, 0, BUFFER_SIZE)
+    } catch (err) {
+      if (err.code === 'EOF') { break }
+      throw err
+    }
+    // Break if we didn't read anything
+    if (bytesRead === 0) { break } 
+    // Add on the bytes we read from the `readBuffer`
+    data += buffer.toString(null, 0, bytesRead)
+  }
+  // Write it to a temporary file
+  var tempPath = path.join(os.tmpdir(), 'input.hb')
+  fs.writeFileSync(tempPath, data)
+  // Then use that as the entry file
+  entryFile = tempPath
+}
 
 var parser     = new Parser(),
     compiler   = new Compiler()
@@ -112,5 +142,21 @@ outputs.map(objectFileForBitcodeFile).forEach(function (obj) {
 })
 linkerObjs.push(stdFile)
 
-execSync('ld '+linkerObjs.join(' ')+' -lgc -lc -lcrt1.o -macosx_version_min 10.9 -o '+binFile)
+/*
+var platformFlags = '',
+    crt           = '/usr/lib/crt1.o'
+
+if (process.platform === 'darwin') {
+  platformFlags = '-macosx_version_min 10.9'
+}
+if (process.platform === 'linux') {
+  // Set the correct dynamic linker
+  linkerObjs.unshift('-dynamic-linker /lib64/ld-linux-x86-64.so.2')
+  crt = '/usr/lib/x86_64-linux-gnu/crt1.o'
+}
+linkerObjs.unshift(crt)
+execSync('ld '+linkerObjs.join(' ')+' -lgc -lc '+platformFlags+' -o '+Opts.outFile)
+*/
+  
+execSync('clang '+linkerObjs.join(' ')+' -lgc -o '+Opts.outFile)
 

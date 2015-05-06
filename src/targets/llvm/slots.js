@@ -1,4 +1,4 @@
-var LLVM              = require('../../../../llvm2'),
+var LLVM              = require('./library'),
     types             = require('../../types'),
     nativeTypeForType = require('./native-types').nativeTypeForType
 

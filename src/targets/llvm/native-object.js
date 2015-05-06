@@ -1,4 +1,4 @@
-var LLVM      = require('../../../../llvm2'),
+var LLVM      = require('./library'),
     Int32Type = LLVM.Types.Int32Type
 
 var types             = require('../../types'),
