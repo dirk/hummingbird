@@ -324,6 +324,8 @@ export class Function extends Node {
   // Parent `multi` type (if this is present the Function will not
   // not codegen itself and instead defer to the Multi's codegen)
   parentMultiType: any = null
+  // Name of the function if it's a child of a multi
+  childName:       string
   // This will be set by type-system visitor later
   scope: any = null
 
@@ -371,7 +373,7 @@ export class Multi extends Node {
   name: any
   args: any
   ret:  any
-  type: any
+  type: types.Multi
 
   constructor(name, args, ret) {
     super()
