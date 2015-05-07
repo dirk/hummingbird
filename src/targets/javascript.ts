@@ -571,16 +571,18 @@ export class JSCompiler {
     var self       = this,
         args       = multi.args.map(function (arg) { return arg.name }),
         joinedArgs = args.join(', '),// joinedArgs = interpose(args, ', ')
-        name       = multi.name
+        name       = (!multi.type.isInstanceMethod ? multi.name+' ' : '')
     // Build function definition
-    var ret = ['function ', name, ' (', joinedArgs, ") {\n"]
+    var ret = ['function ', name, '(', joinedArgs, ") {\n"]
     this.context.incrementIndent()
 
     // Figure out the branches for the dispatcher
-    var definitions = [], cond = []
+    var definitions    = [],
+        cond           = [],
+        branchBaseName = multi.name
     for (var i = multi.type.functionNodes.length - 1; i >= 0; i--) {
       var fn = multi.type.functionNodes[i]
-      fn.childName = name+'_'+(i+1)
+      fn.childName = branchBaseName+'_'+(i+1)
       if (fn.when) {
         cond.push(fn)
       } else {

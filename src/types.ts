@@ -312,9 +312,10 @@ function assertPresent (recv, prop) {
 }
 
 export class Multi extends Type {
-  functionNodes: AST.Function[]
-  args:          Type[]
-  ret:           Type
+  functionNodes:    AST.Function[]
+  args:             Type[]
+  ret:              Type
+  isInstanceMethod: boolean = false
 
   constructor(supertype, args, ret) {
     super(supertype)

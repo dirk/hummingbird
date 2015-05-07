@@ -437,6 +437,8 @@ TypeSystem.prototype.visitClassMulti = function (node: AST.Multi, thisScope, kla
       multiName              = node.name
   // Add the multi as property of the class
   klass.setTypeOfProperty(multiName, multiType)
+  // And let the type know it's an instance method
+  multiType.isInstanceMethod = true
 }
 
 TypeSystem.prototype.visitFor = function (node: AST.For, scope) {
