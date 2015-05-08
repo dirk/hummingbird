@@ -13,13 +13,28 @@ describe('LLVM compiler', function () {
 
   // Need to go through the spawn system since we want to pass it STDIN
   function buildSource (source) {
-    var result = runSync('bin/hbn - -o '+BinFile, source)
-    console.log(result.toString().trim())
+    var result = runSync('bin/hbn - -o '+BinFile, source),
+        output = result.toString().trim()
+    if (output.length) {
+      console.error(output)
+    }
     return result
   }
   function runBinary (otherBin) {
     var bin = (otherBin ? otherBin : BinFile)
     return runSync(bin)
+  }
+
+  function testCompileAndRun (source, expectedResult) {
+    it('should compile', function () {
+      buildSource(source)
+    })
+    it('should run', function () {
+      var result = runBinary().toString()
+      if (expectedResult) {
+        expect(result.trim()).to.eql(expectedResult)
+      }
+    })
   }
 
   describe('given a trivial program', function () {
@@ -44,34 +59,25 @@ describe('LLVM compiler', function () {
                  "}\n"+
                  "var a = new A()\n"+
                  "console.log(a.c())"
-    it('should compile', function () {
-      buildSource(source)
-    })
-    it('should run', function () {
-      var result = runBinary(),
-          out    = result.toString()
-      // var out = result.stdout.toString()
-      expect(out).to.eql("Hello world!\n")
-    })
+    testCompileAndRun(source, "Hello world!")
   })
 
-  function testCompileAndRun (source, expectedResult) {
-    it('should compile', function () {
-      buildSource(source)
-    })
-    it('should run', function () {
-      var result = runBinary().toString()
-      if (expectedResult) {
-        expect(result.trim()).to.eql(expectedResult)
-      }
-    })
-  }
 
   describe('given strings to concatenate', function () {
     var source = "var a = func (n: String) { return \"a\" + n }\n"+
                  "var b = func () { return \"b\" }\n"+
                  "console.log(a(b()))"
     testCompileAndRun(source, "ab")
+  })
+
+  describe('given a class with a default', function () {
+    var source = "class A {\n"+
+                 "  var b: String = \"c\"\n"+
+                 "  init () { }\n"+
+                 "}\n"+
+                 "var a = new A()\n"+
+                 "console.log(a.b)"
+    testCompileAndRun(source, "c")
   })
 })
 

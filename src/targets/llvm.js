@@ -926,7 +926,7 @@ function predefineTypes (ctx, block) {
   })
 }
 
-function genericCompileFunction (ctx, nativeFn, node) {
+function genericCompileFunction (ctx, nativeFn, node, preStatementsCb) {
   var hasThisArg = (node instanceof AST.Init),
       block      = node.block
   // Predefine to be safe
@@ -954,7 +954,12 @@ function genericCompileFunction (ctx, nativeFn, node) {
         // Store the argument value in the slot
         slots.buildSet(ctx, argName, argValue)
       }
-    })
+      // If there was a callback to run before compiling statements, then
+      // go ahead an call it
+      if (preStatementsCb) {
+        preStatementsCb(blockCtx, slots)
+      }
+    })//compileBlock
 
     // If it's returning Void and the last statement isn't a return then
     // go ahead an insert one for safety
@@ -1073,13 +1078,43 @@ AST.Class.prototype.compile = function (ctx, blockCtx) {
   // Define the native object in the context
   nativeObject.define(ctx)
   // Build the initializers for the class
+  this.compilePreinitializer(ctx, blockCtx, nativeObject)
   this.compileInitializers(ctx, blockCtx, nativeObject)
   this.compileInstanceMethods(ctx, blockCtx, nativeObject)
 }
+AST.Class.prototype.compilePreinitializer = function (ctx, blockCtx, nativeObject) {
+  var initArgs     = [new types.Instance(this.type)],
+      initRet      = blockCtx.block.scope.get('Void'),
+      properties   = this.properties,
+      nativeObject = this.type.getNativeObject()
+  // Native function for the pre-initializer
+  var fn = new NativeFunction(nativeObject.internalName+'_pi', initArgs, initRet)
+  fn.defineBody(ctx, function (entry) {
+    var recv = GetParam(fn.getPtr(), 0)
+    for (var i = 0; i < properties.length; i++) {
+      var prop  = properties[i],
+          name  = prop.lvalue.name,
+          value = prop.rvalue
+      if (value === false) { continue }
+      // Set the value on the property of the new instance
+      var ptr = nativeObject.buildStructGEPForProperty(ctx, recv, name)
+      // Compile the value to a value
+      value = value.compileToValue(ctx, blockCtx)
+      ctx.builder.buildStore(value, ptr, '.'+name)
+    }
+    ctx.builder.buildRetVoid()
+  })
+  // Expose the native function on the type
+  this.type.nativePreinitializer = fn
+}
 AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject) {
-  var type         = this.type,
-      nativeObject = type.getNativeObject(),
-      initializers = this.initializers
+  var type           = this.type,
+      preinitializer = this.type.nativePreinitializer,
+      nativeObject   = type.getNativeObject(),
+      initializers   = this.initializers
+  if (!preinitializer) {
+    throw new TypeError('Missing preinitializer on class', this)
+  }
   // Build and compile a native function for each initializer function
   for (var i = 0; i < initializers.length; i++) {
     var init         = initializers[i],
@@ -1091,7 +1126,12 @@ AST.Class.prototype.compileInitializers = function (ctx, blockCtx, nativeObject)
     initArgs.unshift(new types.Instance(type))
     // Create the native function
     var fn = new NativeFunction(internalName, initArgs, initType.ret)
-    genericCompileFunction(ctx, fn, init)
+    // Need to add a call to the preinitializer
+    genericCompileFunction(ctx, fn, init, function (blockCtx, slots) {
+      var ptr  = preinitializer.getPtr(),
+          recv = GetParam(fn.getPtr(), 0)
+      ctx.builder.buildCall(ptr, [recv], '')
+    })
 
     // Add this native function to the native object's list of initializers
     // and to the initializer function type

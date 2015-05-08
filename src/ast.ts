@@ -142,7 +142,9 @@ export class Export extends Node {
 export class Class extends Node {
   name:         any
   definition:   any
-  initializers: any[]
+  // Properties and initializers are extracted from the definition by AST
+  properties:   any[] = []
+  initializers: any[] = []
   // Computed by the typesystem
   type:         any
 
@@ -151,9 +153,18 @@ export class Class extends Node {
     this.name       = name
     this.definition = block
     // Computed nodes from the definition
-    this.initializers = this.definition.statements.filter(function (stmt) {
-      return (stmt instanceof Init)
-    })
+    var statements = this.definition.statements
+    for (var i = 0; i < statements.length; i++) {
+      var stmt = statements[i]
+      switch (stmt.constructor) {
+        case Init:
+          this.initializers.push(stmt)
+          break
+        case Assignment:
+          this.properties.push(stmt)
+          break
+      }
+    }
   }
   print() {
     out.write('export class '+this.name+" ")

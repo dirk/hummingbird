@@ -17,4 +17,5 @@ class Foo {
 
 var f = new Foo("3")
 console.log(f.bar)
+console.log(f.baz)
 
