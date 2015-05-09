@@ -27,6 +27,12 @@ The quickest way to get started is to clone the repository and use that directly
 ```bash
 git clone git@github.com:dirk/hummingbird.git
 cd hummingbird
+# Install the dependencies
+npm install
+# We're actively transitioning to TypeScript, so right now you'll need to
+# call the `compile` or `watch` tasks to compile the sources to JavaScript.
+npm install -g jake
+jake # Default task, calls ts:compile
 # Run the command-line tool with no arguments to see the options
 bin/hb
 # To see the parsed and type-checked AST of a file
@@ -55,6 +61,24 @@ Each feature has a `<spec name="..."></spec>` block containing the Hummingbird e
 npm run gen-spec
 # Running those tests
 npm run test-spec
+```
+
+## Native compilation (via LLVM)
+
+The LLVM-based native compiler is still in its pre-alpha stages and should be considered very unstable. Getting started with it requires a few more steps on top of the basic setup:
+
+```bash
+# The BDW garbage collector is required for building and running, so
+# make sure you have it installed. On a Mac with Homebrew you will
+# want to do:
+brew install bdw-gc
+# Call the Jake default task if you haven't already to build the
+# standard library "extension" objects
+jake
+# Then call the native compiler with a source file
+bin/hbn examples/simple.hb
+# And run the compiled binary
+./a.out
 ```
 
 ## License
