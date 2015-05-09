@@ -108,8 +108,17 @@ AST.Root.prototype.emitToFile = function (opts) {
   ctx.targetModule = (opts.module ? opts.module : null)
   ctx.module       = new LLVM.Module(ctx.targetModule ? ctx.targetModule.getNativeName() : 'main')
   ctx.builder      = new LLVM.Builder()
-  ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
   ctx.funcs        = {}
+  // Setup the pass manager and optimization passes
+  ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
+  // Turns induction variables (ie. in loops) into simpler forms for easier
+  // later analysis
+  LLVM.Library.LLVMAddIndVarSimplifyPass(ctx.pass_manager.ptr)
+  // Convert load-stores on stack allocated slots to phi nodes
+  LLVM.Library.LLVMAddPromoteMemoryToRegisterPass(ctx.pass_manager.ptr)
+  // Simple dead code elimination and basic-block merging
+  //   http://llvm.org/docs/Passes.html#simplifycfg-simplify-the-cfg
+  LLVM.Library.LLVMAddCFGSimplificationPass(ctx.pass_manager.ptr)
   // Slots for global values (eg. builtins)
   ctx.globalSlots  = new GlobalSlots()
   // Maps sets of Slots to their associated Scope by the scope's ID
