@@ -157,7 +157,7 @@ AST.Root.prototype.emitToFile = function (opts) {
 
   // Setup the entry into the function
   ctx.builder.positionAtEnd(mainEntry)
-  if (!opts.module) {
+  if (ctx.isMain === true) {
     // Initialize the GC
     ctx.builder.buildCall(ctx.extern.GC_init, [], '')
   }

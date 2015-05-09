@@ -18,11 +18,15 @@ function compile (ctx, mainEntry, root) {
 
   var topLevelScope = root.scope,
       rootScope     = topLevelScope.parent
-  
-  // External linkages for GC ------------------------------------------------
-  var sizeTType = Int32Type
-  ctx.extern.GC_malloc = NativeFunction.addExternalFunction(ctx, 'GC_malloc', Int8PtrType, [sizeTType])
-  ctx.extern.GC_init   = NativeFunction.addExternalFunction(ctx, 'GC_init', VoidType, [])
+
+  // Functions required for main runtime -------------------------------------
+
+  if (ctx.isMain === true) {
+    // External linkages for GC
+    var sizeTType = Int32Type
+    ctx.extern.GC_malloc = NativeFunction.addExternalFunction(ctx, 'GC_malloc', Int8PtrType, [sizeTType])
+    ctx.extern.GC_init   = NativeFunction.addExternalFunction(ctx, 'GC_init', VoidType, [])
+  }
 
 
   // Builtin functions -------------------------------------------------------
