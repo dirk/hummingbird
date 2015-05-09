@@ -111,6 +111,8 @@ AST.Root.prototype.emitToFile = function (opts) {
   ctx.funcs        = {}
   // Setup the pass manager and optimization passes
   ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
+  // Global value numbering
+  LLVM.Library.LLVMAddGVNPass(ctx.pass_manager.ptr)
   // Turns induction variables (ie. in loops) into simpler forms for easier
   // later analysis
   LLVM.Library.LLVMAddIndVarSimplifyPass(ctx.pass_manager.ptr)
@@ -153,7 +155,7 @@ AST.Root.prototype.emitToFile = function (opts) {
 
   // Add the builtins
   Builtins.compile(ctx, mainEntry, this)
-  BinaryOps.initialize(ctx)
+  BinaryOps.initialize(ctx, rootScope)
 
   // Setup the entry into the function
   ctx.builder.positionAtEnd(mainEntry)
@@ -165,6 +167,9 @@ AST.Root.prototype.emitToFile = function (opts) {
   // Compile ourselves in the main entry function
   this.buildMain(ctx, mainFunc, mainEntry)
 
+  // Run the optimization passes
+  LLVM.Library.LLVMRunFunctionPassManager(ctx.pass_manager.ptr, mainFunc.ptr)
+ 
   // ctx.module.dump()
 
   // Verify the module to make sure that nothing's amiss before we hand it
