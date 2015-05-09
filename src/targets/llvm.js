@@ -94,6 +94,32 @@ function unboxInstanceType (instance, expectedType) {
   return type
 }
 
+var StaticPassManager = null
+function getStaticPassManager () {
+  if (StaticPassManager) { return StaticPassManager }
+
+  // Setup the pass manager and optimization passes
+  var pm = LLVM.Library.LLVMCreatePassManager()
+  // Global value numbering
+  LLVM.Library.LLVMAddGVNPass(pm)
+  // Convert aggregate stack allocations into SSA registers
+  LLVM.Library.LLVMAddScalarReplAggregatesPass(pm)
+  // Promote by-reference arguments to scalar
+  LLVM.Library.LLVMAddArgumentPromotionPass(pm)
+  // Convert load-stores on stack allocated slots to phi nodes
+  LLVM.Library.LLVMAddPromoteMemoryToRegisterPass(pm)
+  // Merge duplicate global constants
+  LLVM.Library.LLVMAddConstantMergePass(pm)
+  // Turns induction variables (ie. in loops) into simpler forms for easier
+  // later analysis
+  LLVM.Library.LLVMAddIndVarSimplifyPass(pm)
+  // Simple dead code elimination and basic-block merging
+  //   http://llvm.org/docs/Passes.html#simplifycfg-simplify-the-cfg
+  LLVM.Library.LLVMAddCFGSimplificationPass(pm)
+  // Save the pass manager and return it
+  StaticPassManager = pm
+  return pm
+}
 
 AST.Node.prototype.compileToValue = function () {
   throw new Error('Compilation to value not yet implemented for: '+this.constructor.name)
@@ -109,18 +135,6 @@ AST.Root.prototype.emitToFile = function (opts) {
   ctx.module       = new LLVM.Module(ctx.targetModule ? ctx.targetModule.getNativeName() : 'main')
   ctx.builder      = new LLVM.Builder()
   ctx.funcs        = {}
-  // Setup the pass manager and optimization passes
-  ctx.pass_manager = new LLVM.FunctionPassManager(ctx.module)
-  // Global value numbering
-  LLVM.Library.LLVMAddGVNPass(ctx.pass_manager.ptr)
-  // Turns induction variables (ie. in loops) into simpler forms for easier
-  // later analysis
-  LLVM.Library.LLVMAddIndVarSimplifyPass(ctx.pass_manager.ptr)
-  // Convert load-stores on stack allocated slots to phi nodes
-  LLVM.Library.LLVMAddPromoteMemoryToRegisterPass(ctx.pass_manager.ptr)
-  // Simple dead code elimination and basic-block merging
-  //   http://llvm.org/docs/Passes.html#simplifycfg-simplify-the-cfg
-  LLVM.Library.LLVMAddCFGSimplificationPass(ctx.pass_manager.ptr)
   // Slots for global values (eg. builtins)
   ctx.globalSlots  = new GlobalSlots()
   // Maps sets of Slots to their associated Scope by the scope's ID
@@ -168,7 +182,7 @@ AST.Root.prototype.emitToFile = function (opts) {
   this.buildMain(ctx, mainFunc, mainEntry)
 
   // Run the optimization passes
-  LLVM.Library.LLVMRunFunctionPassManager(ctx.pass_manager.ptr, mainFunc.ptr)
+  LLVM.Library.LLVMRunPassManager(getStaticPassManager(), ctx.module.ptr)
  
   // ctx.module.dump()
 
