@@ -7,10 +7,13 @@ var LLVM           = require('./library'),
 var Int8Type    = LLVM.Types.Int8Type,
     Int8PtrType = LLVM.Types.pointerType(LLVM.Types.Int8Type)
 
-var stdCoreTypesStringConcat = null
+var stdCoreTypesStringConcatFn = null
 
-function initialize (ctx) {
-  stdCoreTypesStringConcat = NativeFunction.addExternalFunction(ctx, 'Mstd_Mcore_Mtypes_Mstring_Fconcat', Int8PtrType, [Int8PtrType, Int8PtrType])
+function initialize (ctx, rootScope) {
+  var StringType = rootScope.getLocal('String')
+  stdCoreTypesStringConcatFn = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fconcat', [StringType, StringType], StringType)
+  stdCoreTypesStringConcatFn.defineExternal(ctx)
+  // stdCoreTypesStringConcat = NativeFunction.addExternalFunction(ctx, 'Mstd_Mcore_Mtypes_Mstring_Fconcat', Int8PtrType, [Int8PtrType, Int8PtrType])
 }
 
 function assertRexprType (rexprType, type) {
@@ -22,7 +25,7 @@ function assertRexprType (rexprType, type) {
 
 function buildCallBuilder (fn, name) {
   return function (ctx, lvalue, rvalue) {
-    return ctx.builder.buildCall(fn, [lvalue, rvalue], name)
+    return ctx.builder.buildCall(fn.getPtr(ctx), [lvalue, rvalue], name)
   }
 }
 function buildOpBuilder (opName, name) {
@@ -35,7 +38,7 @@ function getAdditionBuilder (lt, rt) {
   switch (lt.constructor) {
   case types.String:
     assertRexprType(rt, types.String)
-    return buildCallBuilder(stdCoreTypesStringConcat, 'concat')
+    return buildCallBuilder(stdCoreTypesStringConcatFn, 'concat')
   // TODO: Only compile Integers!
   case types.Integer:
     assertRexprType(rt, types.Integer)
