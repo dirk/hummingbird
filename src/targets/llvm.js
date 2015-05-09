@@ -132,6 +132,7 @@ AST.Root.prototype.emitToFile = function (opts) {
   var ctx = new Context()
   ctx.isMain       = (opts.module ? false : true)
   ctx.targetModule = (opts.module ? opts.module : null)
+  ctx.dumpModule   = (opts.dump ? true : false)
   ctx.module       = new LLVM.Module(ctx.targetModule ? ctx.targetModule.getNativeName() : 'main')
   ctx.builder      = new LLVM.Builder()
   ctx.funcs        = {}
@@ -184,7 +185,9 @@ AST.Root.prototype.emitToFile = function (opts) {
   // Run the optimization passes
   LLVM.Library.LLVMRunPassManager(getStaticPassManager(), ctx.module.ptr)
  
-  // ctx.module.dump()
+  if (ctx.dumpModule) {
+    ctx.module.dump()
+  }
 
   // Verify the module to make sure that nothing's amiss before we hand it
   // of to the bitcode compiler
@@ -867,9 +870,10 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
       nativeName = this.file.module.getNativeName(),
       outFile    = bitcodeFileForSourceFile(this.file.path)
   moduleRoot.emitToFile({
-    module: this.file.module,
-    logger: ctx.logger,
-    outputs: ctx.outputs
+    module:  this.file.module,
+    logger:  ctx.logger,
+    outputs: ctx.outputs,
+    dump:    ctx.dumpModule
   })
   // Find the external module initializer
   var initName = nativeName+'_init',

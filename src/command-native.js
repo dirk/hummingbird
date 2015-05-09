@@ -35,8 +35,10 @@ var Opts = {
   outFile:     hasArg('o') ? getArg('o') : 'a.out',
   verbose:     hasArg('v'),
   veryVerbose: hasArg('vv'),
-  gc:          getArg('gc')
+  gc:          getArg('gc'),
+  dump:        (argv.dump === true ? true : false)
 }
+
 
 // Logging -------------------------------------------------------------------
 
@@ -111,7 +113,7 @@ try {
 }
 
 var outputs = []
-tree.emitToFile({logger: logger, outputs: outputs})
+tree.emitToFile({logger: logger, outputs: outputs, dump: Opts.dump})
 
 function objectFileForBitcodeFile (path) {
   return path.replace(/\.bc$/, '.o')
