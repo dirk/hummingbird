@@ -948,8 +948,14 @@ function predefineTypes (ctx, block) {
 }
 
 function genericCompileFunction (ctx, nativeFn, node, preStatementsCb) {
-  var hasThisArg = (node instanceof AST.Init),
-      block      = node.block
+  var block = node.block,
+      hasThisArg = false
+  if (node instanceof AST.Init) {
+    hasThisArg = true
+  } else if (node instanceof AST.Function) {
+    var type = unboxInstanceType(node.type, types.Function)
+    hasThisArg = type.isInstanceMethod
+  }
   // Predefine to be safe
   predefineTypes(ctx, block)
 
