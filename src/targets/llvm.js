@@ -102,12 +102,14 @@ function getStaticPassManager () {
   var pm = LLVM.Library.LLVMCreatePassManager()
   // Global value numbering
   LLVM.Library.LLVMAddGVNPass(pm)
-  // Convert aggregate stack allocations into SSA registers
-  LLVM.Library.LLVMAddScalarReplAggregatesPass(pm)
   // Promote by-reference arguments to scalar
   LLVM.Library.LLVMAddArgumentPromotionPass(pm)
+  // Convert aggregate stack allocations into SSA registers
+  LLVM.Library.LLVMAddScalarReplAggregatesPass(pm)
   // Convert load-stores on stack allocated slots to phi nodes
   LLVM.Library.LLVMAddPromoteMemoryToRegisterPass(pm)
+  // Remove local-block-redundant stores
+  LLVM.Library.LLVMAddDeadStoreEliminationPass(pm)
   // Merge duplicate global constants
   LLVM.Library.LLVMAddConstantMergePass(pm)
   // Turns induction variables (ie. in loops) into simpler forms for easier
