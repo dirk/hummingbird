@@ -38,7 +38,7 @@ char *Mstd_Mcore_Mtypes_Mstring_Fuppercase(char *recv) {
   for (unsigned int i = 0; i < recvLen; i++) {
     ret[i] = toupper(recv[i]);
   }
-  recv[recvLen] = '\0';
+  ret[recvLen] = '\0';
   return ret;
 }
 char *Mstd_Mcore_Mtypes_Mstring_Flowercase(char *recv) {
@@ -47,7 +47,7 @@ char *Mstd_Mcore_Mtypes_Mstring_Flowercase(char *recv) {
   for (unsigned int i = 0; i < recvLen; i++) {
     ret[i] = tolower(recv[i]);
   }
-  recv[recvLen] = '\0';
+  ret[recvLen] = '\0';
   return ret;
 }
 
