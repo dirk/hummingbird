@@ -1,5 +1,7 @@
-var LLVM  = require('./library'),
-    types = require('../../types')
+var LLVM   = require('./library'),
+    types  = require('../../types'),
+    Errors = require('../../errors'),
+    ICE    = Errors.InternalCompilerError
 
 var VoidType    = LLVM.Types.VoidType,
     Int64Type   = LLVM.Types.Int64Type,
@@ -15,6 +17,8 @@ function NativeFunction (name, args, ret) {
   // LLVM variable set during definition/compilation
   this.type = null
   this.fn   = null
+  // If it's external (ie. don't load)
+  this.external = false
   // Whether or not this function has been defined
   this.defined = false
   // The function to call to define the function (if it hasn't been defined)
@@ -36,11 +40,15 @@ NativeFunction.prototype.computeType = function () {
   }
   this.type = new LLVM.FunctionType(ret, args, false)
 }
-NativeFunction.prototype.defineExternal = function (ctx) {
+NativeFunction.prototype.defineExternal = function () {
   if (this.defined) {
     throw new ICE('Cannot redefine external function')
   }
-  this.definer = function () {
+  this.external = true
+  this.definer = function (ctx) {
+    if (!ctx) {
+      throw new ICE('Missing context for defining external function')
+    }
     this.computeType()
     this.fn = NativeFunction.addExternalFunction(ctx, this.name, this.ret, this.args)
     this.defined = true
@@ -63,12 +71,12 @@ NativeFunction.prototype.defineBody = function (ctx, cb) {
   // Restore the previous entry point
   ctx.builder.positionAtEnd(previousEntry)
 }
-NativeFunction.prototype.getPtr = function () {
+NativeFunction.prototype.getPtr = function (ctx) {
   if (!this.defined) {
     if (!(this.definer instanceof Function)) {
       throw new ICE('Missing definer for not-yet-defined NativeFunction')
     }
-    this.definer()
+    this.definer(ctx)
   }
   return this.fn.ptr
 }

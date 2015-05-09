@@ -502,11 +502,18 @@ AST.Call.prototype.compileAsModuleMember = function (ctx, blockCtx, exprCtx) {
   var path = retCtx.path
   assertInstanceOf(path, Array)
   // Join the path and look up the function type from the box on our base
-  var name = path.join('_')
-  assertInstanceOf(this.base.type, types.Instance)
-  assertInstanceOf(this.base.type.type, types.Function)
-  var type = this.base.type.type
-  // Look up the actual function global via the name path
+  var name = path.join('_'),
+      type = unboxInstanceType(this.base.type, types.Function),
+      fn   = type.getNativeFunction()
+  // If it's external (ie. C function) then we call it directly
+  if (fn.external) {
+    var ptr = fn.getPtr(ctx),
+        args = this.args.map(function (arg) {
+          return arg.compileToValue(ctx, blockCtx)
+        })
+    return ctx.builder.buildCall(ptr, args, '')
+  }
+  // Otherwise look up the actual function global via the name path
   var global = null
   if (ctx.hasGlobal(name)) {
     global = ctx.getGlobal(name)
@@ -865,8 +872,8 @@ AST.Import.prototype.compile = function (ctx, blockCtx) {
       if (ctx.hasGlobal(path)) {
         throw new ICE('Global already exists: '+path)
       }
-      var global   = ctx.addGlobal(path, nativeTypeForType(instance)),
-          value    = ctx.buildGlobalLoad(path)
+      var global = ctx.addGlobal(path, nativeTypeForType(instance)),
+          value  = ctx.buildGlobalLoad(path)
       // Store the value in the local slot
       slots.buildSet(ctx, use, value)
     }
