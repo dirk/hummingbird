@@ -12,7 +12,7 @@ function renderCommonmark (source) {
   return writer.render(parsed)
 }
 
-child_process.execSync('git checkout master -- lib/spec-parser.js')
+child_process.execSync('git checkout master -- src/spec-parser.js')
 
 var manual = child_process.execSync('git show master:doc/manual.md').toString()
 

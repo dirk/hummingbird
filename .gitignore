@@ -4,8 +4,12 @@ node_modules
 coverage.html
 
 # gh-pages branch-specific files
+ext/
 lib/
+src/
 test/
+examples/
+a.out
 
 # Jekyll-specific files
 _site

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-var parser        = require('../lib/spec-parser'),
+var parser        = require('../src/spec-parser'),
     fs            = require('fs'),
     commonmark    = require('commonmark'),
     child_process = require('child_process')
