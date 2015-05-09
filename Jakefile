@@ -5,11 +5,12 @@ var fs       = require('fs'),
     chalk    = require('chalk')
 
 var paths = {
-  typescriptSrc: 'src/**/*.ts'
+  typescriptSrc: 'src/**/*.ts',
+  stdObjs: 'lib/*.o'
 }
 
 function exec (cmd, opts) {
-  console.log(cmd)
+  // console.log(cmd)
   child_process.execSync(cmd)
 }
 
@@ -18,10 +19,20 @@ file('lib/std.o', ['ext/std.c'], function () {
   var outfile = this.name,
       infile  = this.prereqs[0]
   exec("clang -c "+infile+" -o "+outfile)
+  console.log("Compiled file '"+chalk.cyan(infile)+"'")
+})
+
+desc('Clean standard library build artifacts')
+task('clean', function () {
+  var files = glob.sync(paths.stdObjs)
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i]
+    fs.unlinkSync(file)
+  }
 })
 
 desc('Default building actions')
-task('default', ['lib/std.o'])
+task('default', ['lib/std.o', 'ts:compile'])
 
 // TypeScript ----------------------------------------------------------------
 
