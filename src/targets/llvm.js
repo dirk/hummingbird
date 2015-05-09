@@ -130,7 +130,7 @@ AST.Root.prototype.emitToFile = function (opts) {
     assertInstanceOf(opts.module, types.Module)
   }
   var ctx = new Context()
-  ctx.isMain       = (opts.module ? true : false)
+  ctx.isMain       = (opts.module ? false : true)
   ctx.targetModule = (opts.module ? opts.module : null)
   ctx.module       = new LLVM.Module(ctx.targetModule ? ctx.targetModule.getNativeName() : 'main')
   ctx.builder      = new LLVM.Builder()
@@ -152,13 +152,13 @@ AST.Root.prototype.emitToFile = function (opts) {
   var mainType = new LLVM.FunctionType(Int32Type, [], false),
       mainFunc = null
   if (ctx.isMain) {
-    var initName = ctx.targetModule.getNativeName()+'_init'
-    mainFunc = ctx.module.addFunction(initName, mainType)
-  } else {
     // Set up the main function
     mainFunc = ctx.module.addFunction('main', mainType)
     // Also setup information about our compilation target
     target.initializeTarget(ctx)
+  } else {
+    var initName = ctx.targetModule.getNativeName()+'_init'
+    mainFunc = ctx.module.addFunction(initName, mainType)
   }
   var mainEntry = mainFunc.appendBasicBlock('entry')
 
