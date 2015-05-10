@@ -19,9 +19,9 @@ before_script:
   # Setup library for development building
   - "node_modules/.bin/jake all"
 script:
-  - "npm run test"
-  - "npm run test-spec"
-  - "npm run test-llvm"
+  - "node_modules/.bin/mocha test"
+  - "node_modules/.bin/mocha test/spec"
+  - "node_modules/.bin/mocha test/llvm"
 after_script:
   - "npm run report-coverage"
 
