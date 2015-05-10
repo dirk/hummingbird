@@ -72,8 +72,11 @@ function compile (ctx, mainEntry, root) {
   ctx.globalSlots.buildDefine(ctx, 'console', LLVM.Types.pointerType(consoleObject.structType))
   // ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
 
-  var stringModule = rootScope.getLocal('std').getChild('core').getChild('types').getChild('string'),
-      StringType   = rootScope.getLocal('String')
+  var typesModule   = rootScope.getLocal('std').getChild('core').getChild('types'),
+      stringModule  = typesModule.getChild('string'),
+      integerModule = typesModule.getChild('integer'),
+      StringType    = rootScope.getLocal('String'),
+      IntegerType   = rootScope.getLocal('Integer')
   
   var uppercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fuppercase', [StringType], StringType)
   uppercase.defineExternal(ctx)
@@ -82,6 +85,10 @@ function compile (ctx, mainEntry, root) {
   var lowercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Flowercase', [StringType], StringType)
   lowercase.defineExternal(ctx)
   stringModule.getTypeOfProperty('lowercase').setNativeFunction(lowercase)
+
+  var integerToString = new NativeFunction('Mstd_Mcore_Mtypes_Minteger_FtoString', [IntegerType], StringType)
+  integerToString.defineExternal(ctx)
+  integerModule.getTypeOfProperty('toString').setNativeFunction(integerToString)
 }
 
 module.exports = {
