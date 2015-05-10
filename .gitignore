@@ -16,6 +16,7 @@ src/typesystem.js
 src/typesystem/bootstrap.js
 src/typesystem/scope.js
 src/targets/javascript.js
+src/targets/llvm.js
 src/targets/llvm/native-function.js
 src/targets/llvm/native-types.js
 src/**/*.js.map
