@@ -1,5 +1,6 @@
-var LLVM  = require('./library'),
-    types = require('../../types')
+import types = require('../../types')
+
+var LLVM = require('./library')
 
 var VoidType    = LLVM.Types.VoidType,
     Int64Type   = LLVM.Types.Int64Type,
@@ -8,7 +9,7 @@ var VoidType    = LLVM.Types.VoidType,
     Int1Type    = LLVM.Types.Int1Type
 
 // Computes the equivalent native type for a given Hummingbird type
-function nativeTypeForType (type) {
+function nativeTypeForType (type: types.Type|types.Instance): any {
   switch (type.constructor) {
     case Buffer:
       // Already a pointer to a native type!
@@ -22,15 +23,16 @@ function nativeTypeForType (type) {
     case types.Boolean:
       return Int1Type
     case types.Function:
-      var nativeFunction = type.getNativeFunction()
+      var nativeFunction = type['getNativeFunction']()
       return nativeFunction.type.ptr
       // Just going to return a simple pointer for functions
       // return Int8PtrType
     case types.Object:
-      var nativeObject = type.getNativeObject()
+      var nativeObject = type['getNativeObject']()
       return nativeObject.structType
     case types.Instance:
-      var unboxed = type.type,
+      var instanceType      = <types.Instance>type,
+          unboxed           = instanceType.type,
           unboxedNativeType = nativeTypeForType(unboxed)
       // Don't pointerify primitives
       if (unboxed.primitive === true) {
@@ -40,20 +42,20 @@ function nativeTypeForType (type) {
     /* case types.Module:
       return VoidType */
     default:
-      throw new Error("Can't compute native type for Hummingbird type: "+type.constructor.name)
+      throw new Error("Can't compute native type for Hummingbird type: "+type.constructor['name'])
   }
 }
 
 // Add native names for some types
-types.Module.prototype.getNativeName = function () {
+types.Module.prototype['getNativeName'] = function () {
   var ret = 'M'+this.name
   if (this.parent) {
     ret = this.parent.getNativeName()+'_'+ret
   }
   return ret
 }
-types.String.prototype.getNativePrefix   = function () { return 'S' }
-types.Function.prototype.getNativePrefix = function () { return 'F' }
+types.String.prototype['getNativePrefix']   = function () { return 'S' }
+types.Function.prototype['getNativePrefix'] = function () { return 'F' }
 
 module.exports = {nativeTypeForType: nativeTypeForType}
 
