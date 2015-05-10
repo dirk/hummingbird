@@ -419,6 +419,12 @@ export class LLVMCompiler {
 
   compileAsModuleMember(node: AST.Node, blockCtx: BlockContext, exprCtx: ExprContext) {
     switch (node.constructor) {
+    case AST.Property:
+      return this.compilePropertyAsModuleMember(<AST.Property>node, blockCtx, exprCtx)
+    case AST.Identifier:
+      return this.compileIdentifierAsModuleMember(<AST.Identifier>node, blockCtx, exprCtx)
+    case AST.Call:
+      return this.compileCallAsModuleMember(<AST.Call>node, blockCtx, exprCtx)
     default:
       throw new ICE('Cannot compile as module member: '+node.constructor['name'])
     }
@@ -456,13 +462,13 @@ export class LLVMCompiler {
         path   = []
     if (parent === null) {
       var retCtx: any = {}
-      this.compilePropertyAsModuleMember(prop.base, blockCtx, retCtx)
+      this.compileAsModuleMember(prop.base, blockCtx, retCtx)
       assertInstanceOf(retCtx.path, Array)
       path = retCtx.path
     } else {
       path = exprCtx.path
     }
-    return this.compilePropertyAsModuleMember(prop.property, blockCtx, {path: path})
+    return this.compileAsModuleMember(prop.property, blockCtx, {path: path})
   }
 
   genericCompileFunction(nativeFn: NativeFunction, node: AST.Function, preStatementsCb?) {
@@ -651,7 +657,7 @@ export class LLVMCompiler {
     }
     assertInstanceOf(exprCtx.path, Array)
     var retCtx = {path: _.clone(exprCtx.path)}
-    this.compileCallAsModuleMember(call.base, blockCtx, retCtx)
+    this.compileAsModuleMember(call.base, blockCtx, retCtx)
     var path = retCtx.path
     assertInstanceOf(path, Array)
     // Join the path and look up the function type from the box on our base
