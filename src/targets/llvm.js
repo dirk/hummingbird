@@ -457,7 +457,7 @@ AST.Call.prototype.compileIntrinsicInstanceMethodCall = function (ctx, blockCtx,
   var receiverValue = exprCtx.value
   argValues.unshift(receiverValue)
   // Build the call
-  var retValue = ctx.builder.buildCall(nativeFn.getPtr(), argValues, '')
+  var retValue = ctx.builder.buildCall(nativeFn.getPtr(ctx), argValues, '')
   tryUpdatingExpressionContext(exprCtx, this.type, retValue)
   return retValue
 }

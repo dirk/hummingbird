@@ -41,6 +41,7 @@ NativeFunction.prototype.computeType = function () {
   this.type = new LLVM.FunctionType(ret, args, false)
 }
 NativeFunction.prototype.defineExternal = function () {
+  var self = this
   if (this.defined) {
     throw new ICE('Cannot redefine external function')
   }
@@ -49,9 +50,9 @@ NativeFunction.prototype.defineExternal = function () {
     if (!ctx) {
       throw new ICE('Missing context for defining external function')
     }
-    this.computeType()
-    this.fn = NativeFunction.addExternalFunction(ctx, this.name, this.ret, this.args)
-    this.defined = true
+    self.computeType()
+    self.fn = NativeFunction.addExternalFunction(ctx, self.name, self.ret, self.args)
+    self.defined = true
   }
 }
 NativeFunction.prototype.defineBody = function (ctx, cb) {

@@ -40,9 +40,10 @@ export class Type {
     this.isRoot     = isRoot ? true : false
   }
   getTypeOfProperty(name: string, fromNode = null): Type {
-    var type = this.properties[name]
-    if (type) { return type }
-    throw new TypeError('Property not found on '+this.name+': '+name, fromNode)
+    if (!this.properties.hasOwnProperty(name)) {
+      throw new TypeError('Property not found on '+this.name+': '+name, fromNode)
+    }
+    return this.properties[name]
   }
   setTypeOfProperty(name: string, type: Type): void {
     // TODO: Check that it's not overwriting properties
