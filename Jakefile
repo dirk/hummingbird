@@ -12,7 +12,10 @@ var paths = {
 
 function exec (cmd, opts) {
   console.log(cmd)
-  child_process.execSync(cmd)
+  var result = child_process.execSync(cmd)
+  if (result.length > 0) {
+    console.log(result.toString().trim())
+  }
 }
 
 desc('Build the standard library')

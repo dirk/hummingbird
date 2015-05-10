@@ -27,4 +27,6 @@ for (var i = specs.length - 1; i >= 0; i--) {
 
   var runner = runnerSource.replace(/NAME/g, spec.name)
   fs.writeFileSync(specDir+'/test-'+spec.name+'.js', runner)
+  
+  console.log('Generated tests for: '+spec.name)
 }
