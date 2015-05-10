@@ -129,3 +129,22 @@ while (a < 10) {
 }
 ```
 </spec>
+
+## For
+
+<spec name="for">
+```hb
+var b = 0
+for var a = 1; a < 4; a += 1 {
+  b = b + a
+}
+# b will equal 6 here
+```
+```js
+var b = 0;
+for (var a = 1; a < 4; a += 1) {
+  b = b + a;
+}
+```
+</spec>
+
