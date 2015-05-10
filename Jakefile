@@ -6,7 +6,8 @@ var fs       = require('fs'),
     chalk    = require('chalk')
 
 var paths = {
-  typescriptSrc: 'src/**/*.ts'
+  typescriptSrc: 'src/**/*.ts',
+  stdObjs: 'lib/*.o'
 }
 
 function exec (cmd, opts) {
@@ -22,17 +23,8 @@ function formatSeconds (duration) {
   return Math.round(totalSeconds * 100) / 100
 }
 
-desc('Build the standard library')
-file('lib/std.o', ['ext/std.c'], function () {
-  var start   = new Date(),
-      outfile = this.name,
-      infile  = this.prereqs[0]
-  exec("clang -c "+infile+" -o "+outfile)
-  console.log('Native library compiled in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
-})
-
-desc('Default building actions')
-task('default', ['lib/std.o', 'grammar', 'ts:compile'])
+desc('Default build actions')
+task('default', ['native:build', 'typescript:compile'])
 
 desc('Compile everything possible')
 task('all', ['default', 'specification'])
@@ -91,6 +83,31 @@ task('specification', function () {
 })
 
 
+// Native LLVM target --------------------------------------------------------
+
+namespace('native', function () {
+  desc('Build the standard library')
+  task('build', ['lib/std.o'])
+
+  file('lib/std.o', ['ext/std.c'], function () {
+    var start   = new Date(),
+        outfile = this.name,
+        infile  = this.prereqs[0]
+    exec("clang -c "+infile+" -o "+outfile)
+    console.log('Native library compiled in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
+  })
+
+  desc('Clean build artifacts')
+  task('clean', function () {
+    var files = glob.sync(paths.stdObjs)
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i]
+      fs.unlinkSync(file)
+    }
+  })
+})
+
+
 // TypeScript ----------------------------------------------------------------
 
 var typescript = null
@@ -110,7 +127,7 @@ function isDefinition (fileName) {
   return /\.d\.ts$/.test(fileName)
 }
 
-namespace('ts', function () {
+namespace('typescript', function () {
   desc('Compile TypeScript source')
   task('compile', function () {
     var compileStart = new Date(),
@@ -146,7 +163,6 @@ namespace('ts', function () {
         var durationMs = (new Date() - start)
         console.log("Compiled file '"+chalk.cyan(fileName)+"' in "+chalk.magenta(durationMs+' ms'))
       } else {
-        // TODO: Make the message red
         console.log("Failed to compile file '"+chalk.red(fileName)+"'")
       }
     })
