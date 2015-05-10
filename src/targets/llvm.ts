@@ -231,7 +231,7 @@ export class LLVMCompiler {
   //   throw new Error('Compilation to value not yet implemented for: '+this.constructor.name)
   // }
 
-  compileBlock(block, parentFn, preStatementsCb?) {
+  compileBlock(block: AST.Block|AST.Root, parentFn: Buffer, preStatementsCb?) {
     var ctx = this.ctx
     // Bunch of pre-conditions to make sure we got sane arguments
     if (!(block.statements instanceof Array)) {
@@ -401,7 +401,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileFunctionAsExpression(func, blockCtx) {
+  compileFunctionAsExpression(func: AST.Function, blockCtx) {
     var self = this,
         fn   = getAnonymousNativeFunction(this.ctx, func)
     this.genericCompileFunction(fn, func)
@@ -411,14 +411,14 @@ export class LLVMCompiler {
   }
 
 
-  compileAsModuleMember(node: AST.Node, blockCtx, exprCtx) {
+  compileAsModuleMember(node: AST.Node, blockCtx: BlockContext, exprCtx) {
     switch (node.constructor) {
     default:
       throw new ICE('Cannot compile as module member: '+node.constructor['name'])
     }
   }
 
-  compileProperty(prop: AST.Property, blockCtx, exprCtx?) {
+  compileProperty(prop: AST.Property, blockCtx: BlockContext, exprCtx?) {
     var base      = prop.base,
         parent    = prop.parent,
         property  = prop.property,
@@ -459,7 +459,7 @@ export class LLVMCompiler {
     return this.compilePropertyAsModuleMember(prop.property, blockCtx, {path: path})
   }
 
-  genericCompileFunction(nativeFn, node, preStatementsCb?) {
+  genericCompileFunction(nativeFn: NativeFunction, node: AST.Function, preStatementsCb?) {
     var self       = this,
         block      = node.block,
         hasThisArg = false
@@ -481,7 +481,7 @@ export class LLVMCompiler {
         if (hasThisArg) {
           argOffset = 1
           // `this` will be the first argument
-          var thisValue = GetParam(nativeFn.getPtr(), 0)
+          var thisValue = GetParam(nativeFn.getPtr(self.ctx), 0)
           // Store `this` in the slots
           slots.buildSet(self.ctx, 'this', thisValue)
         }
@@ -490,7 +490,7 @@ export class LLVMCompiler {
         for (var i = 0; i < args.length; i++) {
           var arg      = args[i],
               argName  = arg.name,
-              argValue = GetParam(nativeFn.getPtr(), i + argOffset)
+              argValue = GetParam(nativeFn.getPtr(self.ctx), i + argOffset)
           // Store the argument value in the slot
           slots.buildSet(self.ctx, argName, argValue)
         }
@@ -516,7 +516,7 @@ export class LLVMCompiler {
     })// nativeFn.defineBody
   }// genericCompileFunction
 
-  compileAssignment(assg, blockCtx) {
+  compileAssignment(assg: AST.Assignment, blockCtx: BlockContext) {
     if (assg.type === 'var' || assg.type === 'let') {
       return this.compileNamedAssignment(assg, blockCtx)
     }
@@ -526,7 +526,7 @@ export class LLVMCompiler {
     throw new Error('Cannot compile assignment type: '+assg.type)
   }
 
-  compilePathAssignment(assg, blockCtx) {
+  compilePathAssignment(assg: AST.Assignment, blockCtx: BlockContext) {
     // Lookup the lvalue into a receiver that we can set
     var recvPtr = this.compileAssignmentToStorable(assg, blockCtx, assg.lvalue)
     // Get the rvalue as a value to be stored in the lvalue's receiving pointer
@@ -680,7 +680,7 @@ export class LLVMCompiler {
     return this.ctx.builder.buildCall(fn, args, '')
   }
 
-  compileInstanceMethodCall(call, blockCtx, exprCtx) {
+  compileInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx) {
     var self         = this,
         recvValue    = exprCtx.value,
         recvInstance = exprCtx.type,
@@ -704,7 +704,7 @@ export class LLVMCompiler {
     return retValue
   }
 
-  compileIntrinsicInstanceMethodCall(call, blockCtx, exprCtx) {
+  compileIntrinsicInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx) {
     var self             = this,
         receiverInstance = call.parent.type,
         receiverType     = receiverInstance.type
@@ -730,7 +730,7 @@ export class LLVMCompiler {
     return retValue
   }
 
-  compileIdentifier(id, blockCtx, exprCtx) {
+  compileIdentifier(id: AST.Identifier, blockCtx: BlockContext, exprCtx) {
     var parent   = id.parent,
         newType  = null,
         newValue = null
@@ -758,7 +758,7 @@ export class LLVMCompiler {
     tryUpdatingExpressionContext(exprCtx, newType, newValue)
     return newValue
   }
-  compileIdentifierAsModuleMember(id, blockCtx, exprCtx) {
+  compileIdentifierAsModuleMember(id: AST.Identifier, blockCtx: BlockContext, exprCtx) {
     var path = (exprCtx.path ? exprCtx.path : []),
         type = id.type,
         name = null
@@ -780,7 +780,7 @@ export class LLVMCompiler {
     return null
   }
 
-  compileLiteral(literal, blockCtx) {
+  compileLiteral(literal: AST.Literal, blockCtx: BlockContext) {
     var instance = literal.type
     switch (instance.type.constructor) {
       case types.String:
@@ -806,7 +806,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileClass(klass, blockCtx) {
+  compileClass(klass: AST.Class, blockCtx: BlockContext) {
     // Sanity-check the initializers to make sure nothing weird is going to
     // happen when we start compiling stuff around this class
     sanityCheckInitializers(klass)
@@ -908,14 +908,14 @@ export class LLVMCompiler {
     }
   }
 
-  compileNew(node, blockCtx) {
+  compileNew(node: AST.New, blockCtx: BlockContext) {
     var type         = node.constructorType,
         args         = node.args,
         nativeObject = type.getNativeObject()
     // Look up the initializer determined by the typesystem
     var initializer = node.getInitializer()
     // Figure out the correct NativeFunction to use to initialize this object
-    var init = initializer.getNativeFunction()
+    var init = initializer['getNativeFunction']()
     // Compile all of the arguments down to values
     var argValues = []
     for (var i = 0; i < args.length; i++) {
@@ -942,7 +942,7 @@ export class LLVMCompiler {
 
   ifCounter: number = 1
 
-  compileIf(node, blockCtx) {
+  compileIf(node: AST.If, blockCtx: BlockContext) {
     var truthyVal = compileTruthyTest(this.ctx, blockCtx, node.cond),
         blockNum  = (this.ifCounter++),
         // Get the parent function of the block
@@ -1023,7 +1023,7 @@ export class LLVMCompiler {
     // Position the builder at the end of the continuation block
     this.ctx.builder.positionAtEnd(contBlock)
   }
-  compileConditionBlock(parentFn, blockNode, blockPtr, contBlockPtr) {
+  compileConditionBlock(parentFn: Buffer, blockNode: AST.Block, blockPtr, contBlockPtr) {
     this.ctx.builder.positionAtEnd(blockPtr)
     this.compileBlock(blockNode, parentFn)
     var lastInstrTerm = isLastInstructionTerminator(blockPtr)
@@ -1032,7 +1032,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileBinary(binary: AST.Binary, blockCtx, exprCtx) {
+  compileBinary(binary: AST.Binary, blockCtx: BlockContext, exprCtx) {
     var lexpr = binary.lexpr,
         rexpr = binary.rexpr
     // Check (and unbox) the types
@@ -1053,7 +1053,7 @@ export class LLVMCompiler {
     return retValue
   }
 
-  compileExport(node, blockCtx) {
+  compileExport(node: AST.Export, blockCtx: BlockContext) {
     var ctx  = this.ctx,
         path = [ctx.targetModule.getNativeName()],
         name = node.name,
@@ -1083,7 +1083,7 @@ export class LLVMCompiler {
         global     = setupGlobal(name, exportName)
   }
 
-  compileReturn(node, blockCtx) {
+  compileReturn(node: AST.Return, blockCtx: BlockContext) {
     if (!node.expr) {
       this.ctx.builder.buildRetVoid()
       } else {
