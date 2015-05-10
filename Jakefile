@@ -5,7 +5,9 @@ var fs       = require('fs'),
     chalk    = require('chalk')
 
 var paths = {
-  typescriptSrc: 'src/**/*.ts'
+  typescriptSrc: 'src/**/*.ts',
+  specificationHummingbirdSources: 'test/spec/*.hb',
+  specificationJavascriptSources:  'test/spec/*.js'
 }
 
 function exec (cmd, opts) {
@@ -22,6 +24,29 @@ file('lib/std.o', ['ext/std.c'], function () {
 
 desc('Default building actions')
 task('default', ['lib/std.o'])
+
+
+// Specification -------------------------------------------------------------
+
+namespace('specification', function () {
+  desc('Generate specification tests')
+  task('generate', function () {
+    exec('node share/gen-spec.js')
+  })
+
+  desc('Remove specification files')
+  task('clean', function () {
+    function removeFiles (files) {
+      for (var i = 0; i < files.length; i++) {
+        var f = files[i]
+        fs.unlinkSync(f)
+      }
+    }
+    removeFiles(glob.sync(paths.specificationJavascriptSources))
+    removeFiles(glob.sync(paths.specificationHummingbirdSources))
+  })
+})
+
 
 // TypeScript ----------------------------------------------------------------
 
