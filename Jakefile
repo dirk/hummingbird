@@ -26,7 +26,18 @@ file('lib/std.o', ['ext/std.c'], function () {
 })
 
 desc('Default building actions')
-task('default', ['lib/std.o'])
+task('default', ['lib/std.o', 'grammar', 'ts:compile'])
+
+
+// Grammar -------------------------------------------------------------------
+
+desc('Build parser from grammar')
+task('grammar', ['src/grammar.js'])
+
+file('src/grammar.js', ['src/grammar.pegjs'], function () {
+  var infile = this.prereqs[0]
+  exec('node_modules/.bin/pegjs --cache '+infile)
+})
 
 
 // Specification -------------------------------------------------------------
