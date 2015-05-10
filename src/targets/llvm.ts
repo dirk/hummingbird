@@ -1,9 +1,12 @@
 import AST    = require('../ast')
 import errors = require('../errors')
+import scope  = require('../typesystem/scope')
+import types  = require('../types')
+
+import nativeTypes    = require('./llvm/native-types')
+import NativeFunction = require('./llvm/native-function')
 
 var _            = require('lodash'),
-    types        = require('../types'),
-    scope        = require('../typesystem/scope'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
     LLVM         = require('./llvm/library'),
@@ -20,9 +23,8 @@ var isLastInstructionTerminator = util.isLastInstructionTerminator,
     compileTruthyTest           = util.compileTruthyTest,
     assertInstanceOf            = util.assertInstanceOf
 
-var NativeFunction    = require('./llvm/native-function'),
-    NativeObject      = require('./llvm/native-object'),
-    nativeTypeForType = require('./llvm/native-types').nativeTypeForType
+var NativeObject      = require('./llvm/native-object'),
+    nativeTypeForType = nativeTypes.nativeTypeForType
 
 // Unbox the slots module
 var Slots         = slots.Slots,
@@ -393,9 +395,9 @@ export class LLVMCompiler {
       // Compile the native function with our block
       this.genericCompileFunction(fn, func)
       // Set the linkage of the function to private
-      LLVM.Library.LLVMSetLinkage(fn.getPtr(), LLVM.Library.LLVMPrivateLinkage)
+      LLVM.Library.LLVMSetLinkage(fn.getPtr(this.ctx), LLVM.Library.LLVMPrivateLinkage)
       // Add func to the slots
-      blockCtx.slots.buildSet(this.ctx, func.name, fn.getPtr())
+      blockCtx.slots.buildSet(this.ctx, func.name, fn.getPtr(this.ctx))
     }
   }
 
@@ -830,7 +832,7 @@ export class LLVMCompiler {
     // Native function for the pre-initializer
     var fn = new NativeFunction(nativeObject.internalName+'_pi', initArgs, initRet)
     fn.defineBody(this.ctx, function (entry) {
-      var recv = GetParam(fn.getPtr(), 0)
+      var recv = GetParam(fn.getPtr(self.ctx), 0)
       for (var i = 0; i < properties.length; i++) {
         var prop  = properties[i],
             name  = prop.lvalue.name,
@@ -870,7 +872,7 @@ export class LLVMCompiler {
       // Need to add a call to the preinitializer
       this.genericCompileFunction(fn, init, function (blockCtx, slots) {
         var ptr  = preinitializer.getPtr(),
-            recv = GetParam(fn.getPtr(), 0)
+            recv = GetParam(fn.getPtr(self.ctx), 0)
         self.ctx.builder.buildCall(ptr, [recv], '')
       })
 

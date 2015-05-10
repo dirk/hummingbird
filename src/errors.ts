@@ -41,7 +41,7 @@ class LocativeError extends BaseError {
 }
 
 export class InternalCompilerError extends LocativeError {
-  constructor(message, origin) {
+  constructor(message, origin?) {
     super(message, origin)
     this.name = 'InternalCompilerError'
     super.ensureStack()

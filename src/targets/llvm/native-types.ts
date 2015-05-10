@@ -9,7 +9,7 @@ var VoidType    = LLVM.Types.VoidType,
     Int1Type    = LLVM.Types.Int1Type
 
 // Computes the equivalent native type for a given Hummingbird type
-function nativeTypeForType (type: types.Type|types.Instance): any {
+export function nativeTypeForType (type: types.Type|types.Instance): any {
   switch (type.constructor) {
     case Buffer:
       // Already a pointer to a native type!
@@ -56,6 +56,4 @@ types.Module.prototype['getNativeName'] = function () {
 }
 types.String.prototype['getNativePrefix']   = function () { return 'S' }
 types.Function.prototype['getNativePrefix'] = function () { return 'F' }
-
-module.exports = {nativeTypeForType: nativeTypeForType}
 
