@@ -148,3 +148,23 @@ for (var a = 1; a < 4; a += 1) {
 ```
 </spec>
 
+## If
+
+<spec name="if">
+```hb
+var a = 1
+var b = 0
+if a {
+  b = 1
+}
+# b will equal 1 here
+```
+```js
+var a = 1;
+var b = 0;
+if (a) {
+  b = 1;
+}
+```
+</spec>
+
