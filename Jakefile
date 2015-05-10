@@ -1,32 +1,41 @@
 var fs       = require('fs'),
+    path     = require('path'),
     util     = require('util'),
     child_process = require('child_process'),
     glob     = require('glob'),
     chalk    = require('chalk')
 
 var paths = {
-  typescriptSrc: 'src/**/*.ts',
-  specificationHummingbirdSources: 'test/spec/*.hb',
-  specificationJavascriptSources:  'test/spec/*.js'
+  typescriptSrc: 'src/**/*.ts'
 }
 
 function exec (cmd, opts) {
-  console.log(cmd)
+  // console.log(cmd)
   var result = child_process.execSync(cmd)
   if (result.length > 0) {
     console.log(result.toString().trim())
   }
 }
 
+function formatSeconds (duration) {
+  var totalSeconds = duration / 1000;
+  return Math.round(totalSeconds * 100) / 100
+}
+
 desc('Build the standard library')
 file('lib/std.o', ['ext/std.c'], function () {
-  var outfile = this.name,
+  var start   = new Date(),
+      outfile = this.name,
       infile  = this.prereqs[0]
   exec("clang -c "+infile+" -o "+outfile)
+  console.log('Native library compiled in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
 desc('Default building actions')
 task('default', ['lib/std.o', 'grammar', 'ts:compile'])
+
+desc('Compile everything possible')
+task('all', ['default', 'specification'])
 
 
 // Grammar -------------------------------------------------------------------
@@ -35,30 +44,50 @@ desc('Build parser from grammar')
 task('grammar', ['src/grammar.js'])
 
 file('src/grammar.js', ['src/grammar.pegjs'], function () {
-  var infile = this.prereqs[0]
+  var start  = new Date(),
+      infile = this.prereqs[0]
   exec('node_modules/.bin/pegjs --cache '+infile)
+  console.log('Grammar generated in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
 
 // Specification -------------------------------------------------------------
 
-namespace('specification', function () {
-  desc('Generate specification tests')
-  task('generate', function () {
-    exec('node share/gen-spec.js')
-  })
+desc('Generate specification tests')
+task('specification', function () {
+  var start        = new Date(),
+      parseSpec    = require('./src/spec-parser').parseSpecification
+      specSource   = fs.readFileSync(__dirname+'/doc/specification.md').toString(),
+      runnerSource = fs.readFileSync(__dirname+'/share/spec-runner.js').toString(),
+      specs        = parseSpec(specSource),
+      specTestDir  = __dirname+'/test/spec'
 
-  desc('Remove specification files')
-  task('clean', function () {
-    function removeFiles (files) {
-      for (var i = 0; i < files.length; i++) {
-        var f = files[i]
-        fs.unlinkSync(f)
-      }
-    }
-    removeFiles(glob.sync(paths.specificationJavascriptSources))
-    removeFiles(glob.sync(paths.specificationHummingbirdSources))
-  })
+  // Remove old specification files
+  var files   = fs.readdirSync(specTestDir),
+      removed = 0
+  for (var i = 0; i < files.length; i++) {
+    var f = path.join(specTestDir, files[i])
+    if (!/\.js$/.test(f) && !/\.hb$/.test(f)) { continue }
+    fs.unlinkSync(f)
+    removed += 1
+  }
+  console.log('Removed '+chalk.magenta(removed)+' old specification files')
+
+  // Now generate the specs
+  for (var i = specs.length - 1; i >= 0; i--) {
+    var spec = specs[i]
+
+    var js = spec.js+"\n",
+        hb = spec.hb+"\n"
+    fs.writeFileSync(specTestDir+'/source-'+spec.name+'.js', js)
+    fs.writeFileSync(specTestDir+'/source-'+spec.name+'.hb', hb)
+
+    var runner = runnerSource.replace(/NAME/g, spec.name)
+    fs.writeFileSync(specTestDir+'/test-'+spec.name+'.js', runner)
+    
+    console.log("Generated tests for '"+chalk.cyan(spec.name)+"'")
+  }
+  console.log('Specification tests generated in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
 
@@ -121,9 +150,7 @@ namespace('ts', function () {
         console.log("Failed to compile file '"+chalk.red(fileName)+"'")
       }
     })
-    var totalSeconds = (new Date() - compileStart) / 1000,
-        formattedSeconds = Math.round(totalSeconds * 100) / 100;
-    console.log('Finished in '+chalk.magenta(formattedSeconds+' s'))
+    console.log('Finished in '+chalk.magenta(formatSeconds(new Date() - compileStart)+' s'))
   })
 
   desc('Watch for changes')
