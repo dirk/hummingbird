@@ -102,12 +102,18 @@ class BlockContext {
   }
 }
 
-function BasicLogger () {
-  this.info = console.log
+interface ExprContext {
+  type?: any
+  value?: Buffer
+  path?: any[]
+}
+
+class BasicLogger {
+  info = console.log
 }
 
 
-function unboxInstanceType (instance, expectedType?) {
+function unboxInstanceType (instance: any, expectedType?) {
   assertInstanceOf(instance, types.Instance)
   var type = instance.type
   if (expectedType !== undefined) {
@@ -319,7 +325,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileExpression(expr: AST.Node, blockCtx: BlockContext, exprCtx?) {
+  compileExpression(expr: AST.Node, blockCtx: BlockContext, exprCtx?: ExprContext) {
     switch (expr.constructor) {
     case AST.Property:
       return this.compileProperty(<AST.Property>expr, blockCtx, exprCtx)
@@ -411,14 +417,14 @@ export class LLVMCompiler {
   }
 
 
-  compileAsModuleMember(node: AST.Node, blockCtx: BlockContext, exprCtx) {
+  compileAsModuleMember(node: AST.Node, blockCtx: BlockContext, exprCtx: ExprContext) {
     switch (node.constructor) {
     default:
       throw new ICE('Cannot compile as module member: '+node.constructor['name'])
     }
   }
 
-  compileProperty(prop: AST.Property, blockCtx: BlockContext, exprCtx?) {
+  compileProperty(prop: AST.Property, blockCtx: BlockContext, exprCtx?: ExprContext) {
     var base      = prop.base,
         parent    = prop.parent,
         property  = prop.property,
@@ -445,7 +451,7 @@ export class LLVMCompiler {
     }
     return ret
   }
-  compilePropertyAsModuleMember(prop: AST.Property, blockCtx: BlockContext, exprCtx) {
+  compilePropertyAsModuleMember(prop: AST.Property, blockCtx: BlockContext, exprCtx: ExprContext) {
     var parent = null,
         path   = []
     if (parent === null) {
@@ -586,7 +592,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileCall(call: AST.Call, blockCtx, exprCtx) {
+  compileCall(call: AST.Call, blockCtx, exprCtx: ExprContext) {
     var self   = this,
         parent = call.parent,
         type   = null,
@@ -637,7 +643,7 @@ export class LLVMCompiler {
     tryUpdatingExpressionContext(exprCtx, call.type, retValue)
     return retValue
   }
-  compileCallAsModuleMember(call: AST.Call, blockCtx, exprCtx) {
+  compileCallAsModuleMember(call: AST.Call, blockCtx, exprCtx: ExprContext) {
     var self   = this,
         parent = call.parent
     if (parent === null) {
@@ -680,7 +686,7 @@ export class LLVMCompiler {
     return this.ctx.builder.buildCall(fn, args, '')
   }
 
-  compileInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx) {
+  compileInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
     var self         = this,
         recvValue    = exprCtx.value,
         recvInstance = exprCtx.type,
@@ -704,7 +710,7 @@ export class LLVMCompiler {
     return retValue
   }
 
-  compileIntrinsicInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx) {
+  compileIntrinsicInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
     var self             = this,
         receiverInstance = call.parent.type,
         receiverType     = receiverInstance.type
@@ -730,7 +736,7 @@ export class LLVMCompiler {
     return retValue
   }
 
-  compileIdentifier(id: AST.Identifier, blockCtx: BlockContext, exprCtx) {
+  compileIdentifier(id: AST.Identifier, blockCtx: BlockContext, exprCtx: ExprContext) {
     var parent   = id.parent,
         newType  = null,
         newValue = null
@@ -758,7 +764,7 @@ export class LLVMCompiler {
     tryUpdatingExpressionContext(exprCtx, newType, newValue)
     return newValue
   }
-  compileIdentifierAsModuleMember(id: AST.Identifier, blockCtx: BlockContext, exprCtx) {
+  compileIdentifierAsModuleMember(id: AST.Identifier, blockCtx: BlockContext, exprCtx: ExprContext) {
     var path = (exprCtx.path ? exprCtx.path : []),
         type = id.type,
         name = null
@@ -943,7 +949,7 @@ export class LLVMCompiler {
   ifCounter: number = 1
 
   compileIf(node: AST.If, blockCtx: BlockContext) {
-    var truthyVal = compileTruthyTest(this.ctx, blockCtx, node.cond),
+    var truthyVal = compileTruthyTest(this, blockCtx, node.cond),
         blockNum  = (this.ifCounter++),
         // Get the parent function of the block
         parentFn  = blockCtx.fn.ptr
@@ -1032,7 +1038,7 @@ export class LLVMCompiler {
     }
   }
 
-  compileBinary(binary: AST.Binary, blockCtx: BlockContext, exprCtx) {
+  compileBinary(binary: AST.Binary, blockCtx: BlockContext, exprCtx: ExprContext) {
     var lexpr = binary.lexpr,
         rexpr = binary.rexpr
     // Check (and unbox) the types
@@ -1097,7 +1103,7 @@ export class LLVMCompiler {
 
 // Look up the type and Slots for a given name; begins search from the passed
 // block-context. Returns a 2-tuple of Slots and Type.
-function getTypeAndSlotsForName (ctx, blockCtx, name, foundCb?) {
+function getTypeAndSlotsForName (ctx: Context, blockCtx: BlockContext, name: string, foundCb?) {
   // Keep tracking of the scope of the beginning of the chain
   var outermostScope = null
   var type = blockCtx.block.scope.get(name, function (scope, _type) {
@@ -1112,7 +1118,7 @@ function getTypeAndSlotsForName (ctx, blockCtx, name, foundCb?) {
   return [slots, type]
 }
 
-function tryUpdatingExpressionContext (exprCtx, type, value) {
+function tryUpdatingExpressionContext (exprCtx: ExprContext, type: any, value: Buffer) {
   if (!exprCtx) { return }
   exprCtx.type  = type
   exprCtx.value = value
