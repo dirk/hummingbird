@@ -819,12 +819,28 @@ export class LLVMCompiler {
   }
 
   compileClass(klass: AST.Class, blockCtx: BlockContext) {
+    // Look up the computed type for this Class
+    var type = klass.type
+
+    // If it's intrinsic then make sure there are not initializers and just
+    // compile the instance methods
+    if (type.intrinsic) {
+      if (type.initializers !== undefined) {
+        throw new ICE('Intrinsic class cannot have initializers', klass)
+      }
+      var shimNativeObject = {
+        type: type,
+        defined: true,
+        internalName: 'T'+klass.name
+      }
+      this.compileClassInstanceMethods(klass, blockCtx, shimNativeObject)
+      return
+    }
+
     // Sanity-check the initializers to make sure nothing weird is going to
     // happen when we start compiling stuff around this class
     sanityCheckInitializers(klass)
 
-    // Look up the computed type for this Class
-    var type = klass.type
     // Then build the native object from this type
     var nativeObject = new NativeObject(type)
     type.setNativeObject(nativeObject)
