@@ -2,18 +2,20 @@ import types = require('../../types')
 
 var LLVM = require('./library')
 
-var VoidType    = LLVM.Types.VoidType,
-    Int64Type   = LLVM.Types.Int64Type,
-    Int8Type    = LLVM.Types.Int8Type,
-    Int8PtrType = LLVM.Types.pointerType(Int8Type),
-    Int1Type    = LLVM.Types.Int1Type
+var VoidType    = <Buffer>LLVM.Types.VoidType,
+    Int64Type   = <Buffer>LLVM.Types.Int64Type,
+    Int8Type    = <Buffer>LLVM.Types.Int8Type,
+    Int8PtrType = <Buffer>LLVM.Types.pointerType(Int8Type),
+    Int1Type    = <Buffer>LLVM.Types.Int1Type
+
+type TypeOrBuffer = types.Type|types.Instance|Buffer
 
 // Computes the equivalent native type for a given Hummingbird type
-export function nativeTypeForType (type: types.Type|types.Instance): any {
+export function nativeTypeForType (type: TypeOrBuffer): Buffer {
   switch (type.constructor) {
     case Buffer:
       // Already a pointer to a native type!
-      return type
+      return <Buffer>type
     case types.Void:
       return VoidType
     case types.String:

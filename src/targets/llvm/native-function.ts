@@ -12,9 +12,9 @@ var ICE               = Errors.InternalCompilerError,
     nativeTypeForType = nativeTypes.nativeTypeForType
 
 class NativeFunction {
-  name: any
-  args: any
-  ret:  any
+  name: string
+  args: types.Type[]
+  ret:  types.Type
   // LLVM variable set during definition/compilation
   type: any = null
   fn:   any = null
@@ -63,7 +63,7 @@ class NativeFunction {
       self.defined = true
     }
   }
-  defineBody(ctx, cb) {
+  defineBody(ctx, cb: (entry: Buffer) => void) {
     if (!this.type) {
       this.computeType()
     }
@@ -111,10 +111,10 @@ types.Function.prototype['hasNativeFunction'] = function () {
   return (this.nativeFunction ? true : false)
 }
 
-function computeType (ret, args, varArgs) {
-  var args = args.map(nativeTypeForType),
-      ret  = nativeTypeForType(ret)
-  varArgs  = (varArgs ? true : false)
+function computeType (retType: types.Type, argTypes: types.Type[], varArgs: boolean) {
+  var args        = <Buffer[]>argTypes.map(nativeTypeForType),
+      ret: Buffer = nativeTypeForType(retType)
+  varArgs = (varArgs ? true : false)
   return new LLVM.FunctionType(ret, args, varArgs)
 }
 
