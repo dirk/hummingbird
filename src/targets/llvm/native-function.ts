@@ -80,7 +80,7 @@ class NativeFunction {
     // Restore the previous entry point
     ctx.builder.positionAtEnd(previousEntry)
   }
-  getPtr(ctx) {
+  getPtr(ctx): Buffer {
     if (!this.defined) {
       if (!(this.definer instanceof Function)) {
         throw new ICE('Missing definer for not-yet-defined NativeFunction')

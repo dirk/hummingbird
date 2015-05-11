@@ -66,20 +66,20 @@ class Context {
   castValuePointers: boolean
   noCastValuePointers: boolean
 
-  addGlobal(name, type) {
+  addGlobal(name: string, type: Buffer): Buffer {
     assertInstanceOf(type, Buffer)
     var global = LLVM.Library.LLVMAddGlobal(this.module.ptr, type, name)
     this.globals[name] = global
     return global
   }
-  getGlobal(name) {
+  getGlobal(name): Buffer {
     if (!this.hasGlobal(name)) { throw new Error('Global definition not found: '+name) }
     return this.globals[name]
   }
-  hasGlobal(name) {
+  hasGlobal(name): boolean {
     return (this.globals[name] ? true : false)
   }
-  buildGlobalLoad(name) {
+  buildGlobalLoad(name): Buffer {
     var global = this.globals[name],
         // ptr = this.builder.buildGEP(global, [Int32Zero], name),
         val    = this.builder.buildLoad(global, name)
@@ -89,12 +89,12 @@ class Context {
 
 
 class BlockContext {
-  ctx: any
+  ctx: Context
   fn: any
   block: any
   slots: any
 
-  constructor(ctx, parentFn, block, slots) {
+  constructor(ctx: Context, parentFn, block, slots) {
     this.ctx   = ctx
     this.fn    = parentFn
     this.block = block
@@ -407,12 +407,12 @@ export class LLVMCompiler {
     }
   }
 
-  compileFunctionAsExpression(func: AST.Function, blockCtx) {
+  compileFunctionAsExpression(func: AST.Function, blockCtx): Buffer {
     var self = this,
         fn   = getAnonymousNativeFunction(this.ctx, func)
     this.genericCompileFunction(fn, func)
     // Get the raw function as a value
-    var compiledFn = fn.getPtr()
+    var compiledFn = fn.getPtr(this.ctx)
     return compiledFn
   }
 
@@ -472,9 +472,9 @@ export class LLVMCompiler {
   }
 
   genericCompileFunction(nativeFn: NativeFunction, node: AST.Function, preStatementsCb?) {
-    var self       = this,
-        block      = node.block,
-        hasThisArg = false
+    var self             = this,
+        block: AST.Block = node.block,
+        hasThisArg       = false
     if (node instanceof AST.Init) {
       hasThisArg = true
     } else if (node instanceof AST.Function) {
@@ -580,11 +580,12 @@ export class LLVMCompiler {
       var item = path[i]
       switch (item.constructor) {
         case AST.Identifier:
+          var id = <AST.Identifier>item
           // Unbox and ensure we've got an Object we can work with
           var objType   = unboxInstanceType(itemType, types.Object),
               nativeObj = objType.getNativeObject(),
-              propName  = item.name,
-              propType  = item.type,
+              propName  = id.name,
+              propType  = id.type,
               propPtr   = nativeObj.buildStructGEPForProperty(ctx, itemValue, propName)
           // Return storable pointer if we're the last item in the chain
           if (isLast) { return propPtr }
@@ -650,8 +651,11 @@ export class LLVMCompiler {
     return retValue
   }
   compileCallAsModuleMember(call: AST.Call, blockCtx, exprCtx: ExprContext) {
-    var self   = this,
-        parent = call.parent
+    var self           = this,
+        parent         = call.parent,
+        fnPtr: Buffer  = null,
+        args: Buffer[] = null
+
     if (parent === null) {
       throw new ICE('Not implemented yet')
     }
@@ -662,34 +666,34 @@ export class LLVMCompiler {
     assertInstanceOf(path, Array)
     // Join the path and look up the function type from the box on our base
     var name = path.join('_'),
-        type = unboxInstanceType(call.base.type, types.Function),
-        fn   = type.getNativeFunction()
+        type = <types.Function>unboxInstanceType(call.base.type, types.Function),
+        fn   = type['getNativeFunction']()
     // If it's external (ie. C function) then we call it directly
     if (fn.external) {
-      var ptr = fn.getPtr(this.ctx),
-          args = call.args.map(function (arg) {
-            return self.compileExpression(arg, blockCtx)
-          })
-      return self.ctx.builder.buildCall(ptr, args, '')
+      fnPtr = fn.getPtr(this.ctx)
+      args = call.args.map(function (arg) {
+        return self.compileExpression(arg, blockCtx)
+      })
+      return self.ctx.builder.buildCall(fnPtr, args, '')
     }
     // Otherwise look up the actual function global via the name path
     var global = null
     if (this.ctx.hasGlobal(name)) {
       global = this.ctx.getGlobal(name)
     } else {
-      var args    = type.args.map(nativeTypeForType),
-          ret     = nativeTypeForType(type.ret),
-          fnTy    = new LLVM.FunctionType(ret, args, false),
-          fnPtrTy = LLVM.Types.pointerType(fnTy.ptr)
+      var typeArgs = type.args.map(nativeTypeForType),
+          typeRet  = nativeTypeForType(type.ret),
+          fnTy     = new LLVM.FunctionType(typeRet, typeArgs, false),
+          fnPtrTy  = LLVM.Types.pointerType(fnTy.ptr)
       // Add the function as a global
       global = this.ctx.addGlobal(name, fnPtrTy)
     }
     // Look up the function and call it with the arguments
-    var fn   = this.ctx.buildGlobalLoad(name),
-        args = call.args.map(function (arg) {
-          return arg.compileToValue(self.ctx, blockCtx)
-        })
-    return this.ctx.builder.buildCall(fn, args, '')
+    fnPtr = this.ctx.buildGlobalLoad(name)
+    args = call.args.map(function (arg) {
+      return arg.compileToValue(self.ctx, blockCtx)
+    })
+    return this.ctx.builder.buildCall(fnPtr, args, '')
   }
 
   compileInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
@@ -699,6 +703,7 @@ export class LLVMCompiler {
         recvType     = unboxInstanceType(recvInstance, types.Object),
         instance     = call.base.type,
         method       = instance.type
+
     assertInstanceOf(recvValue, Buffer)
     assertInstanceOf(method, types.Function)
     // Get the object we're going to use and compile the argument values
@@ -914,10 +919,11 @@ export class LLVMCompiler {
     // Iterate over our definition and find each instance method
     var statements = klass.definition.statements
     for (var i = 0; i < statements.length; i++) {
-      var stmt = statements[i]
+      var anyStatement = statements[i]
       // Skip over non-functions
-      if (!(stmt instanceof AST.Function)) { continue }
-      var instance = stmt.type
+      if (!(anyStatement instanceof AST.Function)) { continue }
+      var stmt     = <AST.Function>anyStatement,
+          instance = stmt.type
       // Mark the type as an instance method
       var type = unboxInstanceType(instance)
       if (type.isInstanceMethod !== true) {
@@ -942,7 +948,7 @@ export class LLVMCompiler {
     // Look up the initializer determined by the typesystem
     var initializer = node.getInitializer()
     // Figure out the correct NativeFunction to use to initialize this object
-    var init = initializer['getNativeFunction']()
+    var init: NativeFunction = initializer['getNativeFunction']()
     // Compile all of the arguments down to values
     var argValues = []
     for (var i = 0; i < args.length; i++) {
@@ -960,14 +966,14 @@ export class LLVMCompiler {
     objPtr = this.ctx.builder.buildPointerCast(objPtr, LLVM.Types.pointerType(structType), '')
 
     // Call the initializer function on the object
-    var initFn = init.getPtr()
+    var initFn = init.getPtr(this.ctx)
     argValues.unshift(objPtr)
     this.ctx.builder.buildCall(initFn, argValues, '')
     // Return the pointer to the actual object
     return objPtr
   }
 
-  ifCounter: number = 1
+  private ifCounter: number = 1
 
   compileIf(node: AST.If, blockCtx: BlockContext) {
     var truthyVal = compileTruthyTest(this, blockCtx, node.cond),
@@ -1081,25 +1087,25 @@ export class LLVMCompiler {
   }
 
   compileExport(node: AST.Export, blockCtx: BlockContext) {
-    var ctx  = this.ctx,
-        path = [ctx.targetModule.getNativeName()],
+    var self = this,
+        path = [this.ctx.targetModule.getNativeName()],
         name = node.name,
         type = node.type
     // Check that we have a module to compile to
-    if (!ctx.targetModule) {
+    if (!this.ctx.targetModule) {
       throw new ICE('Missing target module')
     }
 
     function setupGlobal (name, exportName) {
-      var value = blockCtx.slots.buildGet(ctx, name),
+      var value = blockCtx.slots.buildGet(self.ctx, name),
           type  = TypeOf(value),
-          global = LLVM.Library.LLVMAddGlobal(ctx.module.ptr, type, exportName)
+          global = LLVM.Library.LLVMAddGlobal(self.ctx.module.ptr, type, exportName)
       // Set the linkage and initializer
       LLVM.Library.LLVMSetLinkage(global, LLVM.Library.LLVMExternalLinkage)
       var initialNull = LLVM.Library.LLVMConstPointerNull(type)
       LLVM.Library.LLVMSetInitializer(global, initialNull)
       // Store the value in the global
-      ctx.builder.buildStore(value, global, '')
+      self.ctx.builder.buildStore(value, global, '')
       return global
     }
     var exportableTypes = [types.Function, types.String]
@@ -1164,7 +1170,7 @@ function buildPointerCastIfNecessary (ctx, value, desiredType) {
   return value
 }
 
-function bitcodeFileForSourceFile (path) {
+function bitcodeFileForSourceFile (path: string): string {
   var outFile = path.replace(/\.hb$/i, '.bc')
   if (outFile === path) {
     throw new ICE('Couldn\'t compute path for module output file')
@@ -1175,19 +1181,20 @@ function bitcodeFileForSourceFile (path) {
 // Recursively predefine types that need definition before compilation can
 // begin properly. Right now this only deals with on anonymous functions.
 // TODO: Make this properly recurse.
-function predefineTypes (ctx, block) {
+function predefineTypes (ctx: Context, block: AST.Block) {
   block.statements.forEach(function (stmt) {
     switch (stmt.constructor) {
       case AST.Assignment:
-        if (stmt.type !== 'var' && stmt.type !== 'let') {
+        var assg = <AST.Assignment>stmt
+        if (assg.type !== 'var' && assg.type !== 'let') {
           return
         }
-        if (stmt.rvalue.type instanceof AST.Function) {
-          var rvalueInstanceType = stmt.rvalue.type,
+        if (assg.rvalue.type instanceof AST.Function) {
+          var rvalueInstanceType = assg.rvalue.type,
               rvalueType         = unboxInstanceType(rvalueInstanceType)
           // If the native function hasn't been typed
           if (!rvalueType.hasNativeFunction()) {
-            var fn = getAnonymousNativeFunction(ctx, stmt.rvalue)
+            var fn = getAnonymousNativeFunction(ctx, assg.rvalue)
             fn.computeType()
           }
         }
@@ -1198,7 +1205,7 @@ function predefineTypes (ctx, block) {
 
 var nativeFunctionCounter = 1
 
-function getAnonymousNativeFunction (ctx: Context, node: AST.Function) {
+function getAnonymousNativeFunction (ctx: Context, node: AST.Function): NativeFunction {
   if (node.name) {
     throw new ICE('Trying to set up named function as anonymous native function')
   }
