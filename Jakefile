@@ -176,7 +176,7 @@ namespace('typescript', function () {
       ignoreInitial: true
     })
     function changed (path) {
-      jake.Task['ts:compile'].execute()
+      jake.Task['typescript:compile'].execute()
     }
     watcher.on('add', changed).on('change', changed)
     watcher.on('ready', function () {
@@ -185,9 +185,9 @@ namespace('typescript', function () {
   })
 })
 
-//watchTask(['ts:compile'], function () {
-//  this.watchFiles.include('./src/**/*.ts')
-//})
+// watchTask(['typescript:compile'], function () {
+//   this.watchFiles.include('./src/**/*.ts')
+// })
 
 // vim: filetype=javascript
 
