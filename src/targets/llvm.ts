@@ -807,9 +807,8 @@ export class LLVMCompiler {
           booleanValue = true
         } else if (literal.value === 'false') {
           booleanValue = false
-        }
-        if (booleanValue === null) {
-          throw new ICE('Unexpected null value when compiling boolean Literal')
+        } else {
+          throw new ICE("Unexpected value when compiling boolean literal: '"+literal.value+"'")
         }
         return LLVM.Library.LLVMConstInt(Int1Type, booleanValue ? 1 : 0, '')
       default:
