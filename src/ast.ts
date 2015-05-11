@@ -448,7 +448,7 @@ export class Identifier extends Node {
 
 
 export class Call extends Node {
-  base:     any
+  base:     Identifier
   args:     any
   parent:   any
   type:     any
@@ -459,7 +459,7 @@ export class Call extends Node {
     this.base   = base
     this.args   = callArgs
     this.parent = null
-    assertPropertyIsInstanceOf(this, 'base', Node)
+    assertPropertyIsInstanceOf(this, 'base', Identifier)
     assertPropertyIsInstanceOf(this, 'args', Array)
   }
   toString() {

@@ -626,29 +626,28 @@ export class LLVMCompiler {
       }
     }
 
+    var retCtx: ExprContext
+    // Set up the expression context for compiling the base
     if (parent === null) {
       // Make sure we have a real Identifier to start off with
       assertInstanceOf(call.base, AST.Identifier)
-      var retCtx: any = {}
-      this.compileExpression(call.base, blockCtx, retCtx)
-      type  = retCtx.type
-      value = retCtx.value
-
+      retCtx = {}
     } else {
       var baseType  = exprCtx.type,
           baseValue = exprCtx.value
-      var retCtx: any = {type: baseType, value: baseValue}
-      this.compileExpression(call.base, blockCtx, retCtx)
-      type  = retCtx.type
-      value = retCtx.value
+      retCtx = {type: baseType, value: baseValue}
     }
-    var ctx       = this.ctx,
-        funcType  = unboxInstanceType(type, types.Function),
+    // Compile the base with the expression context
+    this.compileExpression(call.base, blockCtx, retCtx)
+    type  = retCtx.type
+    value = retCtx.value
+    // Pull out the function and compute the arguments
+    var funcType  = unboxInstanceType(type, types.Function),
         argValues = call.args.map(function (arg) {
           return self.compileExpression(arg, blockCtx)
         })
     // Build return call and update the context to return
-    var retValue = ctx.builder.buildCall(value, argValues, '')
+    var retValue = this.ctx.builder.buildCall(value, argValues, '')
     tryUpdatingExpressionContext(exprCtx, call.type, retValue)
     return retValue
   }
