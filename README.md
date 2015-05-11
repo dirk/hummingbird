@@ -31,8 +31,9 @@ cd hummingbird
 npm install
 # We're actively transitioning to TypeScript, so right now you'll need to
 # call the `compile` or `watch` tasks to compile the sources to JavaScript.
-npm install -g jake
-jake # Default task, calls ts:compile
+# nb. We use a custom invocation script for Jake that exposes the V8
+#     garbage collector.
+./jake # Default task, calls ts:compile
 # Run the command-line tool with no arguments to see the options
 bin/hb
 # To see the parsed and type-checked AST of a file
@@ -74,7 +75,7 @@ The LLVM-based native compiler is still in its pre-alpha stages and should be co
 brew install bdw-gc
 # Call the Jake default task if you haven't already to build the
 # standard library "extension" objects
-jake
+./jake
 # Then call the native compiler with a source file
 bin/hbn examples/simple.hb
 # And run the compiled binary

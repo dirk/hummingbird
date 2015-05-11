@@ -9,6 +9,11 @@ var paths = {
   stdObjs: 'lib/*.o'
 }
 
+if (!global.gc) {
+  console.log('Missing Node GC API, please run via `'+chalk.green('./jake')+'`')
+  process.exit(1)
+}
+
 function exec (cmd, opts) {
   // console.log(cmd)
   child_process.execSync(cmd)
@@ -93,6 +98,12 @@ namespace('ts', function () {
         console.log("Failed to compile file '"+chalk.red(fileName)+"'")
       }
     })
+    // Null out our variables
+    program = null
+    files   = null
+    // Call the GC
+    global.gc()
+    // And print timing information
     var totalSeconds = (new Date() - compileStart) / 1000,
         formattedSeconds = Math.round(totalSeconds * 100) / 100;
     console.log('Finished in '+chalk.magenta(formattedSeconds+' s'))
