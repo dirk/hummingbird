@@ -5,6 +5,7 @@ import types  = require('../types')
 
 import nativeTypes    = require('./llvm/native-types')
 import NativeFunction = require('./llvm/native-function')
+import util           = require('./llvm/util')
 
 var _            = require('lodash'),
     Scope        = scope.Scope,
@@ -16,15 +17,15 @@ var _            = require('lodash'),
     ICE          = errors.InternalCompilerError,
     // Target information and setup
     target       = require('./llvm/target'),
-    util         = require('./llvm/util'),
-    BinaryOps    = require('./llvm/binary-ops')
+    BinaryOps    = require('./llvm/binary-ops'),
+    NativeObject = require('./llvm/native-object')
 
 var isLastInstructionTerminator = util.isLastInstructionTerminator,
     compileTruthyTest           = util.compileTruthyTest,
     assertInstanceOf            = util.assertInstanceOf
 
-var NativeObject      = require('./llvm/native-object'),
-    nativeTypeForType = nativeTypes.nativeTypeForType
+const nativeTypeForType = nativeTypes.nativeTypeForType
+const ObjectPrefix = types.Object.prototype['getNativePrefix']()
 
 // Unbox the slots module
 var Slots         = slots.Slots,
@@ -47,7 +48,6 @@ var TypeOf            = LLVM.Library.LLVMTypeOf,
     PrintTypeToString = LLVM.Library.LLVMPrintTypeToString,
     GetParam          = LLVM.Library.LLVMGetParam,
     PointerTypeKind   = GetTypeKind(Int8PtrType)
-
 
 class Context {
   // Externally linked functions
@@ -312,6 +312,8 @@ export class LLVMCompiler {
       return this.compileClass(<AST.Class>stmt, blockCtx)
     case AST.Return:
       return this.compileReturn(<AST.Return>stmt, blockCtx)
+    case AST.If:
+      return this.compileIf(<AST.If>stmt, blockCtx)
     default:
       var ExpressionStatements: any[] = [
         AST.Call,
@@ -835,7 +837,7 @@ export class LLVMCompiler {
       var shimNativeObject = {
         type: type,
         defined: true,
-        internalName: 'T'+klass.name
+        internalName: ObjectPrefix+klass.name
       }
       this.compileClassInstanceMethods(klass, blockCtx, shimNativeObject)
       return

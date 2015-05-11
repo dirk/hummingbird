@@ -58,4 +58,5 @@ types.Module.prototype['getNativeName'] = function () {
 }
 types.String.prototype['getNativePrefix']   = function () { return 'S' }
 types.Function.prototype['getNativePrefix'] = function () { return 'F' }
+types.Object.prototype['getNativePrefix']   = function () { return 'T' }
 
