@@ -24,7 +24,7 @@ function formatSeconds (duration) {
 }
 
 desc('Default build actions')
-task('default', ['native:build', 'typescript:compile'])
+task('default', ['grammar', 'typescript:compile', 'native:build'])
 
 desc('Compile everything possible')
 task('all', ['default', 'specification'])
