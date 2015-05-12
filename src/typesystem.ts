@@ -44,7 +44,8 @@ class TypeSystem {
   visitExport:            (node: AST.Export,     scope: scope.Scope, parentNode: AST.Node) => void
   visitClass:             (node: AST.Class,      scope: scope.Scope) => void
   visitClassDefinition:   (node: AST.Block,      scope: scope.Scope, klass: types.Object) => void
-  visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object) => void
+  visitClassFunction:     (node: AST.Function,   scope: scope.Scope, klass: types.Object, searchInParent: Function) => void
+  visitClassMulti:        (node: AST.Multi,      scope: scope.Scope, klass: types.Object) => void
   visitFor:               (node: AST.For,        scope: scope.Scope) => void
   visitIf:                (node: AST.If,         scope: scope.Scope) => void
   visitWhile:             (node: AST.While,      scope: scope.Scope) => void
@@ -60,7 +61,7 @@ class TypeSystem {
   visitFunction:          (node: AST.Function,   parentScope: scope.Scope, immediate: any) => void
   visitMultiFunction:     (node: AST.Function,   scope: scope.Scope, multiNode: AST.Multi) => void
   visitNamedFunction:     (node: AST.Function,   scope: scope.Scope) => void
-  visitFunctionStatement: (node: AST.Function,   scope: scope.Scope, searchInParent: any) => void
+  visitFunctionStatement: (node: AST.Function,   scope: scope.Scope, searchInParent: Function) => void
   visitIdentifier:        (node: AST.Identifier, scope: scope.Scope) => void
   visitProperty:          (node: AST.Property,   scope: scope.Scope, parentNode: AST.Node) => void
   visitCall:              (node: AST.Call,       scope: scope.Scope) => void
@@ -132,6 +133,23 @@ TypeSystem.prototype.visitBlock = function (node: AST.Block, scope) {
   })
 }
 
+function createSearchInParent (parentNode: any) {
+  return function (cb: (stmt: AST.Node) => boolean): AST.Node {
+    var statements = parentNode.statements,
+        found      = null
+    // Call `cb` on each statement of the parent until it returns true
+    for (var i = statements.length - 1; i >= 0; i--) {
+      var stmt = statements[i],
+          ret  = cb(stmt)
+      if (ret === true) {
+        found = stmt
+        break
+      }
+    }
+    return found
+  }// return function
+}// createSearchInParent
+
 TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
   switch (node.constructor) {
     case AST.Assignment:
@@ -175,21 +193,7 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
       // TODO: Maybe just pass along the parent node rather than generating
       //       a whole new anonymous function every time we encounter a
       //       function statement?
-      var searchInParent = function (cb) {
-        var statements = parentNode.statements,
-            found      = null
-        // Call `cb` on each statement of the parent until it returns true
-        for (var i = statements.length - 1; i >= 0; i--) {
-          var stmt = statements[i],
-              ret  = cb(stmt)
-          if (ret === true) {
-            found = stmt
-            break
-          }
-        }
-        return found
-      }
-      this.visitFunctionStatement(node, scope, searchInParent)
+      this.visitFunctionStatement(node, scope, createSearchInParent(parentNode))
       break
     case AST.Class:
       this.visitClass(node, scope)
@@ -354,7 +358,7 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
         }
         break
       case AST.Function:
-        self.visitClassFunction(stmt, scope, klass)
+        self.visitClassFunction(stmt, scope, klass, createSearchInParent(node))
         break
       case AST.Init:
         var initType  = new types.Function(self.rootObject),
@@ -376,6 +380,9 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
         klass.addInitializer(initType)
         stmt.type = initType
         break
+      case AST.Multi:
+        self.visitClassMulti(stmt, scope, klass)
+        break
       default:
         throw new TypeError("Don't know how to visit '"+stmt.constructor.name+"' in class definition")
         break
@@ -383,13 +390,39 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
   })
 }
 
-TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
+TypeSystem.prototype.visitClassFunction = function (node, scope, klass, searchInParent) {
   var self         = this,
       functionName = node.name
   // Check that it's a function statement (ie. has a name)
   if (!functionName) {
     throw new TypeError('Missing function name', node)
   }
+  
+  // Now look up the parent `multi` in the containing block
+  var multiNode: AST.Multi = searchInParent(function (stmt) {
+    if (stmt.constructor === AST.Multi && stmt.name === functionName) {
+      return true
+    }
+    return false
+  })
+  if (multiNode !== null) {
+    var multiType: types.Multi = multiNode.type
+    // Add this implementation to its list of functions and set the parent of
+    // the function so that it knows not to codegen itself
+    multiType.addFunctionNode(node)
+    node.setParentMultiType(multiNode.type)
+
+    // Fill out any missing types
+    for (var i = 0; i < node.args.length; i++) {
+      var arg = node.args[i]
+      // Type is specified so we don't need to worry about it
+      if (arg.type) { continue }
+      // Set the argument's type to the multi argument's type
+      arg.type = multiNode.args[i].type
+    }
+    // throw new TypeError('Compilation of multi functions in classes not yet implemented')
+  }
+
   // Run the generic visitor to figure out argument and return types
   this.visitFunction(node, scope, function (functionType, functionScope) {
     assertInstanceOf(functionScope, ClosingScope, "Function's scope must be a ClosingScope")
@@ -398,14 +431,30 @@ TypeSystem.prototype.visitClassFunction = function (node, scope, klass) {
   var functionInstance = node.type
   // Unbox the instance generated by the visitor to get the pure
   // function type
-  var functionType = functionInstance.type
+  var functionType: types.Function = functionInstance.type
   // Let the function type know that it's an instance method (used by the compiler)
   functionType.isInstanceMethod = true
-  // Add that function type as a property of the class
-  // TODO: Maybe have a separate dictionary for instance methods
-  klass.setTypeOfProperty(functionName, functionType)
+
+  if (multiNode === null) {
+    // Add that function type as a property of the class
+    // TODO: Maybe have a separate dictionary for instance methods
+    klass.setTypeOfProperty(functionName, functionType)
+  } else {
+    node.setParentMultiType(multiType)
+  }
 }
 
+TypeSystem.prototype.visitClassMulti = function (node: AST.Multi, thisScope, klass) {
+  var emptyScope = new Scope(null)
+  this.visitMulti(node, emptyScope)
+  // Set up the multi on the class
+  var multiType: types.Multi = node.type,
+      multiName              = node.name
+  // Add the multi as property of the class
+  klass.setTypeOfProperty(multiName, multiType)
+  // And let the type know it's an instance method
+  multiType.isInstanceMethod = true
+}
 
 TypeSystem.prototype.visitFor = function (node: AST.For, scope) {
   this.visitStatement(node.init, scope)

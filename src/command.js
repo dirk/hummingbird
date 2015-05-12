@@ -121,6 +121,10 @@ function compileFile (args) {
   return file
 }
 
+// Load the JavaScript compile target and print the compiled source
+var javascript = require('./targets/javascript'),
+    jsCompiler = new javascript.JSCompiler()
+
 var commands = {
   inspect: function (args) {
     var file = compileFile(args)
@@ -133,10 +137,7 @@ var commands = {
     if (file.tree.imports.length === 0) {
       targetOpts.single = true
     }
-    // Load the JavaScript compile target and print the compiled source
-    var javascript = require('./targets/javascript'),
-        compiler   = new javascript.JSCompiler(),
-        compiled   = compiler.compileRoot(file.tree, targetOpts)
+    var compiled = jsCompiler.compileRoot(file.tree, targetOpts)
     process.stdout.write(compiled)
     // Check whether we should also print the source-map
     var includeMap = argv.map
@@ -152,7 +153,7 @@ var commands = {
     // Load the vm module and JavaScript target compiler
     var vm = require('vm')
     // Compile the whole file into a bundle to run
-    var compiledSource = file.tree.compile()
+    var compiledSource = jsCompiler.compileRoot(file.tree, targetOpts)
     // Expose "require(...)" to the script
     global.require = require;
     // Run the compiled source in the VM

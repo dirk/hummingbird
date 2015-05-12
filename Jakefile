@@ -1,4 +1,5 @@
 var fs       = require('fs'),
+    path     = require('path'),
     util     = require('util'),
     child_process = require('child_process'),
     glob     = require('glob'),
@@ -19,25 +20,95 @@ function exec (cmd, opts) {
   child_process.execSync(cmd)
 }
 
-desc('Build the standard library')
-file('lib/std.o', ['ext/std.c'], function () {
-  var outfile = this.name,
-      infile  = this.prereqs[0]
-  exec("clang -c "+infile+" -o "+outfile)
-  console.log("Compiled file '"+chalk.cyan(infile)+"'")
+function formatSeconds (duration) {
+  var totalSeconds = duration / 1000;
+  return Math.round(totalSeconds * 100) / 100
+}
+
+desc('Default build actions')
+task('default', ['grammar', 'typescript:compile', 'native:build'])
+
+desc('Compile everything possible')
+task('all', ['default', 'specification'])
+
+
+// Grammar -------------------------------------------------------------------
+
+desc('Build parser from grammar')
+task('grammar', ['src/grammar.js'])
+
+file('src/grammar.js', ['src/grammar.pegjs'], function () {
+  var start  = new Date(),
+      infile = this.prereqs[0]
+  exec('node_modules/.bin/pegjs --cache '+infile)
+  console.log('Grammar generated in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
-desc('Clean standard library build artifacts')
-task('clean', function () {
-  var files = glob.sync(paths.stdObjs)
+
+// Specification -------------------------------------------------------------
+
+desc('Generate specification tests')
+task('specification', function () {
+  var start        = new Date(),
+      parseSpec    = require('./src/spec-parser').parseSpecification
+      specSource   = fs.readFileSync(__dirname+'/doc/specification.md').toString(),
+      runnerSource = fs.readFileSync(__dirname+'/share/spec-runner.js').toString(),
+      specs        = parseSpec(specSource),
+      specTestDir  = __dirname+'/test/spec'
+
+  // Remove old specification files
+  var files   = fs.readdirSync(specTestDir),
+      removed = 0
   for (var i = 0; i < files.length; i++) {
-    var file = files[i]
-    fs.unlinkSync(file)
+    var f = path.join(specTestDir, files[i])
+    if (!/\.js$/.test(f) && !/\.hb$/.test(f)) { continue }
+    fs.unlinkSync(f)
+    removed += 1
   }
+  console.log('Removed '+chalk.magenta(removed)+' old specification files')
+
+  // Now generate the specs
+  for (var i = specs.length - 1; i >= 0; i--) {
+    var spec = specs[i]
+
+    var js = spec.js+"\n",
+        hb = spec.hb+"\n"
+    fs.writeFileSync(specTestDir+'/source-'+spec.name+'.js', js)
+    fs.writeFileSync(specTestDir+'/source-'+spec.name+'.hb', hb)
+
+    var runner = runnerSource.replace(/NAME/g, spec.name)
+    fs.writeFileSync(specTestDir+'/test-'+spec.name+'.js', runner)
+    
+    console.log("Generated tests for '"+chalk.cyan(spec.name)+"'")
+  }
+  console.log('Specification tests generated in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
-desc('Default building actions')
-task('default', ['lib/std.o', 'ts:compile'])
+
+// Native LLVM target --------------------------------------------------------
+
+namespace('native', function () {
+  desc('Build the standard library')
+  task('build', ['lib/std.o'])
+
+  file('lib/std.o', ['ext/std.c'], function () {
+    var start   = new Date(),
+        outfile = this.name,
+        infile  = this.prereqs[0]
+    exec("clang -c "+infile+" -o "+outfile)
+    console.log('Native library compiled in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
+  })
+
+  desc('Clean build artifacts')
+  task('clean', function () {
+    var files = glob.sync(paths.stdObjs)
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i]
+      fs.unlinkSync(file)
+    }
+  })
+})
+
 
 // TypeScript ----------------------------------------------------------------
 
@@ -58,7 +129,7 @@ function isDefinition (fileName) {
   return /\.d\.ts$/.test(fileName)
 }
 
-namespace('ts', function () {
+namespace('typescript', function () {
   desc('Compile TypeScript source')
   task('compile', function () {
     var compileStart = new Date(),
@@ -94,7 +165,6 @@ namespace('ts', function () {
         var durationMs = (new Date() - start)
         console.log("Compiled file '"+chalk.cyan(fileName)+"' in "+chalk.magenta(durationMs+' ms'))
       } else {
-        // TODO: Make the message red
         console.log("Failed to compile file '"+chalk.red(fileName)+"'")
       }
     })
@@ -104,9 +174,7 @@ namespace('ts', function () {
     // Call the GC
     global.gc()
     // And print timing information
-    var totalSeconds = (new Date() - compileStart) / 1000,
-        formattedSeconds = Math.round(totalSeconds * 100) / 100;
-    console.log('Finished in '+chalk.magenta(formattedSeconds+' s'))
+    console.log('Finished in '+chalk.magenta(formatSeconds(new Date() - compileStart)+' s'))
   })
 
   desc('Watch for changes')
@@ -116,7 +184,7 @@ namespace('ts', function () {
       ignoreInitial: true
     })
     function changed (path) {
-      jake.Task['ts:compile'].execute()
+      jake.Task['typescript:compile'].execute()
     }
     watcher.on('add', changed).on('change', changed)
     watcher.on('ready', function () {
@@ -125,9 +193,9 @@ namespace('ts', function () {
   })
 })
 
-//watchTask(['ts:compile'], function () {
-//  this.watchFiles.include('./src/**/*.ts')
-//})
+// watchTask(['typescript:compile'], function () {
+//   this.watchFiles.include('./src/**/*.ts')
+// })
 
 // vim: filetype=javascript
 

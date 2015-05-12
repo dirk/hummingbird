@@ -18,13 +18,11 @@ before_script:
   # Add LLVM shared library
   - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.5/lib:$LD_LIBRARY_PATH"
   # Setup library for development building
-  - "./jake default ts:compile"
-  - "npm run grammar"
-  - "npm run gen-spec"
+  - "./jake all"
 script:
-  - "npm run test"
-  - "npm run test-spec"
-  - "npm run test-llvm"
+  - "node_modules/.bin/mocha test"
+  - "node_modules/.bin/mocha test/spec"
+  - "node_modules/.bin/mocha test/llvm"
 after_script:
   - "npm run report-coverage"
 
