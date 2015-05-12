@@ -10,19 +10,24 @@ var VoidType    = LLVM.Types.VoidType,
 // Global external linkages
 var putsType = new LLVM.FunctionType(Int32Type, [Int8PtrType], false)
 
+// Sets up external "linkages"
 // ctx:  Compilation context object
 // root: AST.Root node
 function compile (ctx, mainEntry, root) {
-  // Setup our external "linkages"
-  ctx.extern.puts = ctx.module.addFunction('puts', putsType)
-
   var topLevelScope = root.scope,
       rootScope     = topLevelScope.parent
-  
-  // External linkages for GC ------------------------------------------------
+
+  // Functions required for main runtime -------------------------------------
+
+  if (ctx.isMain === true) {
+    // External linkages for GC
+    ctx.extern.GC_init   = NativeFunction.addExternalFunction(ctx, 'GC_init', VoidType, [])
+  }
+
+  // General garbage collection functions -----------------------------------
+
   var sizeTType = Int32Type
   ctx.extern.GC_malloc = NativeFunction.addExternalFunction(ctx, 'GC_malloc', Int8PtrType, [sizeTType])
-  ctx.extern.GC_init   = NativeFunction.addExternalFunction(ctx, 'GC_init', VoidType, [])
 
 
   // Builtin functions -------------------------------------------------------
@@ -67,8 +72,11 @@ function compile (ctx, mainEntry, root) {
   ctx.globalSlots.buildDefine(ctx, 'console', LLVM.Types.pointerType(consoleObject.structType))
   // ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
 
-  var stringModule = rootScope.getLocal('std').getChild('core').getChild('types').getChild('string'),
-      StringType   = rootScope.getLocal('String')
+  var typesModule   = rootScope.getLocal('std').getChild('core').getChild('types'),
+      stringModule  = typesModule.getChild('string'),
+      integerModule = typesModule.getChild('integer'),
+      StringType    = rootScope.getLocal('String'),
+      IntegerType   = rootScope.getLocal('Integer')
   
   var uppercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fuppercase', [StringType], StringType)
   uppercase.defineExternal(ctx)
@@ -77,6 +85,10 @@ function compile (ctx, mainEntry, root) {
   var lowercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Flowercase', [StringType], StringType)
   lowercase.defineExternal(ctx)
   stringModule.getTypeOfProperty('lowercase').setNativeFunction(lowercase)
+
+  var integerToString = new NativeFunction('Mstd_Mcore_Mtypes_Minteger_FtoString', [IntegerType], StringType)
+  integerToString.defineExternal(ctx)
+  integerModule.getTypeOfProperty('toString').setNativeFunction(integerToString)
 }
 
 module.exports = {

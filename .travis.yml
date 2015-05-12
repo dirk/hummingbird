@@ -1,6 +1,7 @@
 language: node_js
 node_js:
   - "0.12"
+  - "iojs"
   - "iojs-v1.0.4"
 before_install:
   # Setup sources and keys for LLVM
@@ -17,7 +18,7 @@ before_script:
   # Add LLVM shared library
   - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.5/lib:$LD_LIBRARY_PATH"
   # Setup library for development building
-  - "node_modules/.bin/jake all"
+  - "./jake all"
 script:
   - "node_modules/.bin/mocha test"
   - "node_modules/.bin/mocha test/spec"

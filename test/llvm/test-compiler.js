@@ -40,15 +40,7 @@ describe('LLVM compiler', function () {
   describe('given a trivial program', function () {
     var source = "var a = \"1\"\n"+
                  "console.log(a)";
-    it('should compile', function () {
-      buildSource(source)
-    })
-    it('should run', function () {
-      fs.chmodSync(BinFile, '755')
-      var result = runBinary(),
-          out    = result.toString()
-      expect(out.trim()).to.eql('1')
-    })
+    testCompileAndRun(source, '1')
   })
 
   describe('given a class', function () {
@@ -78,6 +70,14 @@ describe('LLVM compiler', function () {
                  "var a = new A()\n"+
                  "console.log(a.b)"
     testCompileAndRun(source, "c")
+  })
+
+  describe("given an if condition", function () {
+    var source = "var a = 1\n"+
+                 "if a {\n"+
+                 "  console.log(\"b\")\n"+
+                 "}\n"
+    testCompileAndRun(source, 'b')
   })
 })
 

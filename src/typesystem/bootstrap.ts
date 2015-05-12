@@ -55,6 +55,7 @@ module.exports = function (TypeSystem) {
     core.addChild(typs)
 
     this.bootstrapStdCoreTypesString(typs)
+    this.bootstrapStdCoreTypesInteger(typs)
   }
 
   TypeSystem.prototype.addInstanceMethodAndShim = function (module: types.Module, receiverType, methodName: string, returnType) {
@@ -73,16 +74,18 @@ module.exports = function (TypeSystem) {
     typs.addChild(stringModule)
 
     // Add function to module and the String type
-    /*
-    var uppercase = new types.Function(this.rootObject, [this.root.getLocal('String')], this.root.getLocal('String'))
-    stringModule.setTypeOfProperty('uppercase', uppercase)
-    var uppercaseMethod = new types.Function(this.rootObject, [], this.root.getLocal('String'))
-    uppercaseMethod.isInstanceMethod = true
-    uppercaseMethod.shimFor          = uppercase
-    StringType.setTypeOfProperty('uppercase', uppercaseMethod)
-    */
     this.addInstanceMethodAndShim(stringModule, StringType, 'uppercase', StringType)
     this.addInstanceMethodAndShim(stringModule, StringType, 'lowercase', StringType)
+  }
+
+  TypeSystem.prototype.bootstrapStdCoreTypesInteger = function (typs) {
+    var integerModule = new types.Module('integer'),
+        IntegerType   = this.root.getLocal('Integer'),
+        StringType    = this.root.getLocal('String')
+    integerModule.setParent(typs)
+    typs.addChild(integerModule)
+
+    this.addInstanceMethodAndShim(integerModule, IntegerType, 'toString', StringType)
   }
 
 }// module.exports

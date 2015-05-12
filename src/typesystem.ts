@@ -291,15 +291,30 @@ TypeSystem.prototype.visitExport = function (node: AST.Export, scope, parentNode
 
 
 TypeSystem.prototype.visitClass = function (node: AST.Class, scope) {
-  var rootObject = this.rootObject
+  var rootObject = this.rootObject,
+      name       = node.name,
+      classScope = new Scope(scope),
+      klass      = null
+  // Look for a class to extend first
+  var foundClass = false
+  try {
+    foundClass = scope.get(name)
+  } catch (err) { /* pass */ }
+  // If we found a class then go ahead and try to extend it
+  if (foundClass !== false) {
+    klass = foundClass
+    // Visit the extending definition and then return
+    this.visitClassDefinition(node.definition, classScope, klass)
+    node.type = klass
+    return
+  }
   // Create a new Object type with the root object as the supertype
-  var klass = new types.Object(rootObject)
-  klass.name = node.name
+  klass = new types.Object(rootObject)
+  klass.name = name
   klass.intrinsic = false
   scope.setLocal(klass.name, klass)
   scope.setFlagsForLocal(klass.name, Scope.Flags.Constant)
   // Now create a new scope and visit the definition in that scope
-  var classScope = new Scope(scope)
   this.visitClassDefinition(node.definition, classScope, klass)
   // Set the class as the node's type
   node.type = klass

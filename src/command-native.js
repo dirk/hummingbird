@@ -10,7 +10,7 @@ var fs            = require('fs'),
 
 // Load source map support and LLVM target
 require('source-map-support').install()
-require('./targets/llvm')
+var LLVMCompiler = require('./targets/llvm').LLVMCompiler
 
 // Command-line arguments ----------------------------------------------------
 
@@ -35,8 +35,10 @@ var Opts = {
   outFile:     hasArg('o') ? getArg('o') : 'a.out',
   verbose:     hasArg('v'),
   veryVerbose: hasArg('vv'),
-  gc:          getArg('gc')
+  gc:          getArg('gc'),
+  dump:        (argv.dump === true ? true : false)
 }
+
 
 // Logging -------------------------------------------------------------------
 
@@ -110,8 +112,9 @@ try {
   process.exit(1)
 }
 
-var outputs = []
-tree.emitToFile({logger: logger, outputs: outputs})
+var outputs  = [],
+    compiler = new LLVMCompiler()
+compiler.emitToFile(tree, {logger: logger, outputs: outputs, dump: Opts.dump})
 
 function objectFileForBitcodeFile (path) {
   return path.replace(/\.bc$/, '.o')
