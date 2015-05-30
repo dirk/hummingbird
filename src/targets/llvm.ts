@@ -4,6 +4,7 @@ import scope  = require('../typesystem/scope')
 import types  = require('../types')
 
 import BinaryOps      = require('./llvm/binary-ops')
+import Builtins       = require('./llvm/builtins')
 import nativeTypes    = require('./llvm/native-types')
 import NativeFunction = require('./llvm/native-function')
 import slots          = require('./llvm/slots')
@@ -13,7 +14,6 @@ var _            = require('lodash'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
     LLVM         = require('./llvm/library'),
-    Builtins     = require('./llvm/builtins'),
     TypeError    = errors.TypeError,
     ICE          = errors.InternalCompilerError,
     // Target information and setup
