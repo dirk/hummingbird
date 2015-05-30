@@ -3,6 +3,7 @@ import errors = require('../errors')
 import scope  = require('../typesystem/scope')
 import types  = require('../types')
 
+import BinaryOps      = require('./llvm/binary-ops')
 import nativeTypes    = require('./llvm/native-types')
 import NativeFunction = require('./llvm/native-function')
 import slots          = require('./llvm/slots')
@@ -17,7 +18,6 @@ var _            = require('lodash'),
     ICE          = errors.InternalCompilerError,
     // Target information and setup
     target       = require('./llvm/target'),
-    BinaryOps    = require('./llvm/binary-ops'),
     NativeObject = require('./llvm/native-object')
 
 var isLastInstructionTerminator = util.isLastInstructionTerminator,
