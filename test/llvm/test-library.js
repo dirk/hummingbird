@@ -8,7 +8,7 @@ var LLVM   = require('../../src/targets/llvm/library'),
 
 describe('LLVM library', function () {
   describe('target information', function () {
-    var ctx
+    var ctx;
     it('should set up a module', function () {
       ctx = {
         module: {ptr: LLVM.Library.LLVMModuleCreateWithName('test')},
@@ -23,6 +23,10 @@ describe('LLVM library', function () {
       var td = ctx.targetData
       expect(td).to.be.a(Buffer)
       expect(td.isNull()).to.be(false)
+
+      var ts = LLVM.Library.LLVMCopyStringRepOfTargetData(td)
+      expect(ts).to.be.a('string')
+      expect(ts.length).to.be.greaterThan(0)
     })
   })
 })
