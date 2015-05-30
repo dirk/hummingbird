@@ -48,7 +48,7 @@ class NativeFunction {
     this.type = new LLVM.FunctionType(ret, args, false)
   }
 
-  defineExternal() {
+  defineExternal(ctx: any) {
     var self = this
     if (this.defined) {
       throw new ICE('Cannot redefine external function')
