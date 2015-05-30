@@ -22,7 +22,7 @@ function typeCompiled (type) {
   return false
 }
 
-class Slots {
+export class Slots {
   slots: any
   slotsTypes: any
   // Queue of slots to be built once type has become available. Items
@@ -115,7 +115,7 @@ class Slots {
   }
 }
 
-class ConstantSlots {
+export class ConstantSlots {
   slots: any
   constructor() {
     this.slots = {}
@@ -139,7 +139,7 @@ class ConstantSlots {
   }
 }
 
-class GlobalSlots {
+export class GlobalSlots {
   slots: any
   constructor() {
     this.slots = {}
@@ -166,11 +166,5 @@ class GlobalSlots {
         ptr    = ctx.builder.buildGEP(global, [Int32Zero], name)
     return ctx.builder.buildLoad(ptr, name) 
   }
-}
-
-module.exports = {
-  Slots: Slots,
-  ConstantSlots: ConstantSlots,
-  GlobalSlots:   GlobalSlots
 }
 
