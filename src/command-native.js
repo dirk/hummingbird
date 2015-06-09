@@ -128,7 +128,7 @@ function execSync (cmd) {
 
 // Compile using the LLVM bitcode-to-assembly/object compiler
 outputs.forEach(function (of) {
-  execSync('llc -filetype=obj '+of)
+  execSync('llc-3.6 -filetype=obj '+of)
 })
 // process.exit(0)
 
