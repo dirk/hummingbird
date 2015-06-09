@@ -126,9 +126,23 @@ function execSync (cmd) {
   execSync(cmd)
 }
 
+var llc = null
+var llcsToTry = ['llc', 'llc-3.6'];
+for (var i = 0; i < llcsToTry.length; i++) {
+  var c = llcsToTry[i],
+      s = child_process.spawnSync('which', [c]).status
+  // `which` exits with 0 status on success
+  if (s === 0) {
+    llc = c; break
+  }
+}
+if (llc === null) {
+  throw new Error('No `llc` command found')
+}
+
 // Compile using the LLVM bitcode-to-assembly/object compiler
 outputs.forEach(function (of) {
-  execSync('llc-3.6 -filetype=obj '+of)
+  execSync(llc+' -filetype=obj '+of)
 })
 // process.exit(0)
 
