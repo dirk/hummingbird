@@ -1,15 +1,17 @@
-var LLVM           = require('./library'),
-    types          = require('../../types'),
-    errors         = require('../../errors'),
-    NativeFunction = require('./native-function'),
-    ICE            = errors.InternalCompilerError
+import errors = require('../../errors')
+import types  = require('../../types')
+
+import NativeFunction = require('./native-function')
+
+var LLVM = require('./library'),
+    ICE  = errors.InternalCompilerError
 
 var Int8Type    = LLVM.Types.Int8Type,
     Int8PtrType = LLVM.Types.pointerType(LLVM.Types.Int8Type)
 
 var stdCoreTypesStringConcatFn = null
 
-function initialize (ctx, rootScope) {
+export function initialize (ctx, rootScope) {
   var StringType = rootScope.getLocal('String')
   stdCoreTypesStringConcatFn = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fconcat', [StringType, StringType], StringType)
   stdCoreTypesStringConcatFn.defineExternal(ctx)
@@ -34,7 +36,7 @@ function buildOpBuilder (opName, name) {
   }
 }
 
-function getAdditionBuilder (lt, rt) {
+function getAdditionBuilder (lt: types.Type, rt: types.Type) {
   switch (lt.constructor) {
   case types.String:
     assertRexprType(rt, types.String)
@@ -46,7 +48,7 @@ function getAdditionBuilder (lt, rt) {
   }
 }
 
-function getSubtractionBuilder (lt, rt) {
+function getSubtractionBuilder (lt: types.Type, rt: types.Type) {
   switch (lt.constructor) {
   case types.Integer:
     assertRexprType(rt, types.Integer)
@@ -54,7 +56,7 @@ function getSubtractionBuilder (lt, rt) {
   }
 }
 
-function getBuilder (op, lexprType, rexprType) {
+export function getBuilder (op: string, lexprType: types.Type, rexprType: types.Type) {
   var ret = (function () {
     switch (op) {
     case '+':
@@ -73,10 +75,5 @@ function getBuilder (op, lexprType, rexprType) {
   var l = lexprType.inspect(),
       r = rexprType.inspect()
   throw new ICE('Binary op not found: '+l+' '+op+' '+r)
-}
-
-module.exports = {
-  initialize: initialize,
-  getBuilder: getBuilder
 }
 

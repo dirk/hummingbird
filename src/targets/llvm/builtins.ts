@@ -1,6 +1,6 @@
+import NativeFunction = require('./native-function')
+
 var LLVM           = require('./library'),
-    types          = require('../../types'),
-    NativeFunction = require('./native-function'),
     NativeObject   = require('./native-object')
 
 var VoidType    = LLVM.Types.VoidType,
@@ -13,7 +13,7 @@ var putsType = new LLVM.FunctionType(Int32Type, [Int8PtrType], false)
 // Sets up external "linkages"
 // ctx:  Compilation context object
 // root: AST.Root node
-function compile (ctx, mainEntry, root) {
+export function compile (ctx, mainEntry, root) {
   var topLevelScope = root.scope,
       rootScope     = topLevelScope.parent
 
@@ -89,9 +89,5 @@ function compile (ctx, mainEntry, root) {
   var integerToString = new NativeFunction('Mstd_Mcore_Mtypes_Minteger_FtoString', [IntegerType], StringType)
   integerToString.defineExternal(ctx)
   integerModule.getTypeOfProperty('toString').setNativeFunction(integerToString)
-}
-
-module.exports = {
-  compile: compile
 }
 

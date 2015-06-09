@@ -3,21 +3,21 @@ import errors = require('../errors')
 import scope  = require('../typesystem/scope')
 import types  = require('../types')
 
+import BinaryOps      = require('./llvm/binary-ops')
+import Builtins       = require('./llvm/builtins')
 import nativeTypes    = require('./llvm/native-types')
 import NativeFunction = require('./llvm/native-function')
+import slots          = require('./llvm/slots')
 import util           = require('./llvm/util')
 
 var _            = require('lodash'),
     Scope        = scope.Scope,
     ClosingScope = scope.ClosingScope,
     LLVM         = require('./llvm/library'),
-    Builtins     = require('./llvm/builtins'),
-    slots        = require('./llvm/slots'),
     TypeError    = errors.TypeError,
     ICE          = errors.InternalCompilerError,
     // Target information and setup
     target       = require('./llvm/target'),
-    BinaryOps    = require('./llvm/binary-ops'),
     NativeObject = require('./llvm/native-object')
 
 var isLastInstructionTerminator = util.isLastInstructionTerminator,
