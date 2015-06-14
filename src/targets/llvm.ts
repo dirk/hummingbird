@@ -47,22 +47,28 @@ var TypeOf            = LLVM.Library.LLVMTypeOf,
     DumpType          = function (ty) { LLVM.Library.LLVMDumpType(ty); console.log('') },
     PrintTypeToString = LLVM.Library.LLVMPrintTypeToString,
     GetParam          = LLVM.Library.LLVMGetParam,
-    PointerTypeKind   = GetTypeKind(Int8PtrType)
+    PointerTypeKind   = GetTypeKind(Int8PtrType),
+    ConstInt          = LLVM.Library.LLVMConstInt
+
+
+interface GlobalsMap {
+  [index: string]: Buffer
+}
 
 class Context {
   // Externally linked functions
-  extern: any = {}
+  extern:       any = {}
   // Globals
-  globals = {}
-  builder: any
-  module: any
-  isMain: boolean
+  globals:      GlobalsMap = {}
+  builder:      any
+  module:       any
+  isMain:       boolean
   targetModule: any
-  dumpModule: boolean
-  logger: any
-  globalSlots: any
-  slotsMap: any
-  outputs: any
+  dumpModule:   boolean
+  logger:       any
+  globalSlots:  any
+  slotsMap:     any
+  outputs:      any
   castValuePointers: boolean
   noCastValuePointers: boolean
 
@@ -213,7 +219,7 @@ export class LLVMCompiler {
 
     // Run the optimization passes
     LLVM.Library.LLVMRunPassManager(getStaticPassManager(), ctx.module.ptr)
-   
+
     if (ctx.dumpModule) {
       ctx.module.dump()
     }
@@ -806,7 +812,7 @@ export class LLVMCompiler {
         // Build a constant with our string value and return that
         return this.ctx.builder.buildGlobalStringPtr(stringValue, '')
       case types.Integer:
-        return LLVM.Library.LLVMConstInt(Int64Type, literal.value, '')
+        return ConstInt(Int64Type, literal.value, '')
       case types.Boolean:
         var booleanValue = null
         if (literal.value === 'true') {
@@ -816,7 +822,7 @@ export class LLVMCompiler {
         } else {
           throw new ICE("Unexpected value when compiling boolean literal: '"+literal.value+"'")
         }
-        return LLVM.Library.LLVMConstInt(Int1Type, booleanValue ? 1 : 0, '')
+        return ConstInt(Int1Type, booleanValue ? 1 : 0, '')
       default:
         var name = instance.type.constructor.name
         throw new ICE('Cannot handle instance type: '+name)
@@ -915,12 +921,12 @@ export class LLVMCompiler {
       initType.setNativeFunction(fn)
     }
   }
-  compileClassInstanceMethods(klass, blockCtx, nativeObject) {
+  compileClassInstanceMethods(klass: AST.Class, blockCtx: BlockContext, nativeObject) {
     var type = klass.type
     // Iterate over our definition and find each instance method
     var statements = klass.definition.statements
     for (var i = 0; i < statements.length; i++) {
-      var anyStatement = statements[i]
+      var anyStatement: AST.Node = statements[i]
       // Skip over non-functions
       if (!(anyStatement instanceof AST.Function)) { continue }
       var stmt     = <AST.Function>anyStatement,
@@ -1146,14 +1152,14 @@ function getTypeAndSlotsForName (ctx: Context, blockCtx: BlockContext, name: str
   return [slots, type]
 }
 
-function tryUpdatingExpressionContext (exprCtx: ExprContext, type: any, value: Buffer) {
+function tryUpdatingExpressionContext (exprCtx: ExprContext, type: types.Type, value: Buffer) {
   if (!exprCtx) { return }
   exprCtx.type  = type
   exprCtx.value = value
 }
 
 
-function buildPointerCastIfNecessary (ctx, value, desiredType) {
+function buildPointerCastIfNecessary (ctx: Context, value: Buffer, desiredType: Buffer) {
   var valueType = TypeOf(value)
   // Compare the type strings
   var vts = PrintTypeToString(valueType),
