@@ -17,8 +17,8 @@ var LLVMCompiler = require('./targets/llvm').LLVMCompiler
 var optimist = require('optimist'),
     argv = optimist
     // .usage('Usage: hbn [options] [entry]')
-    .boolean('gc')
-    .default('gc', true)
+    .boolean('gc').default('gc', true)
+    .boolean('dump').default('dump', false)
     .argv
 
 function getArg (name) {
@@ -59,7 +59,8 @@ function showHelp() {
   help += "Options:\n"
   help += "  --no-gc  Don't link the GC\n"
   help += "  -v       Verbose\n"
-  help += "  -vv      Extra-verbose (overrides -v)"
+  help += "  -vv      Extra-verbose (overrides -v)\n"
+  help += "  --dump   Dump LLVM module"
   console.error(help)
 }
 if (argv._.length === 0 || argv._[0] === 'help') {
