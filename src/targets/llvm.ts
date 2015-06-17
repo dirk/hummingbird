@@ -624,6 +624,8 @@ export class LLVMCompiler {
           receiverType     = receiverInstance.type
       if (receiverType.intrinsic === true) {
         // Need to do a little bit of special handling for intrinsics
+        // TODO: Instead of checking the receiver, check the actual method
+        //       to see if it's an intrinsic instance method.
         return this.compileIntrinsicInstanceMethodCall(call, blockCtx, exprCtx)
       } else {
         // If it was an instance method then we'll go directly to that
