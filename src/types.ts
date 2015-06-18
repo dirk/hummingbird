@@ -247,7 +247,7 @@ export class Function extends Type {
   isInstanceMethod: boolean
   // If this is an intrinsic instance method shimming for a module method,
   // this points to that module method to call in place of this shim.
-  shimFor: any
+  private shimFor: any = null
 
   constructor(supertype, args?: Type[], ret?: Type) {
     super(supertype)
@@ -302,6 +302,13 @@ export class Function extends Type {
     if (this.ret === null || other.ret === null) { return this.ret === other.ret }
     // Finally compare types of their returns
     return this.ret.equals(other.ret)
+  }
+
+  isIntrinsicShim(): boolean {
+    return (this.shimFor !== null)
+  }
+  setShimForInstrinsic(instrinsicMethod: Function) {
+    this.shimFor = instrinsicMethod
   }
 }
 
