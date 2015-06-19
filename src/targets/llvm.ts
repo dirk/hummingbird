@@ -622,12 +622,11 @@ export class LLVMCompiler {
       if (!methodType.isInstanceMethod) { break }
       var receiverInstance = parent.baseType,
           receiverType     = receiverInstance.type
-      if (receiverType.intrinsic === true) {
-        // Need to do a little bit of special handling for intrinsics
+      // Check if we need to call through the instrinsic shim or can just
+      // do a regular instance method call
+      if (methodType.isIntrinsic === true) {
         return this.compileIntrinsicInstanceMethodCall(call, blockCtx, exprCtx)
       } else {
-        // If it was an instance method then we'll go directly to that
-        // compilation path
         return this.compileInstanceMethodCall(call, blockCtx, exprCtx)
       }
     }
@@ -707,15 +706,14 @@ export class LLVMCompiler {
     var self         = this,
         recvValue    = exprCtx.value,
         recvInstance = exprCtx.type,
-        recvType     = unboxInstanceType(recvInstance, types.Object),
+        recvType     = unboxInstanceType(recvInstance),
         instance     = call.base.type,
         method       = instance.type
 
     assertInstanceOf(recvValue, Buffer)
     assertInstanceOf(method, types.Function)
     // Get the object we're going to use and compile the argument values
-    var recvObj   = recvType.getNativeObject(),
-        argValues = call.args.map(function (arg) {
+    var argValues = call.args.map(function (arg) {
           return self.compileExpression(arg, blockCtx)
         })
     // Get the function to call

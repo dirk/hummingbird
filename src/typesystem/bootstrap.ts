@@ -63,7 +63,7 @@ module.exports = function (TypeSystem) {
     module.setTypeOfProperty(methodName, moduleMethod)
     var instanceMethod = new types.Function(this.rootObject, [], returnType)
     instanceMethod.isInstanceMethod = true
-    instanceMethod.shimFor          = moduleMethod
+    instanceMethod.setShimForInstrinsic(moduleMethod)
     receiverType.setTypeOfProperty(methodName, instanceMethod)
   }
 
