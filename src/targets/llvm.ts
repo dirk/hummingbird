@@ -342,7 +342,7 @@ export class LLVMCompiler {
     case AST.Identifier:
       return this.compileIdentifier(<AST.Identifier>expr, blockCtx, exprCtx)
     case AST.Literal:
-      return this.compileLiteral(<AST.Literal>expr, blockCtx)
+      return this.compileLiteral(<AST.Literal>expr, blockCtx, exprCtx)
     case AST.Function:
       return this.compileFunctionAsExpression(<AST.Function>expr, blockCtx)
     case AST.New:
@@ -802,15 +802,19 @@ export class LLVMCompiler {
     return null
   }
 
-  compileLiteral(literal: AST.Literal, blockCtx: BlockContext) {
-    var instance = literal.type
+  compileLiteral(literal: AST.Literal, blockCtx: BlockContext, exprCtx?: ExprContext) {
+    var instance = literal.type,
+        retType  = instance,
+        retValue = null
     switch (instance.type.constructor) {
       case types.String:
         var stringValue = literal.value
         // Build a constant with our string value and return that
-        return this.ctx.builder.buildGlobalStringPtr(stringValue, '')
+        retValue = this.ctx.builder.buildGlobalStringPtr(stringValue, '')
+        break
       case types.Integer:
-        return ConstInt(Int64Type, literal.value, '')
+        retValue = ConstInt(Int64Type, literal.value, '')
+        break
       case types.Boolean:
         var booleanValue = null
         if (literal.value === 'true') {
@@ -820,11 +824,14 @@ export class LLVMCompiler {
         } else {
           throw new ICE("Unexpected value when compiling boolean literal: '"+literal.value+"'")
         }
-        return ConstInt(Int1Type, booleanValue ? 1 : 0, '')
+        retValue = ConstInt(Int1Type, booleanValue ? 1 : 0, '')
+        break
       default:
         var name = instance.type.constructor.name
         throw new ICE('Cannot handle instance type: '+name)
     }
+    tryUpdatingExpressionContext(exprCtx, retType, retValue)
+    return retValue
   }
 
   compileClass(klass: AST.Class, blockCtx: BlockContext) {

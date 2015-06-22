@@ -5,3 +5,4 @@ class String {
 }
 var a = "a"
 console.log(a.identity())
+console.log("b".identity())
