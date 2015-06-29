@@ -18,7 +18,7 @@ func sayHello () -> Boolean {
 sayHello()
 ```
 
-For more examples see the [specification](doc/specification.md) and [manual](doc/Manual.md).
+For more examples see the [specification](doc/specification.md) and [manual](doc/manual.md).
 
 ## Getting started
 
