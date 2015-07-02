@@ -4,6 +4,7 @@
   "repository": "https://github.com/dirk/hummingbird",
   "dependencies": {
     "pegjs": "~0.8.0",
+    "jison": "~0.4.15",
     "optimist": "~0.6.1",
     "xregexp": "~2.0.0",
     "llvm2": "0.2.13",
@@ -26,7 +27,8 @@
     "coveralls": "~2.11.2",
     "glob": "~5.0.5",
     "chokidar": "~1.0.1",
-    "chalk": "~1.0.0"
+    "chalk": "~1.0.0",
+    "prettyjson": "~1.1.2"
   },
   "scripts": {
     "grammar": "node_modules/.bin/pegjs --cache src/grammar.pegjs",
