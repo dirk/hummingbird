@@ -254,6 +254,36 @@ export class Assignment extends Node {
   }
 }
 
+function assertInstanceOf(value, type, msg?) {
+  if (value instanceof type) { return; }
+  if (!msg) {
+    msg = 'Incorrect type; expected '+type.name+', got '+value.constructor.name
+  }
+  throw new Error(msg)
+}
+
+export function constructPath (name: Identifier, path, parent = null) {
+  assertInstanceOf(name, Identifier)
+  if (path.length == 0) {
+    return name
+  }
+
+  var first = path[0]
+  name.child = first
+  first.parent = name
+
+  for (var i = 0; i < path.length; i++) {
+    var current = path[i],
+        next    = path[i + 1]
+
+    if (next) {
+      current.child = next
+      next.parent = current
+    }
+  }
+
+  return name
+}
 
 export class Path extends Node {
   name: any
@@ -439,41 +469,80 @@ export class New extends Node {
 
 
 export class Identifier extends Node {
-  name:   any
-  parent: any
+  name:   string
+  parent: Node
+  child:  Node
   type:   any
 
   constructor(name) {
     super()
     this.name   = name
     this.parent = null
+    this.child  = null
+    if (typeof name !== 'string') {
+      throw new TypeError('Expected string as name')
+    }
   }
-  print(): void { out.write(this.toString()) }
+  print(): void {
+    if (this.parent) { out.write('.') }
+    out.write(this.toString())
+
+    if (this.child) {
+      this.child.print()
+    }
+  }
   toString(): string { return this.name }
 }
 
 
 export class Call extends Node {
-  base:     Identifier
   args:     any
-  parent:   any
+  parent:   Node
+  child:    Node
   type:     any
   baseType: any
 
-  constructor(base, callArgs) {
+  constructor(args) {
     super()
-    this.base   = base
-    this.args   = callArgs
+    this.args   = args
     this.parent = null
-    assertPropertyIsInstanceOf(this, 'base', Identifier)
+    this.child  = null
     assertPropertyIsInstanceOf(this, 'args', Array)
   }
   toString() {
     var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
-    return this.base+args
+    return args
   }
   print() {
     out.write(this.toString())
+    if (this.child) {
+      this.child.print()
+    }
+  }
+}
+
+export class Indexer extends Node {
+  expr:   any
+  parent: Node
+  child:  Node
+  type:   any
+
+  constructor(expr) {
+    super()
+    this.expr = expr
+    this.parent = null
+    assertPropertyIsInstanceOf(this, 'expr', Node)
+  }
+
+  print() {
+    out.write(this.toString())
+    if (this.child) {
+      this.child.print()
+    }
+  }
+
+  toString() {
+    return '['+this.expr.toString()+']'
   }
 }
 

@@ -47,6 +47,10 @@ module.exports = function (p) {
     return new AST.Root(statements)
   }
 
+  p.parseExpr = function (expr) {
+    return expr
+  }
+
   p.parseBinary = function (left, op, right) {
     return new AST.Binary(left, op, right)
   }
@@ -88,20 +92,26 @@ module.exports = function (p) {
     return new AST.While(cond, block)
   }
 
-  // p.parseChain = function (name, tail) {
-  //   return new AST.Chain(name, tail)
-  // }
-
   p.parseAssignment = function (path, op, expr) {
     return new AST.Assignment('path', path, op, expr)
+  }
+
+  p.parseLeft = function (name, path) {
+    return AST.constructPath(name, path)
   }
 
   p.parseReturn = function (expr) {
     return new AST.Return(expr)
   }
 
-  p.parseCall = function (base, call) {
-    return new AST.Call(base, call)
+
+
+  p.parseCallExpr = function (args) {
+    return new AST.Call(args)
+  }
+
+  p.parseCallArgs = function (args) {
+    return args
   }
 
   p.parseProperty = function (base, property) {
@@ -112,13 +122,18 @@ module.exports = function (p) {
     return new AST.Identifier(name)
   }
 
-  p.parsePath = function (name, path) {
-    return new AST.Path(name, path)
+  p.parsePathExpr = function (name, path) {
+    return AST.constructPath(name, path)
   }
 
   p.parsePathProperty = function (name) {
-    return new AST.Identifier(name)
+    return name
   }
+
+  p.parsePathIndexer = function (expr) {
+    return new AST.Indexer(expr)
+  }
+
 
   p.parseFunctionType = function (args, ret) {
     // Turn null args into a proper empty array of arguments

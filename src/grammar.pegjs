@@ -49,7 +49,7 @@
   p.parseReturn = function (expr) { return [expr] }
 
   p.parseExpr = function (expr) { return ['expr', expr] }
-  p.parseCallExpr = function (call) { return ['callexpr', call] }
+  p.parseCallExpr = function (args) { return ['callexpr', args] }
   p.parseCallArgs = function (args) { return ['callargs'].concat(args) }
   p.parseIndexer = function (base, indexer) { return [base, indexer] }
   p.parseIdentifier = function (name) { return name }
@@ -67,7 +67,12 @@
   p.parseMutli = function (name, args, ret) { return [name, args, ret] }
 
   if (typeof require !== 'undefined') {
-    // require('./parser-extension')(p)
+    for (key in p) {
+      if (p.hasOwnProperty(key)) {
+        delete p[key]
+      }
+    }
+    require('./parser-extension')(p)
   }
 }// End preamble
 
@@ -138,7 +143,7 @@ assgop = "="
        / "+="
 
 // Path assignment of existing variables and their indexes/properties
-leftpath     = n:name path:(leftproperty)* { return p.parseLeft(n, path) }
+leftpath     = n:identifier path:(leftproperty)* { return p.parseLeft(n, path) }
 leftindexer  = "[" _ e:expr _ "]" { return pos(p.parseLeftIndexer(e)) }
 leftproperty = "." n:name { return pos(p.parseLeftProperty(n)) }
 
@@ -164,17 +169,17 @@ basicexpr = "(" e:expr ")" { return e }
           / literalexpr
           / pathexpr
 
-pathexpr = i:identifierexpr c:(pathcomponenet)* { return p.parsePathExpr(i, c) }
+pathexpr = i:identifier c:(pathcomponenet)* { return p.parsePathExpr(i, c) }
 
 pathcomponenet = c:callexpr    { return pos(p.parseCallExpr(c)) }
                / pathproperty
                / indexerexpr
 
 callexpr     = "(" _ args:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseCallArgs(args ? transformArgs(args) : [])) }
-pathproperty = "." i:identifierexpr { return p.parsePathProperty(i) }
+pathproperty = "." i:identifier { return p.parsePathProperty(i) }
 indexerexpr  = "[" _ e:expr _ "]" { return p.parsePathIndexer(e) }
 
-identifierexpr = n:name { return pos(p.parseIdentifier(n)) }
+identifier = n:name { return pos(p.parseIdentifier(n)) }
 
 // chainexpr = n:name t:(indexer / property / call)* { return pos(p.parseChain(n, t)) }
 
