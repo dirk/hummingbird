@@ -14,4 +14,10 @@ var tree = grammar.parse(source, {})
 
 // console.log(prettyjson.render(tree, {}))
 
+var TypeSystem = require('./src/typesystem').TypeSystem
+
 tree.dump()
+
+var typesystem = new TypeSystem()
+typesystem.walk(tree, 'unknown.hb')
+

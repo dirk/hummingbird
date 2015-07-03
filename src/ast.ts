@@ -42,6 +42,10 @@ export class Node {
   isLastStatement: boolean = false
 
   print() { out.write(inspect(this)) }
+  dump() {
+    var name = this.constructor['name']
+    throw new Error('Dumping node yet implemented for node: '+name)
+  }
   compile(...rest) {
     throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
   }
@@ -515,11 +519,17 @@ export class New extends Node {
 }
 
 
+type Pathable = Call|Identifier|Indexer
+
 export class Identifier extends Node {
   name:   string
-  parent: Node
-  child:  Node
-  type:   any
+  parent: Pathable
+  child:  Pathable
+  // The initial type
+  initialType: any
+  // Ultimate type (either the initial if no children or the ultimate type
+  // if it has children)
+  type: any
 
   constructor(name) {
     super()
@@ -555,11 +565,10 @@ export class Identifier extends Node {
   }
 }
 
-
 export class Call extends Node {
   args:     any
-  parent:   Node
-  child:    Node
+  parent:   Pathable
+  child:    Pathable
   type:     any
   baseType: any
 
@@ -600,8 +609,8 @@ export class Call extends Node {
 
 export class Indexer extends Node {
   expr:   any
-  parent: Node
-  child:  Node
+  parent: Pathable
+  child:  Pathable
   type:   any
 
   constructor(expr) {
