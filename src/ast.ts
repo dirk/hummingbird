@@ -27,7 +27,7 @@ var _ind = 0,
     _i   = function () { return repeat(' ', _ind) },
     _w   = function (s) { out.write(_i() + s) },
     _win = function (s) {
-      // Indent and write
+      // Write and indent
       _w(s); _ind += INDENT
     },
     _wout = function (s) { _ind -= INDENT; _w(s) },
@@ -100,6 +100,10 @@ export class Let extends Node {
     }
     return ret
   }
+
+  dump() {
+    this.print()
+  }
 }
 
 
@@ -167,8 +171,13 @@ export class Class extends Node {
     }
   }
   print() {
-    out.write('export class '+this.name+" ")
+    out.write('class '+this.name+" ")
     this.definition.print()
+  }
+  dump() {
+    _win(`class ${this.name}\n`)
+    this.definition.dump()
+    _ind -= INDENT
   }
 }
 
@@ -220,6 +229,8 @@ export class Literal extends Node {
   }
   print(): void { out.write(this.toString()) }
   toString(): string { return JSON.stringify(this.value) }
+
+  dump(): void { _w(this.toString()+"\n") }
 }
 
 
@@ -251,6 +262,13 @@ export class Assignment extends Node {
       this.rvalue.print()
       // _ind -= INDENT
     }
+  }
+
+  dump() {
+    _win(this.type+"\n")
+    this.lvalue.dump()
+    this.rvalue.dump()
+    _ind -= INDENT
   }
 }
 
@@ -369,13 +387,7 @@ export class Function extends Node {
     assertSaneArgs(this.args)
   }
   print(): void {
-    var args = this.args.map(function (arg) {
-      var ret = arg.name
-      if (arg.type) {
-        ret += ': '+arg.type
-      }
-      return ret
-    }).join(', ')
+    var args = this.inspectArgs()
     out.write('func ')
     if (this.name) {
       out.write(this.name+' ')
@@ -386,15 +398,31 @@ export class Function extends Node {
       out.write('-> '+this.ret+' ')
     } else {
       // If we computed an inferred return type for the type
-      out.write('-i> '+instance.type.ret.inspect()+' ')
+      out.write('-i> '+instance.type.ret.dump()+' ')
     }
     this.block.print()
   }
+  private inspectArgs(): string {
+    return this.args.map(function (arg) {
+      var ret = arg.name
+      if (arg.type) {
+        ret += ': '+arg.type
+      }
+      return ret
+    }).join(', ')
+  }
+
   setParentMultiType(multi): void {
     this.parentMultiType = multi
   }
   isChildOfMulti(): boolean {
     return this.parentMultiType ? true : false
+  }
+
+  dump() {
+    var args = this.inspectArgs()
+    _win(`function (${args})\n`)
+    _ind -= INDENT
   }
 }
 
@@ -430,9 +458,20 @@ export class Init extends Node {
     assertSaneArgs(this.args)
   }
   print() {
-    var args = this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
+    var args = this.inspectArgs()
     out.write('init ('+args+') ')
     this.block.print()
+  }
+
+  dump() {
+    var args = this.inspectArgs()
+    _win(`init (${args})\n`)
+    this.block.dump()
+    _ind -= INDENT
+  }
+
+  private inspectArgs(): string {
+    return this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
   }
 }
 
@@ -461,10 +500,18 @@ export class New extends Node {
     return this.initializer
   }
   toString() {
-    var args = this.args.map(function(arg) { return arg.toString() }).join(', ')
+    var args = this.inspectArgs()
     return 'new '+this.name+'('+args+')'
   }
   print() { out.write(this.toString()) }
+
+  dump() {
+    _w(this.toString()+"\n")
+  }
+
+  private inspectArgs(): string {
+    return this.args.map(function(arg) { return arg.toString() }).join(', ')
+  }
 }
 
 
@@ -486,12 +533,26 @@ export class Identifier extends Node {
   print(): void {
     if (this.parent) { out.write('.') }
     out.write(this.toString())
+  }
+  toString(): string {
+    var base = (this.parent ? '.' : '')
+    base += this.name
 
     if (this.child) {
-      this.child.print()
+      base += this.child.toString()
+    }
+
+    return base
+  }
+
+  dump() {
+    _w(`id ${this.name}\n`)
+    if (this.child) {
+      _ind += INDENT
+      this.child.dump()
+      _ind -= INDENT
     }
   }
-  toString(): string { return this.name }
 }
 
 
@@ -518,6 +579,22 @@ export class Call extends Node {
     if (this.child) {
       this.child.print()
     }
+  }
+
+  dump() {
+    _win("call\n")
+
+    _win(`args/${this.args.length}\n`)
+    if (this.args.length > 0) {
+      this.args.forEach(function (arg) { arg.dump() })
+    }
+    _ind -= INDENT
+
+    if (this.child) {
+      this.child.print()
+    }
+
+    _ind -= INDENT
   }
 }
 
@@ -727,6 +804,15 @@ export class Root extends Node {
     }
     return rootScope
   }
+
+  dump() {
+    _win("root\n")
+    for (var i = 0; i < this.statements.length; i++) {
+      var stmt = this.statements[i]
+      stmt.dump()
+    }
+    _wout("\n")
+  }
 }
 
 
@@ -756,6 +842,15 @@ export class Block extends Node {
     _ind -= INDENT
     _w('}')
     // out.write(repeat(' ', _ind - INDENT) + '}')
+  }
+
+  dump() {
+    _win("block\n")
+    for(var i = 0; i < this.statements.length; i++) {
+      var stmt = this.statements[i]
+      stmt.dump()
+    }
+    _ind -= INDENT
   }
 }
 
