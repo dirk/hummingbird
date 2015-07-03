@@ -100,6 +100,10 @@ module.exports = function (p) {
     return AST.constructPath(name, path)
   }
 
+  p.parseLeftProperty = function (identifier) {
+    return identifier
+  }
+
   p.parseReturn = function (expr) {
     return new AST.Return(expr)
   }
@@ -126,8 +130,8 @@ module.exports = function (p) {
     return AST.constructPath(name, path)
   }
 
-  p.parsePathProperty = function (name) {
-    return name
+  p.parsePathProperty = function (identifier) {
+    return identifier
   }
 
   p.parsePathIndexer = function (expr) {

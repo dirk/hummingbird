@@ -145,7 +145,7 @@ assgop = "="
 // Path assignment of existing variables and their indexes/properties
 leftpath     = n:identifier path:(leftproperty)* { return p.parseLeft(n, path) }
 leftindexer  = "[" _ e:expr _ "]" { return pos(p.parseLeftIndexer(e)) }
-leftproperty = "." n:name { return pos(p.parseLeftProperty(n)) }
+leftproperty = "." i:identifier { return pos(p.parseLeftProperty(i)) }
 
 multistmt = "multi" whitespace n:name _ a:args _ r:ret? { return pos(p.parseMutli(n, a, r)) }
 
