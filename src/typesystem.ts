@@ -335,17 +335,23 @@ TypeSystem.prototype.visitClassDefinition = function (node: AST.Block, scope, kl
     switch (stmt.constructor) {
       case AST.Assignment:
         var assg: AST.Assignment = stmt
+
         if (assg.type !== 'var' && assg.type !== 'let') {
-          throw new TypeError('Unexpected assignment type: '+assg.type, assg)
-        }
-        var propertyName = assg.lvalue.name
+          throw new TypeError('Unexpected assignment type: '+assg.type, assg) }
+        if (assg.type === 'let') {
+          assertInstanceOf(assg.lvalue, AST.Let) }
+        if (assg.type === 'var') {
+          assertInstanceOf(assg.lvalue, AST.Var) }
+
+        var lvalue       = <AST.Let>assg.lvalue,
+            propertyName = lvalue.name
         // Check that there's a type specified for this slot
-        if (!assg.lvalue.immediateType) {
+        if (!lvalue.immediateType) {
           throw new TypeError('Missing type for class slot: '+propertyName)
         }
-        var propertyType = self.resolveType(assg.lvalue.immediateType, scope)
+        var propertyType = self.resolveType(lvalue.immediateType, scope)
         // Visit and then check that the default (rvalue) is constant if present
-        if (assg.rvalue !== false) {
+        if (assg.rvalue) {
           self.visitExpression(assg.rvalue, scope)
         }
         // TODO: Smarter checking of constant-ness of default values when it's "let"
@@ -543,11 +549,31 @@ TypeSystem.prototype.visitReturn = function (node: AST.Return, scope, parentNode
   }
 }
 
-TypeSystem.prototype.visitPath = function (node, scope) {
-  var base = node.lvalue
+TypeSystem.prototype.visitPath = function (node: AST.Assignment, scope) {
+  var base = <AST.Identifier>node.lvalue
   assertInstanceOf(base, AST.Identifier, 'Path assignment must begin with an Identifier')
 
   this.visitIdentifier(base, scope)
+
+  var current = base.child
+  while (current) {
+    if (current instanceof AST.Call) {
+      throw new TypeError("Can't have Call in path assignment", current)
+    }
+    if (current instanceof AST.Identifier) {
+      var parent       = current.parent,
+          parentType   = parent.getInitialType(),
+          propertyName = current.name
+
+      assertInstanceOf(parentType, types.Instance)
+      parentType = parentType.type
+
+      if (parentType.hasPropertyFlag(propertyName, types.Flags.ReadOnly)) {
+        throw new TypeError('Trying to path assign to read-only property', current)
+      }
+    }
+    current = current.child
+  }
 
   // TODO: Check that there are no calls in this path and for any other
   //       things that may make the path-assignment impossible
@@ -572,12 +598,13 @@ TypeSystem.prototype.resolveType = function (node, scope) {
 }
 
 TypeSystem.prototype.visitLet = function (node, scope) {
-  var lvalueType: any = new types.Unknown()
-  var name            = node.lvalue.name
-
+  var lvalueType: any = new types.Unknown(),
+      lvalue          = <AST.Let>node.lvalue,
+      name            = lvalue.name
+  
   // If we have an explicit type then look it up
-  if (node.lvalue.immediateType) {
-    var immediateTypeNode = node.lvalue.immediateType
+  if (lvalue.immediateType) {
+    var immediateTypeNode = lvalue.immediateType
     // lvalueType = this.findByName(...)
     lvalueType = this.resolveType(immediateTypeNode, scope)
     // Box the type into an instance
@@ -598,7 +625,7 @@ TypeSystem.prototype.visitLet = function (node, scope) {
     })
     if (lvalueType instanceof types.Unknown) {
       // If the lvalue was inferred then update on the lvalue
-      node.lvalue.type = rvalueType
+      lvalue.type = rvalueType
       scope.setLocal(name, rvalueType)
     } else {
       // If the lvalue type is explicit then make sure they match up
@@ -611,7 +638,7 @@ TypeSystem.prototype.visitLet = function (node, scope) {
 
   } else {
     // No rvalue present
-    node.lvalue.type = lvalueType
+    lvalue.type = lvalueType
     scope.setLocal(name, lvalueType)
   }
   // Now that the local is set in the parent scope we can set its flags
@@ -964,8 +991,6 @@ TypeSystem.prototype.visitChild = function (node: AST.Node, child: AST.Node, sco
 TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
   if (node.parent) {
     var parentType = node.parent.type
-    node.type = 
-    // throw new TypeError("Identifier cannot have a parent", node)
     node.type = this.getTypeOfTypesProperty(parentType, node.name)
   } else {
     node.type = scope.get(node.name)

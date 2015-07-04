@@ -89,6 +89,7 @@ export class FunctionType extends Node {
 
 export class Let extends Node {
   name:          string
+  type:          any
   immediateType: any
 
   constructor(name, immediateType) {
@@ -240,9 +241,9 @@ export class Literal extends Node {
 
 export class Assignment extends Node {
   type:   any
-  lvalue: any
+  lvalue: Let|Var|Identifier
   op:     string
-  rvalue: any
+  rvalue: Node
 
   constructor(type, lvalue, op, rvalue) {
     super()
@@ -254,6 +255,14 @@ export class Assignment extends Node {
     // Only allowed .op for lets/vars is a '='
     if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
       throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
+    }
+    switch (this.type) {
+    case 'let':
+      assertInstanceOf(this.lvalue, Let); break
+    case 'var':
+      assertInstanceOf(this.lvalue, Var); break
+    case 'path':
+      assertInstanceOf(this.lvalue, Identifier); break
     }
   }
   print() {
@@ -563,6 +572,10 @@ export class Identifier extends Node {
       _ind -= INDENT
     }
   }
+
+  getInitialType() {
+    return (this.initialType ? this.initialType : this.type)
+  }
 }
 
 export class Call extends Node {
@@ -579,6 +592,10 @@ export class Call extends Node {
     this.child  = null
     assertPropertyIsInstanceOf(this, 'args', Array)
   }
+  getInitialType() {
+    return this.type
+  }
+
   toString() {
     var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
     return args
@@ -619,6 +636,10 @@ export class Indexer extends Node {
     this.parent = null
     assertPropertyIsInstanceOf(this, 'expr', Node)
   }
+  getInitialType() {
+    return this.type
+  }
+
 
   print() {
     out.write(this.toString())
