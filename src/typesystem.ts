@@ -556,7 +556,7 @@ TypeSystem.prototype.visitPath = function (node: AST.Assignment, scope) {
   this.visitIdentifier(base, scope)
 
   var current = base.child
-  while (current) {
+  while (true) {
     if (current instanceof AST.Call) {
       throw new TypeError("Can't have Call in path assignment", current)
     }
@@ -572,11 +572,20 @@ TypeSystem.prototype.visitPath = function (node: AST.Assignment, scope) {
         throw new TypeError('Trying to path assign to read-only property', current)
       }
     }
+    if (!current.child) { break }
+
     current = current.child
   }
 
   // TODO: Check that there are no calls in this path and for any other
   //       things that may make the path-assignment impossible
+
+  var lvalueType = current.type,
+      rvalueType = this.resolveExpression(node.rvalue, scope)
+
+  if (!lvalueType.equals(rvalueType)) {
+    throw new TypeError('Unequal types in assignment: '+lvalueType.inspect()+' </> '+rvalueType.inspect(), node)
+  }
 }
 
 TypeSystem.prototype.resolveType = function (node, scope) {
