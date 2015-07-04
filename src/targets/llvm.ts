@@ -109,9 +109,12 @@ class BlockContext {
 }
 
 interface ExprContext {
-  type?: any
+  type?:  any
   value?: Buffer
-  path?: any[]
+  path?:  any[]
+
+  parentType?:  any
+  parentValue?: Buffer
 }
 
 class BasicLogger {
@@ -323,6 +326,7 @@ export class LLVMCompiler {
     default:
       var ExpressionStatements: any[] = [
         AST.Call,
+        AST.Identifier,
         AST.New,
         AST.Property
       ];
@@ -572,7 +576,7 @@ export class LLVMCompiler {
         itemType  = pair[1],
         itemValue = null
     // If there's no path then we can just return a storable for the local
-    if (path.length === 0) {
+    if (!lvalue.child) {
       return slots.getStorable(name)
     } else {
       itemValue = slots.buildGet(ctx, name)
@@ -580,75 +584,62 @@ export class LLVMCompiler {
       var nativeType = nativeTypeForType(itemType)
       itemValue = ctx.builder.buildPointerCast(itemValue, nativeType, name)
     }
-    for (var i = 0; i < path.length; i++) {
-      var isLast = false
-      if (i === (path.length - 1)) {
-        isLast = true
-      }
-      var item = path[i]
-      switch (item.constructor) {
+
+    var child = lvalue.child
+    while (child) {
+      switch (child.constructor) {
         case AST.Identifier:
-          var id = <AST.Identifier>item
+          var id = <AST.Identifier>child
           // Unbox and ensure we've got an Object we can work with
           var objType   = unboxInstanceType(itemType, types.Object),
               nativeObj = objType.getNativeObject(),
               propName  = id.name,
               propType  = id.type,
               propPtr   = nativeObj.buildStructGEPForProperty(ctx, itemValue, propName)
-          // Return storable pointer if we're the last item in the chain
-          if (isLast) { return propPtr }
           // Otherwise build a dereference
           itemType  = propType
           itemValue = ctx.builder.buildLoad(propPtr, propName)
           break
         default:
-          throw new ICE('Cannot handle path item type: '+item.constructor.name)
+          throw new ICE('Cannot handle path item type: '+child.constructor.name)
       }
+      // Return storable pointer if we're the last item in the chain
+      if (!child.child) { return propPtr }
+
+      child = child.child
     }
+    throw new ICE("Fall-through descending path children")
   }
 
   compileCall(call: AST.Call, blockCtx, exprCtx: ExprContext) {
-    var self   = this,
-        parent = call.parent,
-        type   = null,
-        value  = null
+    var self     = this,
+        func     = call.parent,
+        funcType = func.getInitialType(),
+        value    = exprCtx.value
 
-    // First we need to check for it being an instance method
-    while (parent !== null) {
-      var methodType = call.base.type
-      if (!(methodType instanceof types.Instance)) { break }
-      // Unbox the instance and check if it's an instace method
-      methodType = methodType.type
-      if (!methodType.isInstanceMethod) { break }
-      var receiverInstance = parent.baseType,
-          receiverType     = receiverInstance.type
+    if (func === null) {
+      throw new ICE('Missing function for Call')
+    }
+    var funcType = unboxInstanceType(funcType, types.Function)
+
+    if (funcType.isInstanceMethod) {
+      var receiver = func.parent
+      if (!receiver) {
+        throw new ICE('Missing receiver for call')
+      }
+      var receiverInstance = receiver.type,
+          receiverType     = unboxInstanceType(receiverInstance)
       // Check if we need to call through the instrinsic shim or can just
       // do a regular instance method call
-      if (methodType.isIntrinsic === true) {
+      if (funcType.isIntrinsicShim()) {
         return this.compileIntrinsicInstanceMethodCall(call, blockCtx, exprCtx)
       } else {
         return this.compileInstanceMethodCall(call, blockCtx, exprCtx)
       }
     }
 
-    var retCtx: ExprContext
-    // Set up the expression context for compiling the base
-    if (parent === null) {
-      // Make sure we have a real Identifier to start off with
-      assertInstanceOf(call.base, AST.Identifier)
-      retCtx = {}
-    } else {
-      var baseType  = exprCtx.type,
-          baseValue = exprCtx.value
-      retCtx = {type: baseType, value: baseValue}
-    }
-    // Compile the base with the expression context
-    this.compileExpression(call.base, blockCtx, retCtx)
-    type  = retCtx.type
-    value = retCtx.value
     // Pull out the function and compute the arguments
-    var funcType  = unboxInstanceType(type, types.Function),
-        argValues = call.args.map(function (arg) {
+    var argValues = call.args.map(function (arg) {
           return self.compileExpression(arg, blockCtx)
         })
     // Build return call and update the context to return
@@ -658,7 +649,7 @@ export class LLVMCompiler {
   }
   compileCallAsModuleMember(call: AST.Call, blockCtx, exprCtx: ExprContext) {
     var self           = this,
-        parent         = call.parent,
+        func           = call.parent,
         fnPtr: Buffer  = null,
         args: Buffer[] = null
 
@@ -666,18 +657,20 @@ export class LLVMCompiler {
       throw new ICE('Not implemented yet')
     }
     assertInstanceOf(exprCtx.path, Array)
+
     var retCtx = {path: _.clone(exprCtx.path)}
-    this.compileAsModuleMember(call.base, blockCtx, retCtx)
+    this.compileAsModuleMember(func, blockCtx, retCtx)
     var path = retCtx.path
     assertInstanceOf(path, Array)
+
     // Join the path and look up the function type from the box on our base
     var name = path.join('_'),
-        type = <types.Function>unboxInstanceType(call.base.type, types.Function),
+        type = <types.Function>unboxInstanceType(func.type, types.Function),
         fn   = type['getNativeFunction']()
     // If it's external (ie. C function) then we call it directly
     if (fn.external) {
       fnPtr = fn.getPtr(this.ctx)
-      args = call.args.map(function (arg) {
+      args  = call.args.map(function (arg) {
         return self.compileExpression(arg, blockCtx)
       })
       return self.ctx.builder.buildCall(fnPtr, args, '')
@@ -703,11 +696,16 @@ export class LLVMCompiler {
   }
 
   compileInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
+    if(!exprCtx.parentValue) {
+      throw new ICE('Missing parent value in instance method Call')
+    }
+
     var self         = this,
-        recvValue    = exprCtx.value,
-        recvInstance = exprCtx.type,
+        recvValue    = exprCtx.parentValue,
+        recvInstance = exprCtx.parentType,
         recvType     = unboxInstanceType(recvInstance),
-        instance     = call.base.type,
+        func         = call.parent,
+        instance     = func.getInitialType(),
         method       = instance.type
 
     assertInstanceOf(recvValue, Buffer)
@@ -718,6 +716,7 @@ export class LLVMCompiler {
         })
     // Get the function to call
     var methodFn = method.getNativeFunction()
+
     // And add the receiver object pointer and call the function
     argValues.unshift(recvValue)
     var retValue  = this.ctx.builder.buildCall(methodFn.getPtr(), argValues, '')
@@ -728,23 +727,30 @@ export class LLVMCompiler {
 
   compileIntrinsicInstanceMethodCall(call: AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
     var self             = this,
-        receiverInstance = call.parent.type,
-        receiverType     = receiverInstance.type
+        method           = <AST.Identifier>call.parent,
+        receiver         = method.parent,
+        receiverInstance = receiver.type,
+        receiverType     = unboxInstanceType(receiverInstance)
 
     // Look up the shim method. The shim will get transformed into a proper call
-    var shimMethodInstance = call.base.type,
-        shimMethod         = shimMethodInstance.type
+    var shimMethodInstance = method.getInitialType(),
+        shimMethod         = <types.Function>unboxInstanceType(shimMethodInstance, types.Function)
     // Look up the ultimate method via the shim
-    if (shimMethod.shimFor == null) {
-      throw new ICE('Missing ultimate method for shim: '+call.base.name)
+    if (!shimMethod.isIntrinsicShim()) {
+      throw new ICE('Missing ultimate method for shim: '+method.name)
     }
-    var method   = shimMethod.shimFor,
-        nativeFn = method.getNativeFunction(),
-        argValues = call.args.map(function (arg) {
-          return self.compileExpression(arg, blockCtx)
-        })
+    var ultimateMethod = shimMethod.getIntrinsicShim(),
+        nativeFn       = ultimateMethod['getNativeFunction']()
+          
+    var argValues = call.args.map(function (arg) {
+      return self.compileExpression(arg, blockCtx)
+    })
+
     // Add the receiver to the front of the arguments
-    var receiverValue = exprCtx.value
+    if (!exprCtx.parentValue) {
+      throw new ICE('Missing receiver in parent value')
+    }
+    var receiverValue = exprCtx.parentValue
     argValues.unshift(receiverValue)
     // Build the call
     var retValue = this.ctx.builder.buildCall(nativeFn.getPtr(this.ctx), argValues, '')
@@ -769,17 +775,64 @@ export class LLVMCompiler {
     } else {
       var value = exprCtx.value
       // Check the types and then build the GEP
-      var objType   = unboxInstanceType(exprCtx.type),
-          nativeObj = objType.getNativeObject()
+      var objType = unboxInstanceType(exprCtx.type),
+          idType  = unboxInstanceType(id.getInitialType())
 
-      // Build the pointer and load it into a value
-      var ptr  = nativeObj.buildStructGEPForProperty(this.ctx, value, id.name)
-      newType  = id.type
-      newValue = this.ctx.builder.buildLoad(ptr, id.name)
+      if (objType.primitive) {
+        var type = objType.getTypeOfProperty(id.name, id)
+        
+        if (!(type instanceof types.Function)) {
+          throw new ICE("Cannot compile non-Function property of primitive")
+        }
+        // if (type.isIntrinsicShim()) {
+        //   newValue = type.getIntrinsicShim().getNativeFunction().getPtr(this.ctx)
+        // } else {
+        //   newValue = type.getNativeFunction().getPtr(this.ctx)
+        // }
+        newValue = null
+
+      } else if (idType instanceof types.Function && idType.isInstanceMethod) {
+        // Don't try to get instance method properties
+        newValue = null
+
+      } else {
+        var nativeObj = objType.getNativeObject()
+        // Build the pointer and load it into a value
+        var ptr = nativeObj.buildStructGEPForProperty(this.ctx, value, id.name)
+        newValue = this.ctx.builder.buildLoad(ptr, id.name)
+      }
+      newType = id.getInitialType()
     }
-    tryUpdatingExpressionContext(exprCtx, newType, newValue)
-    return newValue
+
+    if (id.child) {
+      return this.compileChildOf(id, blockCtx, {
+        type:        newType,
+        value:       newValue,
+        parentType:  (exprCtx ? exprCtx.type : null),
+        parentValue: (exprCtx ? exprCtx.value : null)
+      })
+    } else {
+      tryUpdatingExpressionContext(exprCtx, newType, newValue)
+      return newValue
+    }
   }
+
+  compileChildOf(node: AST.Identifier|AST.Call, blockCtx: BlockContext, exprCtx: ExprContext) {
+    if (!node.child) {
+      throw new ICE('Expected child')
+    }
+    var child = node.child
+
+    switch (child.constructor) {
+    case AST.Identifier:
+      return this.compileIdentifier(<AST.Identifier>child, blockCtx, exprCtx)
+    case AST.Call:
+      return this.compileCall(<AST.Call>child, blockCtx, exprCtx)
+    default:
+      throw new ICE('Child compilation fall-through on: '+child.constructor['name'])
+    }
+  }
+
   compileIdentifierAsModuleMember(id: AST.Identifier, blockCtx: BlockContext, exprCtx: ExprContext) {
     var path = (exprCtx.path ? exprCtx.path : []),
         type = id.type,
@@ -1201,12 +1254,13 @@ function predefineTypes (ctx: Context, block: AST.Block) {
         if (assg.type !== 'var' && assg.type !== 'let') {
           return
         }
-        if (assg.rvalue.type instanceof AST.Function) {
-          var rvalueInstanceType = assg.rvalue.type,
+        if (assg.rvalue instanceof AST.Function) {
+          var rvalue             = <AST.Function>rvalue,
+              rvalueInstanceType = rvalue.type,
               rvalueType         = unboxInstanceType(rvalueInstanceType)
           // If the native function hasn't been typed
           if (!rvalueType.hasNativeFunction()) {
-            var fn = getAnonymousNativeFunction(ctx, assg.rvalue)
+            var fn = getAnonymousNativeFunction(ctx, rvalue)
             fn.computeType()
           }
         }
