@@ -226,7 +226,7 @@ export class JSCompiler {
       var ExpressionStatements: any[] = [
         AST.Function,
         AST.New,
-        AST.Property
+        AST.Identifier
       ];
       if (ExpressionStatements.indexOf(stmt.constructor) !== -1) {
         return this.compileExpression(stmt, opts)
@@ -242,8 +242,6 @@ export class JSCompiler {
       return this.compileLiteral(<AST.Literal>expr, opts)
     case AST.Function:
       return this.compileFunction(<AST.Function>expr, opts)
-    case AST.Property:
-      return this.compileProperty(<AST.Property>expr, opts)
     case AST.Call:
       return this.compileCall(<AST.Call>expr, opts)
     case AST.Identifier:
@@ -335,25 +333,13 @@ export class JSCompiler {
     return asSourceNode(bin, ret)
   }
 
-  compileProperty(prop: AST.Property, opts: CompileOptions) {
-    var term = ";\n"
-    if (opts && opts.omitTerminator === true) { term = '' }
-
-    var property = prop.property
-    if (typeof property !== 'string') {
-      property = this.compileExpression(prop.property, {omitTerminator: true})
-    }
-    var base = this.compileIdentifier(prop.base, {omitTerminator: true})
-    var ret = [base, '.' , property, term]
-    return asSourceNode(prop, ret)
-  }// compileProperty
-
   compileCall(call: AST.Call, opts: CompileOptions) {
     var self = this
     var args = call.args.map(function (arg) {
       return self.compileExpression(arg, {omitTerminator: true})
     })
-    var ret = [this.compileExpression(call.base), '(']
+    var ret = ['(']
+
     var length = args.length, lastIndex = args.length - 1
     for (var i = 0; i < length; i++) {
       ret.push(args[i])
@@ -362,7 +348,13 @@ export class JSCompiler {
       }
     }
     ret.push(')')
+
+    if (call.child) {
+      this.compileChild(call.child, opts)
+    }
+
     if (!opts || opts.omitTerminator !== true) { ret.push(";\n") }
+
     return asSourceNode(call, ret)
   }// compileCall
 
@@ -425,18 +417,33 @@ export class JSCompiler {
     } else {
       // TODO: Handle more complex path assignments
       // throw new Error('Compilation of path-assignments not yet implemented')
-      var lvalue = assg.lvalue.name
-      assg.lvalue.path.forEach(function (item) {
-        lvalue += '.'+self.compileIdentifier(item, opts)
-      })
+      var lvalue = this.compileExpression(assg.lvalue, {omitTerminator: true})
       var rvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
       ret = [lvalue, ' '+assg.op+' ', rvalue, term]
     }
     return asSourceNode(assg, ret)
   }// compileAssignment
 
+  compileChild(node: AST.Node, opts: CompileOptions) {
+    switch (node.constructor) {
+    case AST.Identifier:
+      return this.compileIdentifier(<AST.Identifier>node, opts)
+    case AST.Call:
+      return this.compileCall(<AST.Call>node, opts)
+    default:
+      throw new TypeError('Child compilation fall-through on: '+node.constructor['name'])
+    }
+  }
+
   compileIdentifier(id: AST.Identifier, opts: CompileOptions) {
-    return asSourceNode(id, id.name)
+    var ret: any[] = [id.name]
+    if (id.parent) {
+      ret.unshift('.')
+    }
+    if (id.child) {
+      ret.push(this.compileChild(id.child, opts))
+    }
+    return asSourceNode(id, ret)
   }
 
   compileLiteral(literal: AST.Literal, opts: CompileOptions) {
