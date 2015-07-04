@@ -555,26 +555,32 @@ TypeSystem.prototype.visitPath = function (node: AST.Assignment, scope) {
 
   this.visitIdentifier(base, scope)
 
-  var current = base.child
-  while (true) {
-    if (current instanceof AST.Call) {
-      throw new TypeError("Can't have Call in path assignment", current)
-    }
-    if (current instanceof AST.Identifier) {
-      var parent       = current.parent,
-          parentType   = parent.getInitialType(),
-          propertyName = current.name
-
-      assertInstanceOf(parentType, types.Instance)
-      parentType = parentType.type
-
-      if (parentType.hasPropertyFlag(propertyName, types.Flags.ReadOnly)) {
-        throw new TypeError('Trying to path assign to read-only property', current)
+  var current = null
+  if (base.child) {
+    current = base.child
+    while (true) {
+      if (current instanceof AST.Call) {
+        throw new TypeError("Can't have Call in path assignment", current)
       }
-    }
-    if (!current.child) { break }
+      if (current instanceof AST.Identifier) {
+        var parent       = current.parent,
+            parentType   = parent.getInitialType(),
+            propertyName = current.name
 
-    current = current.child
+        assertInstanceOf(parentType, types.Instance)
+        parentType = parentType.type
+
+        if (parentType.hasPropertyFlag(propertyName, types.Flags.ReadOnly)) {
+          throw new TypeError('Trying to path assign to read-only property', current)
+        }
+      }
+      if (!current.child) { break }
+
+      current = current.child
+    }
+
+  } else {
+    current = base
   }
 
   // TODO: Check that there are no calls in this path and for any other
