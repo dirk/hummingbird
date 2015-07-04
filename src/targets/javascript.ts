@@ -338,7 +338,7 @@ export class JSCompiler {
     var args = call.args.map(function (arg) {
       return self.compileExpression(arg, {omitTerminator: true})
     })
-    var ret = ['(']
+    var ret: any[] = ['(']
 
     var length = args.length, lastIndex = args.length - 1
     for (var i = 0; i < length; i++) {
@@ -350,7 +350,7 @@ export class JSCompiler {
     ret.push(')')
 
     if (call.child) {
-      this.compileChild(call.child, opts)
+      ret.push(this.compileChild(call.child, opts))
     }
 
     if (!opts || opts.omitTerminator !== true) { ret.push(";\n") }
@@ -408,7 +408,7 @@ export class JSCompiler {
     if (assg.type === 'var' || assg.type === 'let') {
       // TODO: Register name in context scope and check for conflicts.
       var lvalue = assg.lvalue.name
-      if (assg.rvalue !== false) {
+      if (assg.rvalue) {
         var rvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
         ret = ['var ', lvalue, ' '+assg.op+' ', rvalue, term]
       } else {
@@ -417,9 +417,9 @@ export class JSCompiler {
     } else {
       // TODO: Handle more complex path assignments
       // throw new Error('Compilation of path-assignments not yet implemented')
-      var lvalue = this.compileExpression(assg.lvalue, {omitTerminator: true})
-      var rvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
-      ret = [lvalue, ' '+assg.op+' ', rvalue, term]
+      var compiledLvalue = this.compileExpression(assg.lvalue, {omitTerminator: true}),
+          compiledRvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
+      ret = [compiledLvalue, ' '+assg.op+' ', compiledRvalue, term]
     }
     return asSourceNode(assg, ret)
   }// compileAssignment

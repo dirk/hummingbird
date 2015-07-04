@@ -1056,6 +1056,10 @@ TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {
     }
   }
   node.type = new types.Instance(functionType.ret)
+
+  if (node.child) {
+    this.visitChild(node, node.child, scope)
+  }
 }
 
 /*
