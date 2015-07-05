@@ -310,6 +310,9 @@ export class Function extends Type {
   setShimForInstrinsic(instrinsicMethod: Function) {
     this.shimFor = instrinsicMethod
   }
+  getIntrinsicShim(): Function {
+    return this.shimFor
+  }
 }
 
 

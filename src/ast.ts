@@ -27,7 +27,7 @@ var _ind = 0,
     _i   = function () { return repeat(' ', _ind) },
     _w   = function (s) { out.write(_i() + s) },
     _win = function (s) {
-      // Indent and write
+      // Write and indent
       _w(s); _ind += INDENT
     },
     _wout = function (s) { _ind -= INDENT; _w(s) },
@@ -42,6 +42,10 @@ export class Node {
   isLastStatement: boolean = false
 
   print() { out.write(inspect(this)) }
+  dump() {
+    var name = this.constructor['name']
+    throw new Error('Dumping node yet implemented for node: '+name)
+  }
   compile(...rest) {
     throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
   }
@@ -85,6 +89,7 @@ export class FunctionType extends Node {
 
 export class Let extends Node {
   name:          string
+  type:          any
   immediateType: any
 
   constructor(name, immediateType) {
@@ -99,6 +104,10 @@ export class Let extends Node {
       ret += ': '+this.immediateType.toString()
     }
     return ret
+  }
+
+  dump() {
+    this.print()
   }
 }
 
@@ -167,8 +176,13 @@ export class Class extends Node {
     }
   }
   print() {
-    out.write('export class '+this.name+" ")
+    out.write('class '+this.name+" ")
     this.definition.print()
+  }
+  dump() {
+    _win(`class ${this.name}\n`)
+    this.definition.dump()
+    _ind -= INDENT
   }
 }
 
@@ -220,14 +234,16 @@ export class Literal extends Node {
   }
   print(): void { out.write(this.toString()) }
   toString(): string { return JSON.stringify(this.value) }
+
+  dump(): void { _w(this.toString()+"\n") }
 }
 
 
 export class Assignment extends Node {
   type:   any
-  lvalue: any
+  lvalue: Let|Var|Identifier
   op:     string
-  rvalue: any
+  rvalue: Node
 
   constructor(type, lvalue, op, rvalue) {
     super()
@@ -239,6 +255,14 @@ export class Assignment extends Node {
     // Only allowed .op for lets/vars is a '='
     if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
       throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
+    }
+    switch (this.type) {
+    case 'let':
+      assertInstanceOf(this.lvalue, Let); break
+    case 'var':
+      assertInstanceOf(this.lvalue, Var); break
+    case 'path':
+      assertInstanceOf(this.lvalue, Identifier); break
     }
   }
   print() {
@@ -252,8 +276,45 @@ export class Assignment extends Node {
       // _ind -= INDENT
     }
   }
+
+  dump() {
+    _win(this.type+"\n")
+    this.lvalue.dump()
+    this.rvalue.dump()
+    _ind -= INDENT
+  }
 }
 
+function assertInstanceOf(value, type, msg?) {
+  if (value instanceof type) { return; }
+  if (!msg) {
+    msg = 'Incorrect type; expected '+type.name+', got '+value.constructor.name
+  }
+  throw new Error(msg)
+}
+
+export function constructPath (name: Identifier, path, parent = null) {
+  assertInstanceOf(name, Identifier)
+  if (path.length == 0) {
+    return name
+  }
+
+  var first = path[0]
+  name.child = first
+  first.parent = name
+
+  for (var i = 0; i < path.length; i++) {
+    var current = path[i],
+        next    = path[i + 1]
+
+    if (next) {
+      current.child = next
+      next.parent = current
+    }
+  }
+
+  return name
+}
 
 export class Path extends Node {
   name: any
@@ -339,13 +400,7 @@ export class Function extends Node {
     assertSaneArgs(this.args)
   }
   print(): void {
-    var args = this.args.map(function (arg) {
-      var ret = arg.name
-      if (arg.type) {
-        ret += ': '+arg.type
-      }
-      return ret
-    }).join(', ')
+    var args = this.inspectArgs()
     out.write('func ')
     if (this.name) {
       out.write(this.name+' ')
@@ -356,15 +411,31 @@ export class Function extends Node {
       out.write('-> '+this.ret+' ')
     } else {
       // If we computed an inferred return type for the type
-      out.write('-i> '+instance.type.ret.inspect()+' ')
+      out.write('-i> '+instance.type.ret.dump()+' ')
     }
     this.block.print()
   }
+  private inspectArgs(): string {
+    return this.args.map(function (arg) {
+      var ret = arg.name
+      if (arg.type) {
+        ret += ': '+arg.type
+      }
+      return ret
+    }).join(', ')
+  }
+
   setParentMultiType(multi): void {
     this.parentMultiType = multi
   }
   isChildOfMulti(): boolean {
     return this.parentMultiType ? true : false
+  }
+
+  dump() {
+    var args = this.inspectArgs()
+    _win(`function (${args})\n`)
+    _ind -= INDENT
   }
 }
 
@@ -400,9 +471,20 @@ export class Init extends Node {
     assertSaneArgs(this.args)
   }
   print() {
-    var args = this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
+    var args = this.inspectArgs()
     out.write('init ('+args+') ')
     this.block.print()
+  }
+
+  dump() {
+    var args = this.inspectArgs()
+    _win(`init (${args})\n`)
+    this.block.dump()
+    _ind -= INDENT
+  }
+
+  private inspectArgs(): string {
+    return this.args.map(function (arg) { return arg.name+': '+arg.type.toString() }).join(', ')
   }
 }
 
@@ -431,49 +513,143 @@ export class New extends Node {
     return this.initializer
   }
   toString() {
-    var args = this.args.map(function(arg) { return arg.toString() }).join(', ')
+    var args = this.inspectArgs()
     return 'new '+this.name+'('+args+')'
   }
   print() { out.write(this.toString()) }
+
+  dump() {
+    _w(this.toString()+"\n")
+  }
+
+  private inspectArgs(): string {
+    return this.args.map(function(arg) { return arg.toString() }).join(', ')
+  }
 }
 
 
+type Pathable = Call|Identifier|Indexer
+
 export class Identifier extends Node {
-  name:   any
-  parent: any
-  type:   any
+  name:   string
+  parent: Pathable
+  child:  Pathable
+  // The initial type
+  initialType: any
+  // Ultimate type (either the initial if no children or the ultimate type
+  // if it has children)
+  type: any
 
   constructor(name) {
     super()
     this.name   = name
     this.parent = null
+    this.child  = null
+    if (typeof name !== 'string') {
+      throw new TypeError('Expected string as name')
+    }
   }
-  print(): void { out.write(this.toString()) }
-  toString(): string { return this.name }
+  print(): void {
+    if (this.parent) { out.write('.') }
+    out.write(this.toString())
+  }
+  toString(): string {
+    var base = (this.parent ? '.' : '')
+    base += this.name
+
+    if (this.child) {
+      base += this.child.toString()
+    }
+
+    return base
+  }
+
+  dump() {
+    _w(`id ${this.name}\n`)
+    if (this.child) {
+      _ind += INDENT
+      this.child.dump()
+      _ind -= INDENT
+    }
+  }
+
+  getInitialType() {
+    return (this.initialType ? this.initialType : this.type)
+  }
 }
 
-
 export class Call extends Node {
-  base:     Identifier
   args:     any
-  parent:   any
+  parent:   Pathable
+  child:    Pathable
   type:     any
   baseType: any
 
-  constructor(base, callArgs) {
+  constructor(args) {
     super()
-    this.base   = base
-    this.args   = callArgs
+    this.args   = args
     this.parent = null
-    assertPropertyIsInstanceOf(this, 'base', Identifier)
+    this.child  = null
     assertPropertyIsInstanceOf(this, 'args', Array)
   }
+  getInitialType() {
+    return this.type
+  }
+
   toString() {
     var args ='('+this.args.map(function (arg) { return arg.toString() }).join(', ')+')'
-    return this.base+args
+    return args
   }
   print() {
     out.write(this.toString())
+    if (this.child) {
+      this.child.print()
+    }
+  }
+
+  dump() {
+    _win("call\n")
+
+    _win(`args/${this.args.length}\n`)
+    if (this.args.length > 0) {
+      this.args.forEach(function (arg) { arg.dump() })
+    }
+    _ind -= INDENT
+
+    if (this.child) {
+      this.child.print()
+    }
+
+    _ind -= INDENT
+  }
+}
+
+export class Indexer extends Node {
+  expr:   any
+  parent: Pathable
+  child:  Pathable
+  type:   any
+
+  constructor(expr) {
+    super()
+    this.expr = expr
+    this.parent = null
+    assertPropertyIsInstanceOf(this, 'expr', Node)
+  }
+  getInitialType() {
+    return this.type
+  }
+
+
+  print() {
+    out.write(this.toString())
+    if (this.child) {
+      this.child.print()
+    }
+  }
+
+  toString() {
+    return '['+this.expr.toString()+']'
   }
 }
 
@@ -658,6 +834,15 @@ export class Root extends Node {
     }
     return rootScope
   }
+
+  dump() {
+    _win("root\n")
+    for (var i = 0; i < this.statements.length; i++) {
+      var stmt = this.statements[i]
+      stmt.dump()
+    }
+    _wout("\n")
+  }
 }
 
 
@@ -687,6 +872,15 @@ export class Block extends Node {
     _ind -= INDENT
     _w('}')
     // out.write(repeat(' ', _ind - INDENT) + '}')
+  }
+
+  dump() {
+    _win("block\n")
+    for(var i = 0; i < this.statements.length; i++) {
+      var stmt = this.statements[i]
+      stmt.dump()
+    }
+    _ind -= INDENT
   }
 }
 

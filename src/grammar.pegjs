@@ -34,7 +34,7 @@
   p.parseInit = function (args, block) { return [args, block] }
   p.parseBlock = function (statements) { return statements }
   p.parseIf = function (cond, block, elseIfs, elseBlock) { return [cond, block, elseIfs, elseBlock] }
-  p.parseRoot = function (statements) { return statements }
+  p.parseRoot = function (statements) { return ['root'].concat(statements) }
   p.parseBinary = function (left, op, right) { return [left, op, right] }
   p.parseInteger = function (integerString) { return integerString }
   p.parseString = function (string) { return string }
@@ -47,18 +47,31 @@
   p.parseChain = function (name, tail) { return [name, tail] }
   p.parseAssignment = function (path, op, expr) { return [path, op, expr] }
   p.parseReturn = function (expr) { return [expr] }
-  p.parseCall = function (base, call) { return [base, call] }
-  p.parseCallArgs = function (args) { return args }
-  p.parseProperty = function (base, property) { return [base, property] }
-  p.parseIndexer = function (base, indexer) { return [base, indexer] }
 
-  p.parsePath = function (name, path) { return [name, path] }
-  p.parsePathProperty = function (name) { return [name] }
+  p.parseExpr = function (expr) { return ['expr', expr] }
+  p.parseCallExpr = function (args) { return ['callexpr', args] }
+  p.parseCallArgs = function (args) { return ['callargs'].concat(args) }
+  p.parseIndexer = function (base, indexer) { return [base, indexer] }
+  p.parseIdentifier = function (name) { return name }
+
+  p.parseLeft = function (name, path) { return [name, path] }
+  p.parseLeftIndexer = function (expr) { return expr }
+  p.parseLeftProperty = function (name) { return name }
+
+  p.parsePathExpr = function (name, path) { return ['pathexpr', name, path] }
+  p.parsePathProperty = function (identifier) { return ['pathproperty', identifier] }
+  p.parsePathIndexer = function (expr) { return ['pathindexer', expr] }
+
   p.parseNameType = function (name) { return [name] }
   p.parseFunctionType = function (args, ret) { return [args, ret] }
   p.parseMutli = function (name, args, ret) { return [name, args, ret] }
 
   if (typeof require !== 'undefined') {
+    for (key in p) {
+      if (p.hasOwnProperty(key)) {
+        delete p[key]
+      }
+    }
     require('./parser-extension')(p)
   }
 }// End preamble
@@ -125,42 +138,48 @@ initdecl  = "init" _ a:args _ b:block  { return pos(p.parseInit(a, b)) }
 letvardecl = lvalue:leftdecl rvalue:(_ "=" _ expr)? { return pos(p.parseDeclaration(lvalue, rvalue ? rvalue[3] : false)) }
 leftdecl = k:("let" / "var") whitespace n:name t:(":" whitespace type)? { return pos(p.parseLeftDeclaration(k, n, t ? t[2] : null)) }
 
-assg = path:path _ op:assgop _ e:expr { return pos(p.parseAssignment(path, op, e)) }
+assg = path:leftpath _ op:assgop _ e:expr { return pos(p.parseAssignment(path, op, e)) }
 assgop = "="
        / "+="
 
 // Path assignment of existing variables and their indexes/properties
-path = n:name path:(indexer / pathproperty)* { return p.parsePath(n, path) }
-indexer = "[" _ expr _ "]"
-pathproperty = "." n:name { return pos(p.parsePathProperty(n)) }
+leftpath     = n:identifier path:(leftproperty)* { return p.parseLeft(n, path) }
+leftindexer  = "[" _ e:expr _ "]" { return pos(p.parseLeftIndexer(e)) }
+leftproperty = "." i:identifier { return pos(p.parseLeftProperty(i)) }
 
 multistmt = "multi" whitespace n:name _ a:args _ r:ret? { return pos(p.parseMutli(n, a, r)) }
 
-expr = binaryexpr
+expr = e:binaryexpr { return p.parseExpr(e) }
 
 // Binary expressions have highest precedence
 binaryexpr = le:unaryexpr _ op:binaryop _ re:binaryexpr { return pos(p.parseBinary(le, op, re)) }
            / unaryexpr
 
-unaryexpr = "!" m:memberexpr { return m }
-          / memberexpr
+unaryexpr = "!" path:basicexpr { return path }
+          / basicexpr
 
-memberexpr = b:basicexpr c:callexpr     { return pos(p.parseCall(b, c)) }
-           / b:basicexpr e:propertyexpr { return pos(p.parseProperty(b, e)) }
-           / b:basicexpr i:indexerexpr  { return pos(p.parseIndexer(b, i)) }
-           / b:basicexpr                { return b }
-
-callexpr      = "(" _ args:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseCallArgs(args ? transformArgs(args) : [])) }
-propertyexpr = "." m:memberexpr { return m }
-indexerexpr  = indexer
+// memberexpr = b:basicexpr c:callexpr     { return pos(p.parseCall(b, c)) }
+//            / b:basicexpr e:propertyexpr { return pos(p.parseProperty(b, e)) }
+//            / b:basicexpr i:indexerexpr  { return pos(p.parseIndexer(b, i)) }
+//            / b:basicexpr                { return b }
 
 basicexpr = "(" e:expr ")" { return e }
           / funcexpr
           / newexpr
           / literalexpr
-          / identifierexpr
+          / pathexpr
 
-identifierexpr = n:name { return pos(p.parseIdentifier(n)) }
+pathexpr = i:identifier c:(pathcomponenet)* { return p.parsePathExpr(i, c) }
+
+pathcomponenet = c:callexpr    { return pos(p.parseCallExpr(c)) }
+               / pathproperty
+               / indexerexpr
+
+callexpr     = "(" _ args:(expr _ ("," _ expr _)* )? _ ")" { return pos(p.parseCallArgs(args ? transformArgs(args) : [])) }
+pathproperty = "." i:identifier { return p.parsePathProperty(i) }
+indexerexpr  = "[" _ e:expr _ "]" { return p.parsePathIndexer(e) }
+
+identifier = n:name { return pos(p.parseIdentifier(n)) }
 
 // chainexpr = n:name t:(indexer / property / call)* { return pos(p.parseChain(n, t)) }
 
