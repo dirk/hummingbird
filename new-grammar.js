@@ -11,6 +11,9 @@ var grammar = {
       ["return"               , "return 'RETURN';"],
       ["let"                  , "return 'LET';"],
       ["var"                  , "return 'VAR';"],
+      ["if"                   , "return 'IF';"],
+      ["while"                , "return 'WHILE';"],
+      ["for"                  , "return 'FOR';"],
       ["[A-Za-z][A-Za-z0-9_]*", "return 'WORD';"],
       ["0|([1-9][0-9]*)"      , "return 'NUMBER';"],
       ["$"                    , "return 'EOF';"],
@@ -28,6 +31,7 @@ var grammar = {
       ["\\*"                  , "return '*';"],
       [","                    , "return ',';"],
       ["="                    , "return '=';"],
+      [";"                    , "return ';';"],
     ]// rules
   },// lex
 
@@ -44,7 +48,7 @@ var grammar = {
 
     block:      [["{ }"                                             , "$$ = [];"],
                  ["{ block_statements }"                            , "$$ = $2;"]],
-    
+
     block_statements:
                 [["statement"                                       , "$$ = [$1];"],
                  ["block_statements terminal statement"             , "$$ = $1.concat([$3]);"]],
@@ -52,6 +56,7 @@ var grammar = {
     statement:  [["declaration_statement"                           , identity],
                  ["function_statement"                              , identity],
                  ["return_statement"                                , identity],
+                 ["condition_statement"                             , identity],
                  ["assignment_statement"                            , identity],
                  ["expression_statement"                            , identity]],
 
@@ -60,6 +65,14 @@ var grammar = {
 
     function_statement:
                 [["FUNC identifier function_parameters block"       , "$$ = {name: $2, params: $3, block: $4};"]],
+
+    condition_statement:
+                [["condition_type expression block"                 , "$$ = {type: $1, cond: $2, block: $3};"],
+                 ["FOR expression ; expression ; expression block"  , "$$ = {type: 'for', init: $2, cond: $4, after: $6, block: $7}"]],
+
+    condition_type:
+                [["IF"                                              , "$$ = 'if';"],
+                 ["WHILE"                                           , "$$ = 'while';"]],
 
     declaration_statement:
                 [["declaration_type identifier"                     , "$$ = {decl: $1, name: $2, val: null};"],
@@ -144,6 +157,9 @@ var lines = [
   "func e(f) { return f * 2 }",
   "g = func () {}",
   "let h = 1",
+  "if true { }",
+  "while false { }",
+  "for 1; 2; 3 { }",
 ]
 
 inspect(parser.parse(lines.join("\n")))
