@@ -35,12 +35,13 @@ task('all', ['default', 'specification'])
 // Grammar -------------------------------------------------------------------
 
 desc('Build parser from grammar')
-task('grammar', ['src/grammar.js'])
+task('grammar', ['src/grammar.jison.js'])
 
-file('src/grammar.js', ['src/grammar.pegjs'], function () {
+file('src/grammar.jison.js', ['src/grammar.jison'], function () {
   var start  = new Date(),
+      outfile = this.name,
       infile = this.prereqs[0]
-  exec('node_modules/.bin/pegjs --cache '+infile)
+  exec('node_modules/.bin/jison '+infile+' -o '+outfile)
   console.log('Grammar generated in '+chalk.magenta(formatSeconds(new Date() - start)+' s'))
 })
 
