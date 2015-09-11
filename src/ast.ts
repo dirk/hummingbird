@@ -44,7 +44,7 @@ export class Node {
   print() { out.write(inspect(this)) }
   dump() {
     var name = this.constructor['name']
-    throw new Error('Dumping node yet implemented for node: '+name)
+    throw new Error('Dumping not yet implemented for node: '+name)
   }
   compile(...rest) {
     throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
@@ -551,7 +551,11 @@ export class Identifier extends Node {
   }
   print(): void {
     if (this.parent) { out.write('.') }
-    out.write(this.toString())
+    out.write(this.name)
+
+    if (this.child) {
+      this.child.print()
+    }
   }
   toString(): string {
     var base = (this.parent ? '.' : '')
@@ -617,7 +621,7 @@ export class Call extends Node {
     _ind -= INDENT
 
     if (this.child) {
-      this.child.print()
+      this.child.dump()
     }
 
     _ind -= INDENT
@@ -640,7 +644,6 @@ export class Indexer extends Node {
     return this.type
   }
 
-
   print() {
     out.write(this.toString())
     if (this.child) {
@@ -650,6 +653,17 @@ export class Indexer extends Node {
 
   toString() {
     return '['+this.expr.toString()+']'
+  }
+
+  dump() {
+    _win("indexer\n")
+    this.expr.dump()
+
+    if (this.child) {
+      this.child.dump()
+    }
+
+    _ind -= INDENT
   }
 }
 
