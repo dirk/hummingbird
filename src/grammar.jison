@@ -47,7 +47,12 @@
 %%
 
 root
-  : statements { return new yy.AST.Root($1); }
+  : root_body { return new yy.AST.Root($1); }
+  ;
+
+root_body
+  : terminal statements { $$ = $2; }
+  | statements          { $$ = $1; }
   ;
 
 statements
@@ -131,7 +136,7 @@ declaration_statement
       }
   | declaration_lvalue
       { var kind = $1.constructor.name.toLowerCase();
-        $$ = new yy.AST.Assignment(kind, $1, null, null);
+        $$ = new yy.AST.Assignment(kind, $1, false, null);
       }
   ;
 
