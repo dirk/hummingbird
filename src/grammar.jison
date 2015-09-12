@@ -1,11 +1,10 @@
-
-
 /* Lexer  ------------------------------------------------------------------ */
 
 %lex
 %%
 
-[ \t]+                 /* Skip whitespace */
+[ \t]+                  /* Skip whitespace */
+"#".*($|\r\n|\r|\n)     /* Skip commments */
 "func"                  return 'FUNC';
 "return"                return 'RETURN';
 "let"                   return 'LET';
@@ -16,12 +15,18 @@
 [A-Za-z][A-Za-z0-9_]*   return 'WORD';
 0|([1-9][0-9]*)         return 'NUMBER';
 \n                      return 'NEWLINE';
-<<EOF>>                 return 'EOF';
+"->"                    return '->';
+"=="                    return '==';
+"!="                    return '!=';
+"||"                    return '||';
+"&&"                    return '&&';
+"<"                     return '<';
+">"                     return '>';
 "("                     return '(';
 ")"                     return ')';
 "["                     return '[';
 "]"                     return ']';
-"{"                     return '{';
+"{"\s*                  return '{';
 "}"                     return '}';
 "."                     return '.';
 "+"                     return '+';
@@ -30,6 +35,9 @@
 "/"                     return '/';
 "="                     return '=';
 ";"                     return ';';
+":"                     return ':';
+<<EOF>>                 return 'EOF';
+.                       return 'ERROR';
 
 /lex
 
@@ -39,7 +47,7 @@
 %%
 
 root
-  : statements { return $1; }
+  : statements { return new yy.AST.Root($1); }
   ;
 
 statements
@@ -52,13 +60,19 @@ terminated_statement
   ;
 
 block
-  : '{' '}'                                             { $$ = []; }
-  | '{' block_statements '}'                            { $$ = $2; }
+  : '{' block_body '}'                                  { $$ = new yy.AST.Block($2); }
+  | '{' '}'                                             { $$ = new yy.AST.Block([]); }
+  ;
+
+block_body
+  : block_statements statement                          { $$ = $1.concat($2); }
+  | block_statements                                    { $$ = $1; }
+  | statement                                           { $$ = [$1]; }
   ;
 
 block_statements
-  : statement                                           { $$ = [$1]; }
-  | block_statements terminal statement                 { $$ = $1.concat([$3]); }
+  : block_statements terminated_statement               { $$ = $1.concat([$2]); }
+  | terminated_statement                                { $$ = [$1]; }
   ;
 
 statement
@@ -71,35 +85,75 @@ statement
   ;
 
 return_statement
-  : RETURN expression                                   { $$ = {'return': $2}; }
+  : RETURN expression
+      { $$ = new yy.AST.Return($2); }
   ;
 
 function_statement
-  : FUNC identifier function_parameters block           { $$ = {name: $2, params: $3, block: $4}; }
+  : FUNC identifier function_declaration
+     {  var f = $3;
+        f.name = $2;
+        $$ = f;
+     }
+  ;
+
+function_declaration
+  : function_parameters function_return block
+      { var f = new yy.AST.Function($1, $2, $3);
+        $$ = f;
+      }
+  | function_parameters block
+      { var f = new yy.AST.Function($1, null, $2);
+        $$ = f;
+      }
+  ;
+
+function_return
+  : '->' type { $$ = $2; }
   ;
 
 condition_statement
-  : condition_type expression block                     { $$ = {type: $1, cond: $2, block: $3}; }
-  | FOR expression ';' expression ';' expression block  { $$ = {type: 'for', init: $2, cond: $4, after: $6, block: $7} }
-  ;
-
-condition_type
-  : IF                                                  { $$ = 'if'; }
-  | WHILE                                               { $$ = 'while'; }
+  : IF expression block                    
+      { $$ = new yy.AST.If($2, $3, [], null);
+      }
+  | WHILE expression block                    
+      { $$ = new yy.AST.While($2, $3);
+      }
+  | FOR statement ';' statement ';' statement block 
+      { $$ = new yy.AST.For($2, $4, $6, $7);
+      }
   ;
 
 declaration_statement
-  : declaration_type identifier                         { $$ = {decl: $1, name: $2, val: null}; }
-  | declaration_type identifier '=' expression          { $$ = {decl: $1, name: $2, val: $4}; }
+  : declaration_lvalue '=' expression
+      { var kind = $1.constructor.name.toLowerCase();
+        $$ = new yy.AST.Assignment(kind, $1, $2, $3);
+      }
+  | declaration_lvalue
+      { var kind = $1.constructor.name.toLowerCase();
+        $$ = new yy.AST.Assignment(kind, $1, null, null);
+      }
+  ;
+
+declaration_lvalue
+  : declaration_type identifier ':' name_type
+      { var Con = $1;
+        $$ = new Con($2.name, $4);
+      }
+  | declaration_type identifier
+      { var Con = $1;
+        $$ = new Con($2.name, null);
+      }
   ;
 
 declaration_type
-  : LET                                                 { $$ = 'let'; }
-  | VAR                                                 { $$ = 'var'; }
+  : LET                                                 { $$ = yy.AST.Let; }
+  | VAR                                                 { $$ = yy.AST.Var; }
   ;
 
 assignment_statement
-  : expression '=' expression                           { $$ = {lhs: $1, rhs: $3}; }
+  : expression '=' expression
+      { $$ = new yy.AST.Assignment('path', $1, '=', $3); }
   ;
 
 expression_statement
@@ -107,38 +161,68 @@ expression_statement
   ;
 
 expression
-  : multiplicative_expression
+  : logical_expression
   ;
 
-/* Highest precendence */
-multiplicative_expression
-  : multiplicative_expression '*' additive_expression   { $$ = {lhs: $1, rhs: $3}; }
-  | multiplicative_expression '/' additive_expression   { $$ = {lhs: $1, rhs: $3}; }
+logical_expression
+  : logical_expression '||' comparitive_expression      { $$ = yy.binary($1, $2, $3); }
+  | logical_expression '&&' comparitive_expression      { $$ = yy.binary($1, $2, $3); }
+  | comparitive_expression                              { $$ = $1; }
+  ;
+
+comparitive_expression
+  : comparitive_expression '<' equality_expression      { $$ = yy.binary($1, $2, $3); }
+  | comparitive_expression '>' equality_expression      { $$ = yy.binary($1, $2, $3); }
+  | equality_expression                                 { $$ = $1; }
+  ;
+
+equality_expression
+  : equality_expression '==' additive_expression        { $$ = yy.binary($1, $2, $3); }
+  | equality_expression '!=' additive_expression        { $$ = yy.binary($1, $2, $3); }
   | additive_expression                                 { $$ = $1; }
   ;
 
 additive_expression
-  : postfix_expression                                  { $$ = $1; }
-  | additive_expression '+' postfix_expression          { $$ = {lhs: $1, rhs: $3}; }
-  | additive_expression '-' postfix_expression          { $$ = {lhs: $1, rhs: $3}; }
+  : additive_expression '+' multiplicative_expression   { $$ = yy.binary($1, $2, $3); }
+  | additive_expression '-' multiplicative_expression   { $$ = yy.binary($1, $2, $3); }
+  | multiplicative_expression                           { $$ = $1; }
+  ;
+
+/* Highest binary precendence */
+multiplicative_expression
+  : multiplicative_expression '*' postfix_expression    { $$ = yy.binary($1, $2, $3); }
+  | multiplicative_expression '/' postfix_expression    { $$ = yy.binary($1, $2, $3); }
+  | postfix_expression                                  { $$ = $1; }
   ;
 
 postfix_expression
+  : postfix_expression_list
+      { var x = $1;
+        if (x instanceof Array) {
+          // console.log(x)
+          $$ = yy.AST.constructPath(x[0], x.slice(1, x.length));
+        } else {
+          $$ = x;
+        }
+      }
+  ;
+
+postfix_expression_list
   : primary_expression                                  { $$ = $1; }
-  | postfix_expression call                             { $$ = [].concat($1, {call:     $2}); }
-  | postfix_expression '[' expression ']'               { $$ = [].concat($1, {indexer:  $3}); }
-  | postfix_expression '.' identifier                   { $$ = [].concat($1, {property: $3}); }
+  | postfix_expression_list call                        { $$ = [].concat($1, $2); }
+  | postfix_expression_list indexer                     { $$ = [].concat($1, $2); }
+  | postfix_expression_list property                    { $$ = [].concat($1, $2); }
   ;
 
 primary_expression
   : '(' expression ')'                                  { $$ = $2; }
-  | FUNC function_parameters block                      { $$ = {params: $2, block: $3}; }
+  | FUNC function_declaration                           { $$ = $2; }
   | atom                                                { $$ = $1; }
   ;
 
 call
-  : '(' ')'                                             { $$ = []; }
-  | '(' call_arguments ')'                              { $$ = $2; }
+  : '(' ')'                                             { $$ = new yy.AST.Call([]); }
+  | '(' call_arguments ')'                              { $$ = new yy.AST.Call($2); }
   ;
 
 call_arguments
@@ -146,18 +230,34 @@ call_arguments
   | call_arguments ',' expression                       { $$ = $1.concat([$3]); }
   ;
 
+indexer
+  : '[' expression ']'                                  { $$ = new yy.AST.Indexer($2); }
+  ;
+
+property
+  : '.' identifier                                      { $$ = $2; }
+  ;
+
 function_parameters
   : '(' ')'                                             { $$ = []; }
-  | '(' function_parameter_list ')'                     { $$ = $1; }
+  | '(' function_parameter_list ')'                     { $$ = $2; }
   ;
 
 function_parameter_list
   : function_parameter                                  { $$ = [$1]; }
-  | function_parameter_list ',' function_paramete       { $$ = $1.concat([$3]) }
+  | function_parameter_list ',' function_parameter      { $$ = $1.concat([$3]) }
   ;
 
 function_parameter
-  : identifier
+  : WORD ':' name_type                                  { $$ = {name: $1, type: $3}; }
+  ;
+
+type
+  : name_type
+  ;
+
+name_type
+  : WORD   { $$ = new yy.AST.NameType($1); }
   ;
 
 atom
@@ -166,14 +266,20 @@ atom
   ;
 
 identifier
-  : WORD
+  : WORD   { $$ = new yy.AST.Identifier($1); }
   ;
 
 number
-  : NUMBER
+  : NUMBER { $$ = new yy.AST.Literal(parseInt($1, 10), 'Integer'); }
   ;
 
 terminal
+  : terminal terminal_token
+  | terminal_token
+  ;
+
+terminal_token
   : NEWLINE
   | EOF
+  | ';'
   ;

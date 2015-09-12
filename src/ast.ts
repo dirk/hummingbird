@@ -218,6 +218,13 @@ export class Binary extends Node {
   toString(): string {
     return this.lexpr.toString()+' '+this.op+' '+this.rexpr.toString()
   }
+
+  dump() {
+    _win(`binary ${this.op}\n`)
+    this.lexpr.dump()
+    this.rexpr.dump()
+    _ind -= INDENT
+  }
 }
 
 
@@ -235,7 +242,9 @@ export class Literal extends Node {
   print(): void { out.write(this.toString()) }
   toString(): string { return JSON.stringify(this.value) }
 
-  dump(): void { _w(this.toString()+"\n") }
+  dump(): void {
+    _w('literal '+this.toString()+"\n")
+  }
 }
 
 
@@ -397,7 +406,7 @@ export class Function extends Node {
     this.block = block
     // Run some compiler checks
     assertPropertyIsInstanceOf(this, 'args', Array)
-    assertSaneArgs(this.args)
+    // assertSaneArgs(this.args)
   }
   print(): void {
     var args = this.inspectArgs()
@@ -409,9 +418,11 @@ export class Function extends Node {
     var instance = this.type
     if (this.ret) {
       out.write('-> '+this.ret+' ')
-    } else {
+    } else if (instance) {
       // If we computed an inferred return type for the type
       out.write('-i> '+instance.type.ret.dump()+' ')
+    } else {
+      out.write('-> ? ')
     }
     this.block.print()
   }
@@ -433,8 +444,10 @@ export class Function extends Node {
   }
 
   dump() {
-    var args = this.inspectArgs()
-    _win(`function (${args})\n`)
+    var args = this.inspectArgs(),
+        typ  = this.type ? this.type.toString() : '?'
+    _win(`function (${args}) ${typ}\n`)
+    this.block.dump()
     _ind -= INDENT
   }
 }
@@ -720,6 +733,13 @@ export class If extends Node {
       this.elseBlock.print()
     }
   }
+
+  dump() {
+    _win("if\n")
+    this.cond.dump()
+    this.block.dump()
+    _ind -= INDENT
+  }
 }
 
 
@@ -763,6 +783,25 @@ export class For extends Node {
     // Restore indent and print the block
     _ind = i;
     this.block.print()
+  }
+  dump() {
+    var self  = this,
+        attrs = ['init', 'cond', 'after'];
+
+    _win("for\n")
+
+    for (var i = 0; i < attrs.length; i++) {
+      var attr = attrs[i]
+
+      if (self[attr]) {
+        _win(`.${attr}\n`)
+        self[attr].dump()
+        _ind -= INDENT
+      }
+    }
+
+    this.block.dump()
+    _ind -= INDENT
   }
 }
 
@@ -808,6 +847,11 @@ export class Return extends Node {
       return 'return '+this.expr.toString()
     }
     return 'return'
+  }
+  dump() {
+    _win("return\n")
+    if (this.expr) { this.expr.dump() }
+    _ind -= INDENT
   }
 }
 
