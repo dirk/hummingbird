@@ -2,8 +2,8 @@ if (!process.browser) {
   var fs = require('fs')
 
   // Before loading the parser let's check to make sure it's up-to-date
-  var grammarFile       = __dirname+'/grammar.js',
-      grammarSourceFile = __dirname+'/grammar.pegjs',
+  var grammarFile       = __dirname+'/grammar.jison.js',
+      grammarSourceFile = __dirname+'/grammar.jison',
       grammarStat       = null,
       grammarSourceStat = null
 
@@ -26,7 +26,7 @@ if (!process.browser) {
   }
 }//if !process.browser
 
-var grammar = require('./grammar'),
+var grammar = require('./grammar.jison.js'),
     AST     = require('./ast'),
     types   = require('./types')
     stderr  = process.stderr,
@@ -34,12 +34,19 @@ var grammar = require('./grammar'),
 
 var extend = require('util')._extend
 
+grammar.parser.yy = {
+  AST: AST,
+  binary: function (lexpr, op, rexpr) {
+    return new AST.Binary(lexpr, op, rexpr)
+  }
+}
+
 var Parser = function () {
   this.file = '(unknown)'
 }
 Parser.prototype.parse = function (code) {
   var tree
-  tree = grammar.parse(code, {file: this.file})
+  tree = grammar.parse(code)
   return tree
 }
 
