@@ -6,12 +6,15 @@
 [ \t]+                  /* Skip whitespace */
 "#".*($|\r\n|\r|\n)     /* Skip commments */
 "func"                  return 'FUNC';
+"class"                 return 'CLASS';
 "return"                return 'RETURN';
 "let"                   return 'LET';
 "var"                   return 'VAR';
 "if"                    return 'IF';
+"else"                  return 'ELSE';
 "while"                 return 'WHILE';
 "for"                   return 'FOR';
+"null"                  return 'NULL';
 [A-Za-z][A-Za-z0-9_]*   return 'WORD';
 0|([1-9][0-9]*)         return 'NUMBER';
 \n                      return 'NEWLINE';
@@ -118,15 +121,55 @@ function_return
   ;
 
 condition_statement
-  : IF expression block                    
-      { $$ = new yy.AST.If($2, $3, [], null);
-      }
+  : if_statement
   | WHILE expression block                    
       { $$ = new yy.AST.While($2, $3);
       }
   | FOR statement ';' statement ';' statement block 
       { $$ = new yy.AST.For($2, $4, $6, $7);
       }
+  ;
+
+if_statement
+  : if else_if_list else
+      { var i = $1;
+        i.elseIfs = $2;
+        i.elseBlock = $3;
+        $$ = i;
+      }
+  | if else_if_list
+      { var i = $1;
+        i.elseIfs = $2;
+        $$ = i;
+      }
+  | if else
+      { var i = $1;
+        i.elseBlock = $3;
+        $$ = i;
+      }
+  | if
+      { $$ = $1;
+      }
+  ;
+
+/* Fundamental if structure */
+if
+  : IF expression block                    
+      { $$ = new yy.AST.If($2, $3, [], null);
+      }
+  ;
+
+else
+  : ELSE block                                          { $$ = $2; }
+  ;
+
+else_if
+  : ELSE if                                             { $$ = $2; }
+  ;
+
+else_if_list
+  : else_if_list else_if                                { $$ = $1.concat([$2]); }
+  | else_if                                             { $$ = [$1]; }
   ;
 
 declaration_statement
