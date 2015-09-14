@@ -1,12 +1,19 @@
 /* Lexer  ------------------------------------------------------------------ */
 
 %lex
+
+StringEscapeSequence    \\[\'\"\\bfnrtv]
+StringCharacter         ([^\"\\\n\r]+)|({StringEscapeSequence})
+StringLiteral           \"{StringCharacter}\"
+
 %%
 
 [ \t]+                  /* Skip whitespace */
 "#".*($|\r\n|\r|\n)     /* Skip commments */
 "func"                  return 'FUNC';
+"new"                   return 'NEW';
 "class"                 return 'CLASS';
+"init"                  return 'INIT';
 "return"                return 'RETURN';
 "let"                   return 'LET';
 "var"                   return 'VAR';
@@ -17,6 +24,7 @@
 "null"                  return 'NULL';
 [A-Za-z][A-Za-z0-9_]*   return 'WORD';
 0|([1-9][0-9]*)         return 'NUMBER';
+{StringLiteral}         return 'STRING';
 \n                      return 'NEWLINE';
 "->"                    return '->';
 "=="                    return '==';
@@ -85,7 +93,9 @@ block_statements
 
 statement
   : declaration_statement
+  | class_statement
   | function_statement
+  | init_statement
   | return_statement
   | condition_statement
   | assignment_statement
@@ -99,10 +109,16 @@ return_statement
 
 function_statement
   : FUNC identifier function_declaration
-     {  var f = $3;
-        f.name = $2;
-        $$ = f;
+     { var f = $3;
+       f.name = $2;
+       $$ = f;
      }
+  ;
+
+init_statement
+  : INIT function_parameters block
+      { $$ = new yy.AST.Init($2, $3);
+      }
   ;
 
 function_declaration
@@ -199,6 +215,10 @@ declaration_type
   | VAR                                                 { $$ = yy.AST.Var; }
   ;
 
+class_statement
+  : CLASS WORD block                                    { $$ = new yy.AST.Class($2, $3); }
+  ;
+
 assignment_statement
   : expression '=' expression
       { $$ = new yy.AST.Assignment('path', $1, '=', $3); }
@@ -265,7 +285,13 @@ postfix_expression_list
 primary_expression
   : '(' expression ')'                                  { $$ = $2; }
   | FUNC function_declaration                           { $$ = $2; }
+  | new_expression                                      { $$ = $1; }
   | atom                                                { $$ = $1; }
+  ;
+
+new_expression
+  : NEW WORD '(' ')'                                    { $$ = new yy.AST.New($2, []); }
+  | NEW WORD '(' call_arguments ')'                     { $$ = new yy.AST.New($2, $4); }
   ;
 
 call
@@ -311,6 +337,7 @@ name_type
 atom
   : identifier
   | number
+  | string
   ;
 
 identifier
@@ -319,6 +346,14 @@ identifier
 
 number
   : NUMBER { $$ = new yy.AST.Literal(parseInt($1, 10), 'Integer'); }
+  ;
+
+string
+  : STRING
+      { var s = $1;
+        s = s.slice(1, s.length - 1); // Remove the surrounding quotes
+        $$ = new yy.AST.Literal(s, 'String');
+      }
   ;
 
 terminal
