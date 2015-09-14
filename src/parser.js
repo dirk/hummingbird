@@ -26,28 +26,78 @@ if (!process.browser) {
   }
 }//if !process.browser
 
-var grammar = require('./grammar.jison.js'),
-    AST     = require('./ast'),
-    types   = require('./types')
-    stderr  = process.stderr,
-    _       = require('lodash')
+var JisonParser = require('./grammar.jison.js').parser,
+    AST         = require('./ast'),
+    types       = require('./types')
+    stderr      = process.stderr,
+    _           = require('lodash')
 
 var extend = require('util')._extend
 
-grammar.parser.yy = {
+JisonParser.yy = {
   AST: AST,
-  binary: function (lexpr, op, rexpr) {
-    return new AST.Binary(lexpr, op, rexpr)
+  binary: function (token, lexpr, op, rexpr) {
+    return JisonParser.yy.node('Binary', token, lexpr, op, rexpr)
+  },
+  file: '(unknown)',
+  node: function () {
+    throw 'Must be overridden'
   }
 }
 
-var Parser = function () {
+var HBParser = function () {
   this.file = '(unknown)'
 }
-Parser.prototype.parse = function (code) {
-  var tree
-  tree = grammar.parse(code)
+HBParser.prototype.parse = function (code) {
+  this.setupParser()
+  var tree = JisonParser.parse(code)
   return tree
 }
 
-module.exports = Parser
+HBParser.prototype.setupParser = function () {
+  var parser = this
+
+  JisonParser.yy.node = function () {
+
+    var klass = AST[arguments[0]],
+        token = arguments[1],
+        rest  = Array.prototype.slice.call(arguments, 2)
+
+    if (!klass) {
+      throw 'AST class not found: '+arguments[0]
+    }
+    if (!token.first_line) {
+      throw 'Expected token as second argument'
+    }
+
+    var n = null
+    switch (rest.length) {
+      case 0:
+        n = eval('new klass()')
+        break
+      case 1:
+        n = eval('new klass(rest[0])')
+        break
+      case 2:
+        n = eval('new klass(rest[0], rest[1])')
+        break
+      case 3:
+        n = eval('new klass(rest[0], rest[1], rest[2])')
+        break
+      case 4:
+        n = eval('new klass(rest[0], rest[1], rest[2], rest[3])')
+        break
+      default:
+        throw 'Cannot handle node constructor with '+rest.length+' arguments'
+    }
+
+    // { first_line: 2, last_line: 2, first_column: 0, last_column: 5 }
+    n._line   = token.first_line
+    n._column = token.first_column
+    n._file   = parser.file
+    return n
+  }
+
+}// HBParser.prototype.setupParser
+
+module.exports = HBParser

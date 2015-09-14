@@ -18,10 +18,12 @@ StringLiteral           \"{StringCharacter}\"
 "let"                   return 'LET';
 "var"                   return 'VAR';
 "if"                    return 'IF';
-"else"                  return 'ELSE';
+"else"\s*               return 'ELSE';
 "while"                 return 'WHILE';
 "for"                   return 'FOR';
 "null"                  return 'NULL';
+"true"                  return 'TRUE';
+"false"                 return 'FALSE';
 [A-Za-z][A-Za-z0-9_]*   return 'WORD';
 0|([1-9][0-9]*)         return 'NUMBER';
 {StringLiteral}         return 'STRING';
@@ -40,6 +42,7 @@ StringLiteral           \"{StringCharacter}\"
 "{"\s*                  return '{';
 "}"                     return '}';
 "."                     return '.';
+","                     return ',';
 "+"                     return '+';
 "-"                     return '-';
 "*"                     return '*';
@@ -76,8 +79,8 @@ terminated_statement
   ;
 
 block
-  : '{' block_body '}'                                  { $$ = new yy.AST.Block($2); }
-  | '{' '}'                                             { $$ = new yy.AST.Block([]); }
+  : '{' block_body '}'                                  { $$ = yy.node('Block', @1, $2); }
+  | '{' '}'                                             { $$ = yy.node('Block', @1, []); }
   ;
 
 block_body
@@ -104,11 +107,11 @@ statement
 
 return_statement
   : RETURN expression
-      { $$ = new yy.AST.Return($2); }
+      { $$ = yy.node('Return', @1, $2); }
   ;
 
 function_statement
-  : FUNC identifier function_declaration
+  : FUNC WORD function_declaration
      { var f = $3;
        f.name = $2;
        $$ = f;
@@ -123,11 +126,11 @@ init_statement
 
 function_declaration
   : function_parameters function_return block
-      { var f = new yy.AST.Function($1, $2, $3);
+      { var f = yy.node('Function', @1, $1, $2, $3);
         $$ = f;
       }
   | function_parameters block
-      { var f = new yy.AST.Function($1, null, $2);
+      { var f = yy.node('Function', @1, $1, null, $2);
         $$ = f;
       }
   ;
@@ -142,7 +145,7 @@ condition_statement
       { $$ = new yy.AST.While($2, $3);
       }
   | FOR statement ';' statement ';' statement block 
-      { $$ = new yy.AST.For($2, $4, $6, $7);
+      { $$ = yy.node('For', @1, $2, $4, $6, $7);
       }
   ;
 
@@ -160,7 +163,7 @@ if_statement
       }
   | if else
       { var i = $1;
-        i.elseBlock = $3;
+        i.elseBlock = $2;
         $$ = i;
       }
   | if
@@ -171,7 +174,7 @@ if_statement
 /* Fundamental if structure */
 if
   : IF expression block                    
-      { $$ = new yy.AST.If($2, $3, [], null);
+      { $$ = new yy.AST.If($2, $3, null, null);
       }
   ;
 
@@ -191,11 +194,11 @@ else_if_list
 declaration_statement
   : declaration_lvalue '=' expression
       { var kind = $1.constructor.name.toLowerCase();
-        $$ = new yy.AST.Assignment(kind, $1, $2, $3);
+        $$ = yy.node('Assignment', @1, kind, $1, $2, $3);
       }
   | declaration_lvalue
       { var kind = $1.constructor.name.toLowerCase();
-        $$ = new yy.AST.Assignment(kind, $1, false, null);
+        $$ = yy.node('Assignment', @1, kind, $1, false, null);
       }
   ;
 
@@ -216,12 +219,13 @@ declaration_type
   ;
 
 class_statement
-  : CLASS WORD block                                    { $$ = new yy.AST.Class($2, $3); }
+  : CLASS WORD block                                    { $$ = yy.node('Class', @1, $2, $3); }
   ;
 
 assignment_statement
   : expression '=' expression
-      { $$ = new yy.AST.Assignment('path', $1, '=', $3); }
+      { $$ = yy.node('Assignment', @1, 'path', $1, '=', $3);
+      }
   ;
 
 expression_statement
@@ -233,26 +237,26 @@ expression
   ;
 
 logical_expression
-  : logical_expression '||' comparitive_expression      { $$ = yy.binary($1, $2, $3); }
-  | logical_expression '&&' comparitive_expression      { $$ = yy.binary($1, $2, $3); }
+  : logical_expression '||' comparitive_expression      { $$ = yy.binary(@1, $1, $2, $3); }
+  | logical_expression '&&' comparitive_expression      { $$ = yy.binary(@1, $1, $2, $3); }
   | comparitive_expression                              { $$ = $1; }
   ;
 
 comparitive_expression
-  : comparitive_expression '<' equality_expression      { $$ = yy.binary($1, $2, $3); }
-  | comparitive_expression '>' equality_expression      { $$ = yy.binary($1, $2, $3); }
+  : comparitive_expression '<' equality_expression      { $$ = yy.binary(@1, $1, $2, $3); }
+  | comparitive_expression '>' equality_expression      { $$ = yy.binary(@1, $1, $2, $3); }
   | equality_expression                                 { $$ = $1; }
   ;
 
 equality_expression
-  : equality_expression '==' additive_expression        { $$ = yy.binary($1, $2, $3); }
-  | equality_expression '!=' additive_expression        { $$ = yy.binary($1, $2, $3); }
+  : equality_expression '==' additive_expression        { $$ = yy.binary(@1, $1, $2, $3); }
+  | equality_expression '!=' additive_expression        { $$ = yy.binary(@1, $1, $2, $3); }
   | additive_expression                                 { $$ = $1; }
   ;
 
 additive_expression
-  : additive_expression '+' multiplicative_expression   { $$ = yy.binary($1, $2, $3); }
-  | additive_expression '-' multiplicative_expression   { $$ = yy.binary($1, $2, $3); }
+  : additive_expression '+' multiplicative_expression   { $$ = yy.binary(@1, $1, $2, $3); }
+  | additive_expression '-' multiplicative_expression   { $$ = yy.binary(@1, $1, $2, $3); }
   | multiplicative_expression                           { $$ = $1; }
   ;
 
@@ -290,13 +294,13 @@ primary_expression
   ;
 
 new_expression
-  : NEW WORD '(' ')'                                    { $$ = new yy.AST.New($2, []); }
-  | NEW WORD '(' call_arguments ')'                     { $$ = new yy.AST.New($2, $4); }
+  : NEW WORD '(' ')'                                    { $$ = yy.node('New', @1, $2, []); }
+  | NEW WORD '(' call_arguments ')'                     { $$ = yy.node('New', @1, $2, $4); }
   ;
 
 call
-  : '(' ')'                                             { $$ = new yy.AST.Call([]); }
-  | '(' call_arguments ')'                              { $$ = new yy.AST.Call($2); }
+  : '(' ')'                                             { $$ = yy.node('Call', @1, []); }
+  | '(' call_arguments ')'                              { $$ = yy.node('Call', @1, $2); }
   ;
 
 call_arguments
@@ -336,24 +340,36 @@ name_type
 
 atom
   : identifier
-  | number
-  | string
+  | number_literal
+  | string_literal
+  | boolean_literal
   ;
 
 identifier
-  : WORD   { $$ = new yy.AST.Identifier($1); }
+  : WORD   { $$ = yy.node('Identifier', @1, $1); }
   ;
 
-number
-  : NUMBER { $$ = new yy.AST.Literal(parseInt($1, 10), 'Integer'); }
+number_literal
+  : NUMBER { $$ = yy.node('Literal', @1, parseInt($1, 10), 'Integer'); }
   ;
 
-string
+string_literal
   : STRING
       { var s = $1;
         s = s.slice(1, s.length - 1); // Remove the surrounding quotes
         $$ = new yy.AST.Literal(s, 'String');
       }
+  ;
+
+boolean_literal
+  : boolean
+      { $$ = yy.node('Literal', @1, $1, 'Boolean');
+      }
+  ;
+
+boolean
+  : TRUE
+  | FALSE
   ;
 
 terminal
