@@ -34,20 +34,50 @@ var JisonParser = require('./grammar.jison.js').parser,
 
 var extend = require('util')._extend
 
+function annotateNode (node, token) {
+  node._line   = token.first_line
+  node._column = token.first_column
+  node._file   = JisonParser.yy.file
+  return node
+}
+function getRestOfArguments (args, length) {
+  var rest = Array.prototype.slice.call(args, 2)
+  
+  if (rest.length !== length) {
+    throw new Error('Expected '+length+' additional arguments, got '+rest.length)
+  }
+  return rest
+}
+
 JisonParser.yy = {
   AST: AST,
   binary: function (token, lexpr, op, rexpr) {
-    return JisonParser.yy.node('Binary', token, lexpr, op, rexpr)
+    return JisonParser.yy.node3('Binary', token, lexpr, op, rexpr)
   },
   extendIf: function (_if, _else_ifs, _else) {
     if (_else_ifs) { _if.elseIfs = _else_ifs }
     if (_else)     { _if.elseBlock = _else }
     return _if
   },
+  node1: function (klass, token) {
+    var rest = getRestOfArguments(arguments, 1)
+    return annotateNode(new AST[klass](rest[0]), token)
+  },
+  node2: function (klass, token) {
+    var rest = getRestOfArguments(arguments, 2)
+    return annotateNode(new AST[klass](rest[0], rest[1]), token)
+  },
+  node3: function (klass, token) {
+    var rest = getRestOfArguments(arguments, 3)
+    return annotateNode(new AST[klass](rest[0], rest[1], rest[2]), token)
+  },
+  node4: function (klass, token) {
+    var rest = getRestOfArguments(arguments, 4)
+    return annotateNode(new AST[klass](rest[0], rest[1], rest[2], rest[3]), token)
+  },
+
+  // Set by a HBParser instance
   file: '(unknown)',
-  node: function () {
-    throw 'Must be overridden'
-  }
 }
 
 var HBParser = function () {
@@ -55,54 +85,10 @@ var HBParser = function () {
 }
 HBParser.prototype.parse = function (code) {
   this.setupParser()
-  var tree = JisonParser.parse(code)
-  return tree
+  return JisonParser.parse(code)
 }
-
 HBParser.prototype.setupParser = function () {
-  var parser = this
-
-  JisonParser.yy.node = function () {
-
-    var klass = AST[arguments[0]],
-        token = arguments[1],
-        rest  = Array.prototype.slice.call(arguments, 2)
-
-    if (!klass) {
-      throw 'AST class not found: '+arguments[0]
-    }
-    if (!token.first_line) {
-      throw 'Expected token as second argument'
-    }
-
-    var n = null
-    switch (rest.length) {
-      case 0:
-        n = eval('new klass()')
-        break
-      case 1:
-        n = eval('new klass(rest[0])')
-        break
-      case 2:
-        n = eval('new klass(rest[0], rest[1])')
-        break
-      case 3:
-        n = eval('new klass(rest[0], rest[1], rest[2])')
-        break
-      case 4:
-        n = eval('new klass(rest[0], rest[1], rest[2], rest[3])')
-        break
-      default:
-        throw 'Cannot handle node constructor with '+rest.length+' arguments'
-    }
-
-    // { first_line: 2, last_line: 2, first_column: 0, last_column: 5 }
-    n._line   = token.first_line
-    n._column = token.first_column
-    n._file   = parser.file
-    return n
-  }
-
-}// HBParser.prototype.setupParser
+  JisonParser.yy.file = this.file
+}
 
 module.exports = HBParser
