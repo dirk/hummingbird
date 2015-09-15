@@ -11,6 +11,7 @@ StringLiteral           \"{StringCharacter}\"
 [ \t]+                  /* Skip whitespace */
 "#".*($|\r\n|\r|\n)     /* Skip commments */
 "func"                  return 'FUNC';
+"when"                  return 'WHEN';
 "multi"                 return 'MULTI';
 "new"                   return 'NEW';
 "class"                 return 'CLASS';
@@ -42,13 +43,14 @@ StringLiteral           \"{StringCharacter}\"
 "]"                     return ']';
 "{"\s*                  return '{';
 "}"                     return '}';
+"="                     return '=';
+"+="                    return '+=';
 "."                     return '.';
 ","                     return ',';
 "+"                     return '+';
 "-"                     return '-';
 "*"                     return '*';
 "/"                     return '/';
-"="                     return '=';
 ";"                     return ';';
 ":"                     return ':';
 <<EOF>>                 return 'EOF';
@@ -109,15 +111,40 @@ statement
 
 return_statement
   : RETURN expression
-      { $$ = yy.node('Return', @1, $2); }
+      { $$ = yy.node('Return', @1, $2);
+      }
   ;
 
 function_statement
-  : FUNC WORD function_declaration
-     { var f = $3;
-       f.name = $2;
-       $$ = f;
-     }
+  : function_statement_declaration when_extension block
+      { var f = $1;
+        f.when = $2;
+        f.block = $3;
+        $$ = f;
+      }
+  | function_statement_declaration block
+      { var f = $1;
+        f.block = $2;
+        $$ = f;
+      }
+  ;
+
+when_extension
+  : WHEN '(' expression ')'                             { $$ = $3; }
+  ;
+
+/* Name, argument types, and return type */
+function_statement_declaration
+  : FUNC WORD function_parameters function_return
+      { var f = yy.node('Function', @1, $3, $4, null);
+        f.name = $2;
+        $$ = f;
+      }
+  | FUNC WORD function_parameters
+      { var f = yy.node('Function', @1, $3, null, null);
+        f.name = $2;
+        $$ = f;
+      }
   ;
 
 multi_statement
@@ -137,12 +164,10 @@ init_statement
 
 function_declaration
   : function_parameters function_return block
-      { var f = yy.node('Function', @1, $1, $2, $3);
-        $$ = f;
+      { $$ = yy.node('Function', @1, $1, $2, $3);
       }
   | function_parameters block
-      { var f = yy.node('Function', @1, $1, null, $2);
-        $$ = f;
+      { $$ = yy.node('Function', @1, $1, null, $2);
       }
   ;
 
@@ -153,7 +178,7 @@ function_return
 condition_statement
   : if_statement
   | WHILE expression block
-      { $$ = new yy.AST.While($2, $3);
+      { $$ = yy.node('While', @1, $2, $3);
       }
   | FOR statement ';' statement ';' statement block
       { $$ = yy.node('For', @1, $2, $4, $6, $7);
@@ -178,7 +203,7 @@ if_statement
 /* Fundamental if structure */
 if
   : IF expression block
-      { $$ = new yy.AST.If($2, $3, null, null);
+      { $$ = yy.node('If', @1, $2, $3, null, null);
       }
   ;
 
@@ -202,7 +227,7 @@ declaration_statement
       }
   | declaration_lvalue
       { var kind = $1.constructor.name.toLowerCase();
-        $$ = yy.node('Assignment', @1, kind, $1, false, null);
+        $$ = yy.node('Assignment', @1, kind, $1, false, false);
       }
   ;
 
@@ -227,9 +252,14 @@ class_statement
   ;
 
 assignment_statement
-  : expression '=' expression
-      { $$ = yy.node('Assignment', @1, 'path', $1, '=', $3);
+  : expression assignment_op expression
+      { $$ = yy.node('Assignment', @1, 'path', $1, $2, $3);
       }
+  ;
+
+assignment_op
+  : '='
+  | '+='
   ;
 
 expression_statement
@@ -266,8 +296,8 @@ additive_expression
 
 /* Highest binary precendence */
 multiplicative_expression
-  : multiplicative_expression '*' postfix_expression    { $$ = yy.binary($1, $2, $3); }
-  | multiplicative_expression '/' postfix_expression    { $$ = yy.binary($1, $2, $3); }
+  : multiplicative_expression '*' postfix_expression    { $$ = yy.binary(@1, $1, $2, $3); }
+  | multiplicative_expression '/' postfix_expression    { $$ = yy.binary(@1, $1, $2, $3); }
   | postfix_expression                                  { $$ = $1; }
   ;
 
@@ -332,6 +362,7 @@ function_parameter_list
 
 function_parameter
   : WORD ':' name_type                                  { $$ = {name: $1, type: $3}; }
+  | WORD                                                { $$ = {name: $1, type: null}; }
   ;
 
 type
