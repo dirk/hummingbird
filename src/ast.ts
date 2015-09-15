@@ -251,8 +251,8 @@ export class Literal extends Node {
 export class Assignment extends Node {
   type:   any
   lvalue: Let|Var|Identifier
-  op:     string
-  rvalue: Node
+  op:     string|boolean     // `false` if not present
+  rvalue: Node|boolean       // `false` if not present
 
   constructor(type, lvalue, op, rvalue) {
     super()
@@ -262,7 +262,9 @@ export class Assignment extends Node {
     // Possible values: '=', '+=', or null
     this.op     = op
     // Only allowed .op for lets/vars is a '='
-    if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
+    if ((this.type === 'let' || this.type === 'var') &&
+         (this.op !== '=' && this.op !== false))
+    {
       throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
     }
     switch (this.type) {
@@ -454,7 +456,7 @@ export class Function extends Node {
 
 
 export class Multi extends Node {
-  name: any
+  name: string
   args: any
   ret:  any
   type: types.Multi
@@ -464,6 +466,7 @@ export class Multi extends Node {
     this.name = name
     this.args = args
     this.ret  = ret
+    assertPropertyIsTypeOf(this, 'name', 'string')
   }
   print() {
     var args = this.args.map(function (arg) {
@@ -713,7 +716,7 @@ export class If extends Node {
     super()
     this.cond      = cond
     this.block     = block
-    this.elseIfs   = elseIfs ? elseIfs : null
+    this.elseIfs   = elseIfs   ? elseIfs   : []
     this.elseBlock = elseBlock ? elseBlock : null
   }
   print() {

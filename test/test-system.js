@@ -169,7 +169,7 @@ describe('System', function () {
       // Check the single else-if
       var ei = i.elseIfs[0]
       expect(ei).to.be.an(AST.If)
-      expect(ei.elseIfs).to.be(null)
+      expect(ei.elseIfs).to.eql([])
       expect(ei.elseBlock).to.be(null)
     }
     it('should parse the first formulation', function () {
