@@ -1,8 +1,7 @@
 node_modules
 .DS_Store
-src/grammar.js
-src/grammar2.js
 src/grammar.jison.js
+src/grammar.pegjs.js
 test/spec
 dist
 .srclib-cache
