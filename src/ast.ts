@@ -305,7 +305,6 @@ function assertInstanceOf(value, type, msg?) {
 }
 
 export function constructPath (name: Identifier, path, parent = null) {
-  assertInstanceOf(name, Identifier)
   if (path.length == 0) {
     return name
   }
@@ -355,7 +354,8 @@ function assertHasProperty (obj, prop) {
 
 function assertPropertyIsInstanceOf (recv, prop, type) {
   if (recv[prop] instanceof type) { return }
-  throw new Error('Expected '+prop+' to be an instance of '+type.name)
+  var gotName = recv[prop].constructor.name
+  throw new Error('Expected '+prop+' to be an instance of '+type.name+', got '+gotName)
 }
 function assertPropertyIsTypeOf (recv, prop, type) {
   if (typeof recv[prop] === type) { return }

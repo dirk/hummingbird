@@ -85,6 +85,8 @@ var HBParser = function () {
 }
 HBParser.prototype.parse = function (code) {
   this.setupParser()
+  // Replace ALL "\r" in code
+  code = code.replace(/\r/g, '')
   return JisonParser.parse(code)
 }
 HBParser.prototype.setupParser = function () {

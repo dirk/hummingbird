@@ -9,7 +9,7 @@ StringLiteral           \"{StringCharacter}\"
 %%
 
 [ \t]+                  /* Skip whitespace */
-"#".*($|\r\n|\r|\n)     /* Skip commments */
+"#".*($|\n)             /* Skip commments */
 "func"                  return 'FUNC';
 "when"                  return 'WHEN';
 "multi"                 return 'MULTI';
@@ -20,7 +20,7 @@ StringLiteral           \"{StringCharacter}\"
 "let"                   return 'LET';
 "var"                   return 'VAR';
 "if"                    return 'IF';
-\s*"else"\s*            return 'ELSE'; /* Gobble space on either side */
+\n*"else"\n*            return 'ELSE'; /* Gobble space on either side */
 "while"                 return 'WHILE';
 "for"                   return 'FOR';
 "null"                  return 'NULL';
@@ -41,7 +41,7 @@ StringLiteral           \"{StringCharacter}\"
 ")"                     return ')';
 "["                     return '[';
 "]"                     return ']';
-"{"\s*                  return '{';
+"{"\n*                  return '{';
 "}"                     return '}';
 "="                     return '=';
 "+="                    return '+=';
@@ -73,7 +73,7 @@ root_body
   ;
 
 statements
-  : statements terminated_statement                     { $$ = $1.concat([$2]); }
+  : statements terminated_statement                     { $1.push($2); $$ = $1; }
   | terminated_statement                                { $$ = [$1]; }
   ;
 
@@ -87,13 +87,13 @@ block
   ;
 
 block_body
-  : block_statements statement                          { $$ = $1.concat($2); }
+  : block_statements statement                          { $1.push($2); $$ = $1; }
   | block_statements                                    { $$ = $1; }
   | statement                                           { $$ = [$1]; }
   ;
 
 block_statements
-  : block_statements terminated_statement               { $$ = $1.concat([$2]); }
+  : block_statements terminated_statement               { $1.push($2); $$ = $1; }
   | terminated_statement                                { $$ = [$1]; }
   ;
 
@@ -216,7 +216,7 @@ else_if
   ;
 
 else_if_list
-  : else_if_list else_if                                { $$ = $1.concat([$2]); }
+  : else_if_list else_if                                { $1.push($2); $$ = $1; }
   | else_if                                             { $$ = [$1]; }
   ;
 
@@ -315,9 +315,9 @@ postfix_expression
 
 postfix_expression_list
   : primary_expression                                  { $$ = $1; }
-  | postfix_expression_list call                        { $$ = [].concat($1, $2); }
-  | postfix_expression_list indexer                     { $$ = [].concat($1, $2); }
-  | postfix_expression_list property                    { $$ = [].concat($1, $2); }
+  | postfix_expression_list call                        { $$ = fastConcat($1, $2); }
+  | postfix_expression_list indexer                     { $$ = fastConcat($1, $2); }
+  | postfix_expression_list property                    { $$ = fastConcat($1, $2); }
   ;
 
 primary_expression
@@ -338,8 +338,8 @@ call
   ;
 
 call_arguments
-  : expression                                          { $$ = [$1]; }
-  | call_arguments ',' expression                       { $$ = $1.concat([$3]); }
+  : call_arguments ',' expression                       { $1.push($3); $$ = $1; }
+  | expression                                          { $$ = [$1]; }
   ;
 
 indexer
@@ -356,8 +356,8 @@ function_parameters
   ;
 
 function_parameter_list
-  : function_parameter                                  { $$ = [$1]; }
-  | function_parameter_list ',' function_parameter      { $$ = $1.concat([$3]) }
+  : function_parameter_list ',' function_parameter      { $1.push($3); $$ = $1; }
+  | function_parameter                                  { $$ = [$1]; }
   ;
 
 function_parameter
@@ -426,3 +426,16 @@ terminal_token
   | EOF
   | ';'
   ;
+
+%%
+
+function fastConcat (left, right) {
+  if (!(left instanceof Array)) {
+    left = [left]
+  }
+  if (right instanceof Array) {
+    throw new Error("Cannot fastConcat right Array")
+  }
+  left.push(right)
+  return left
+}

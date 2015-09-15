@@ -108,14 +108,8 @@ module.exports = function (p) {
     return new AST.Return(expr)
   }
 
-
-
-  p.parseCallExpr = function (args) {
+  p.parseCall = function (args) {
     return new AST.Call(args)
-  }
-
-  p.parseCallArgs = function (args) {
-    return args
   }
 
   p.parseProperty = function (base, property) {
@@ -130,11 +124,7 @@ module.exports = function (p) {
     return AST.constructPath(name, path)
   }
 
-  p.parsePathProperty = function (identifier) {
-    return identifier
-  }
-
-  p.parsePathIndexer = function (expr) {
+  p.parseIndexer = function (expr) {
     return new AST.Indexer(expr)
   }
 
