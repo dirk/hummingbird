@@ -149,7 +149,7 @@ module.exports = function (p) {
     return new AST.NameType(name)
   }
 
-  p.parseMutli = function (name, args, ret) {
+  p.parseMulti = function (name, args, ret) {
     return new AST.Multi(name, args, ret)
   }
 

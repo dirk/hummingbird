@@ -11,6 +11,7 @@ StringLiteral           \"{StringCharacter}\"
 [ \t]+                  /* Skip whitespace */
 "#".*($|\r\n|\r|\n)     /* Skip commments */
 "func"                  return 'FUNC';
+"multi"                 return 'MULTI';
 "new"                   return 'NEW';
 "class"                 return 'CLASS';
 "init"                  return 'INIT';
@@ -98,6 +99,7 @@ statement
   : declaration_statement
   | class_statement
   | function_statement
+  | multi_statement
   | init_statement
   | return_statement
   | condition_statement
@@ -116,6 +118,15 @@ function_statement
        f.name = $2;
        $$ = f;
      }
+  ;
+
+multi_statement
+  : MULTI WORD function_parameters function_return
+      { $$ = yy.node('Multi', @1, $2, $3, $4);
+      }
+  | MULTI WORD function_parameters
+      { $$ = yy.node('Multi', @1, $2, $3, null);
+      }
   ;
 
 init_statement
@@ -141,10 +152,10 @@ function_return
 
 condition_statement
   : if_statement
-  | WHILE expression block                    
+  | WHILE expression block
       { $$ = new yy.AST.While($2, $3);
       }
-  | FOR statement ';' statement ';' statement block 
+  | FOR statement ';' statement ';' statement block
       { $$ = yy.node('For', @1, $2, $4, $6, $7);
       }
   ;
@@ -196,7 +207,7 @@ declaration_statement
   ;
 
 declaration_lvalue
-  : declaration_type identifier ':' name_type
+  : declaration_type identifier ':' type
       { var Con = $1;
         $$ = new Con($2.name, $4);
       }
@@ -325,10 +336,19 @@ function_parameter
 
 type
   : name_type
+  | function_type
   ;
 
 name_type
-  : WORD   { $$ = new yy.AST.NameType($1); }
+  : WORD
+      { $$ = yy.node('NameType', @1, $1);
+      }
+  ;
+
+function_type
+  : function_parameters function_return
+      { $$ = yy.node('FunctionType', @1, $1, $2);
+      }
   ;
 
 atom

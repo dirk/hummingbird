@@ -147,7 +147,7 @@ leftpath     = n:identifier path:(leftproperty)* { return p.parseLeft(n, path) }
 leftindexer  = "[" _ e:expr _ "]" { return pos(p.parseLeftIndexer(e)) }
 leftproperty = "." i:identifier { return pos(p.parseLeftProperty(i)) }
 
-multistmt = "multi" whitespace n:name _ a:args _ r:ret? { return pos(p.parseMutli(n, a, r)) }
+multistmt = "multi" whitespace n:name _ a:args _ r:ret? { return pos(p.parseMulti(n, a, r)) }
 
 expr = e:binaryexpr { return p.parseExpr(e) }
 
