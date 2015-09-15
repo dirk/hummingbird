@@ -39,6 +39,11 @@ JisonParser.yy = {
   binary: function (token, lexpr, op, rexpr) {
     return JisonParser.yy.node('Binary', token, lexpr, op, rexpr)
   },
+  extendIf: function (_if, _else_ifs, _else) {
+    if (_else_ifs) { _if.elseIfs = _else_ifs }
+    if (_else)     { _if.elseBlock = _else }
+    return _if
+  },
   file: '(unknown)',
   node: function () {
     throw 'Must be overridden'

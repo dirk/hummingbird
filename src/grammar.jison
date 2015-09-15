@@ -18,7 +18,7 @@ StringLiteral           \"{StringCharacter}\"
 "let"                   return 'LET';
 "var"                   return 'VAR';
 "if"                    return 'IF';
-"else"\s*               return 'ELSE';
+\s*"else"\s*            return 'ELSE'; /* Gobble space on either side */
 "while"                 return 'WHILE';
 "for"                   return 'FOR';
 "null"                  return 'NULL';
@@ -151,20 +151,13 @@ condition_statement
 
 if_statement
   : if else_if_list else
-      { var i = $1;
-        i.elseIfs = $2;
-        i.elseBlock = $3;
-        $$ = i;
+      { $$ = yy.extendIf($1, $2, $3);
       }
   | if else_if_list
-      { var i = $1;
-        i.elseIfs = $2;
-        $$ = i;
+      { $$ = yy.extendIf($1, $2);
       }
   | if else
-      { var i = $1;
-        i.elseBlock = $2;
-        $$ = i;
+      { $$ = yy.extendIf($1, null, $2);
       }
   | if
       { $$ = $1;
@@ -173,7 +166,7 @@ if_statement
 
 /* Fundamental if structure */
 if
-  : IF expression block                    
+  : IF expression block
       { $$ = new yy.AST.If($2, $3, null, null);
       }
   ;

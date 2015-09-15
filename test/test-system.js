@@ -164,7 +164,7 @@ describe('System', function () {
       var i = root.statements[1]
       expect(i).to.be.an(AST.If)
       expect(i.elseIfs).to.be.ok()
-      expect(i.elseIfs.length).to.eql(1)
+      expect(i.elseIfs.length).to.eql(2)
       expect(i.elseBlock).to.be(null)
       // Check the single else-if
       var ei = i.elseIfs[0]
@@ -172,9 +172,10 @@ describe('System', function () {
       expect(ei.elseIfs).to.be(null)
       expect(ei.elseBlock).to.be(null)
     }
-    xit('should parse the first formulation', function () {
+    it('should parse the first formulation', function () {
       var source = preamble+
                    "if a { }\n"+// FIXME: Allow newlines between `}` and `else`
+                   "else if a { }\n"+
                    "else if a { }\n"
       var tree = parseAndWalk(source)
       checkTree(tree)
@@ -182,11 +183,14 @@ describe('System', function () {
     it('should parse the second formulation', function () {
       var source = preamble+
                    "if a {\n"+
-                   "} else if a { }\n"
+                   "} else if a {\n"+
+                   "} else if a {\n"+
+                   "}\n"
       expect(parseAndWalk(source)).to.be.ok()
     })
     it('should parse the third formulation', function () {
       var source = preamble+
+                   "if a { } else\n"+
                    "if a { } else\n"+
                    "if a { }\n"
       expect(parseAndWalk(source)).to.be.ok()
