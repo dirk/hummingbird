@@ -1,10 +1,11 @@
 var ParserJison = require('../src/parser'),
     GrammarPegjs = require('../src/grammar.pegjs.js')
 
-var AST   = require('../src/ast'),
-    types = require('../src/types'),
-    fs    = require('fs'),
-    Benchmark = require('benchmark')
+var AST         = require('../src/ast'),
+    types       = require('../src/types'),
+    reportError = require('../src/util').reportError,
+    fs          = require('fs'),
+    Benchmark   = require('benchmark')
 
 var parserJison = new ParserJison()
 
@@ -15,11 +16,14 @@ function parseJison (code) {
   return parserJison.parse(code)
 }
 
-var exampleCode = fs.readFileSync(__dirname+'/../examples/fibonacci.hb', 'utf8')
+var exampleCode = fs.readFileSync(__dirname+'/../examples/all-2.hb', 'utf8')
+try {
+  parseJison(exampleCode)
+} catch (err) {
+  reportError(err)
+  process.exit(0)
+}
 
-var suite = new Benchmark.Suite()
-
-suite
 var jisonBenchmark = new Benchmark('Jison', function () {
   parseJison(exampleCode)
 })
