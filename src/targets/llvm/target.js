@@ -30,7 +30,7 @@ function initializeTarget (ctx) {
   // Expose TargetData on the context
   ctx.targetData = targetData
 
-  ctx.logger.info('Initialized target compilation for '+cpu)
+  ctx.logger.info('Initialized target compilation for '+cpu+' ('+nativeTargetTriple+')')
 }
 
 module.exports = {

@@ -55,7 +55,7 @@ logger.add(winston.transports.Console, {
 
 function showHelp() {
   // var help = optimist.help().trim()+"\n"
-  var help = "Usage: hbn [options] [entry]\n\n"
+  var help = "Usage: hbn [entry-file] [options]\n\n"
   help += "Options:\n"
   help += "  --no-gc  Don't link the GC\n"
   help += "  -v       Verbose\n"
