@@ -567,17 +567,17 @@ export class LLVMCompiler {
     blockCtx.slots.buildSet(this.ctx, assg.lvalue.name, rvalue)
   }
 
-  compileAssignmentToStorable(assg, blockCtx, lvalue) {
+  compileAssignmentToStorable(assg, blockCtx, lvalue): Buffer {
     var ctx       = this.ctx,
         name      = lvalue.name,
         path      = lvalue.path,
         pair      = getTypeAndSlotsForName(ctx, blockCtx, name),
-        slots     = pair[0],
-        itemType  = pair[1],
+        slots     = pair.slots,
+        itemType  = pair.type,
         itemValue = null
     // If there's no path then we can just return a storable for the local
     if (!lvalue.child) {
-      return slots.getStorable(name)
+      return slots.getStorable(ctx, name)
     } else {
       itemValue = slots.buildGet(ctx, name)
       // Get the native type and cast the pointer to it
@@ -770,8 +770,8 @@ export class LLVMCompiler {
     if (parent === null) {
       // Look up ourselves rather than building off a parent
       var pair = getTypeAndSlotsForName(this.ctx, blockCtx, id.name)
-      newValue = pair[0].buildGet(this.ctx, id.name)
-      newType  = pair[1]
+      newValue = pair.slots.buildGet(this.ctx, id.name)
+      newType  = pair.type
     } else {
       var value = exprCtx.value
       // Check the types and then build the GEP
@@ -1193,9 +1193,19 @@ export class LLVMCompiler {
 
 }// LLVMCompiler
 
+class SlotsTypeLookup {
+  slots: slots.Slots
+  type:  types.Type
+
+  constructor(slots: slots.Slots, type: types.Type) {
+    this.slots = slots
+    this.type  = type
+  }
+}
+
 // Look up the type and Slots for a given name; begins search from the passed
 // block-context. Returns a 2-tuple of Slots and Type.
-function getTypeAndSlotsForName (ctx: Context, blockCtx: BlockContext, name: string, foundCb?) {
+function getTypeAndSlotsForName (ctx: Context, blockCtx: BlockContext, name: string, foundCb?): SlotsTypeLookup {
   // Keep tracking of the scope of the beginning of the chain
   var outermostScope = null
   var type = blockCtx.block.scope.get(name, function (scope, _type) {
@@ -1207,7 +1217,7 @@ function getTypeAndSlotsForName (ctx: Context, blockCtx: BlockContext, name: str
   if (!slots) {
     throw new Error("Couldn't find slots for scope #"+outermostScope.id)
   }
-  return [slots, type]
+  return new SlotsTypeLookup(slots, type)
 }
 
 function tryUpdatingExpressionContext (exprCtx: ExprContext, type: types.Type, value: Buffer) {

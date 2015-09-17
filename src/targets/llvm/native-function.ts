@@ -32,7 +32,7 @@ class NativeFunction {
   }
 
   computeType() {
-    var args  = this.args.map(nativeTypeForType)
+    var args = this.args.map(nativeTypeForType)
     if (this.ret instanceof types.Instance) {
       throw new ICE('Expected return type to be plain type; got instance')
     }
