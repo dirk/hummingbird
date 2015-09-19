@@ -1,28 +1,45 @@
+sudo: false
+
+# Support for Node.js v4.x
+env:
+  - CXX=g++-4.8
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-precise-3.6
+    packages:
+      - g++-4.8
+      # Support for LLVM
+      - libstdc++6
+      # Install LLVM
+      - llvm-3.6
+      - llvm-3.6-dev
+      - llvm-3.6-runtime
+      - libllvm3.6
+      - libllvm3.6-dbg
+      - clang-3.6
+      # BDW GC build dependency
+      - libc6-dev
+      - libgc-dev
+
 language: node_js
+
 node_js:
+  - "stable"
+  - "4.1.0"
   - "0.12"
-  - "iojs"
-  - "iojs-v1.0.4"
-before_install:
-  # Setup sources and keys for LLVM
-  - sudo sh -c "echo 'deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.5 main' >> /etc/apt/sources.list"
-  - sudo sh -c "echo 'deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main' >> /etc/apt/sources.list"
-  - wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
-  # Setup packages and install LLVM
-  - sudo apt-get update
-  - sudo apt-get install -y --force-yes libstdc++6
-  - sudo apt-get install -y --force-yes llvm-3.5 llvm-3.5-dev llvm-3.5-runtime libllvm3.5 clang-3.5
-  # BDW GC built dependency
-  - sudo apt-get install libc6-dev libgc-dev
+
 before_script:
   # Add LLVM shared library
-  - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.5/lib:$LD_LIBRARY_PATH"
+  - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.6/lib:$LD_LIBRARY_PATH"
   # Setup library for development building
   - "./jake all"
+
 script:
   - "node_modules/.bin/mocha test"
   - "node_modules/.bin/mocha test/spec"
   - "node_modules/.bin/mocha test/llvm"
+
 after_script:
   - "npm run report-coverage"
-
