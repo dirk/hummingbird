@@ -8,7 +8,7 @@
     "jison": "~0.4.15",
     "optimist": "~0.6.1",
     "xregexp": "~2.0.0",
-    "llvm2": "0.2.13",
+    "llvm2": "0.3.0",
     "requirejs": "~2.1.17",
     "lodash": "~3.8.0",
     "source-map": "~0.4.2",
