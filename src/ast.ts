@@ -44,7 +44,7 @@ export class Node {
   print() { out.write(inspect(this)) }
   dump() {
     var name = this.constructor['name']
-    throw new Error('Dumping node yet implemented for node: '+name)
+    throw new Error('Dumping not yet implemented for node: '+name)
   }
   compile(...rest) {
     throw new Error('Compilation not yet implemented for node: '+this.constructor['name'])
@@ -218,6 +218,13 @@ export class Binary extends Node {
   toString(): string {
     return this.lexpr.toString()+' '+this.op+' '+this.rexpr.toString()
   }
+
+  dump() {
+    _win(`binary ${this.op}\n`)
+    this.lexpr.dump()
+    this.rexpr.dump()
+    _ind -= INDENT
+  }
 }
 
 
@@ -235,15 +242,17 @@ export class Literal extends Node {
   print(): void { out.write(this.toString()) }
   toString(): string { return JSON.stringify(this.value) }
 
-  dump(): void { _w(this.toString()+"\n") }
+  dump(): void {
+    _w('literal '+this.toString()+"\n")
+  }
 }
 
 
 export class Assignment extends Node {
   type:   any
   lvalue: Let|Var|Identifier
-  op:     string
-  rvalue: Node
+  op:     string|boolean     // `false` if not present
+  rvalue: Node|boolean       // `false` if not present
 
   constructor(type, lvalue, op, rvalue) {
     super()
@@ -253,7 +262,9 @@ export class Assignment extends Node {
     // Possible values: '=', '+=', or null
     this.op     = op
     // Only allowed .op for lets/vars is a '='
-    if ((this.type === 'let' || this.type === 'var') && this.op !== '=') {
+    if ((this.type === 'let' || this.type === 'var') &&
+         (this.op !== '=' && this.op !== false))
+    {
       throw new Error('Invalid operator on '+this.type+" statement: '"+this.op+"'")
     }
     switch (this.type) {
@@ -294,7 +305,6 @@ function assertInstanceOf(value, type, msg?) {
 }
 
 export function constructPath (name: Identifier, path, parent = null) {
-  assertInstanceOf(name, Identifier)
   if (path.length == 0) {
     return name
   }
@@ -344,7 +354,8 @@ function assertHasProperty (obj, prop) {
 
 function assertPropertyIsInstanceOf (recv, prop, type) {
   if (recv[prop] instanceof type) { return }
-  throw new Error('Expected '+prop+' to be an instance of '+type.name)
+  var gotName = recv[prop].constructor.name
+  throw new Error('Expected '+prop+' to be an instance of '+type.name+', got '+gotName)
 }
 function assertPropertyIsTypeOf (recv, prop, type) {
   if (typeof recv[prop] === type) { return }
@@ -397,7 +408,7 @@ export class Function extends Node {
     this.block = block
     // Run some compiler checks
     assertPropertyIsInstanceOf(this, 'args', Array)
-    assertSaneArgs(this.args)
+    // assertSaneArgs(this.args)
   }
   print(): void {
     var args = this.inspectArgs()
@@ -409,9 +420,11 @@ export class Function extends Node {
     var instance = this.type
     if (this.ret) {
       out.write('-> '+this.ret+' ')
-    } else {
+    } else if (instance) {
       // If we computed an inferred return type for the type
       out.write('-i> '+instance.type.ret.dump()+' ')
+    } else {
+      out.write('-> ? ')
     }
     this.block.print()
   }
@@ -433,15 +446,17 @@ export class Function extends Node {
   }
 
   dump() {
-    var args = this.inspectArgs()
-    _win(`function (${args})\n`)
+    var args = this.inspectArgs(),
+        typ  = this.type ? this.type.toString() : '?'
+    _win(`function (${args}) ${typ}\n`)
+    this.block.dump()
     _ind -= INDENT
   }
 }
 
 
 export class Multi extends Node {
-  name: any
+  name: string
   args: any
   ret:  any
   type: types.Multi
@@ -451,6 +466,7 @@ export class Multi extends Node {
     this.name = name
     this.args = args
     this.ret  = ret
+    assertPropertyIsTypeOf(this, 'name', 'string')
   }
   print() {
     var args = this.args.map(function (arg) {
@@ -551,7 +567,11 @@ export class Identifier extends Node {
   }
   print(): void {
     if (this.parent) { out.write('.') }
-    out.write(this.toString())
+    out.write(this.name)
+
+    if (this.child) {
+      this.child.print()
+    }
   }
   toString(): string {
     var base = (this.parent ? '.' : '')
@@ -617,7 +637,7 @@ export class Call extends Node {
     _ind -= INDENT
 
     if (this.child) {
-      this.child.print()
+      this.child.dump()
     }
 
     _ind -= INDENT
@@ -640,7 +660,6 @@ export class Indexer extends Node {
     return this.type
   }
 
-
   print() {
     out.write(this.toString())
     if (this.child) {
@@ -650,6 +669,17 @@ export class Indexer extends Node {
 
   toString() {
     return '['+this.expr.toString()+']'
+  }
+
+  dump() {
+    _win("indexer\n")
+    this.expr.dump()
+
+    if (this.child) {
+      this.child.dump()
+    }
+
+    _ind -= INDENT
   }
 }
 
@@ -686,7 +716,7 @@ export class If extends Node {
     super()
     this.cond      = cond
     this.block     = block
-    this.elseIfs   = elseIfs ? elseIfs : null
+    this.elseIfs   = elseIfs   ? elseIfs   : []
     this.elseBlock = elseBlock ? elseBlock : null
   }
   print() {
@@ -705,6 +735,13 @@ export class If extends Node {
       out.write(" else ")
       this.elseBlock.print()
     }
+  }
+
+  dump() {
+    _win("if\n")
+    this.cond.dump()
+    this.block.dump()
+    _ind -= INDENT
   }
 }
 
@@ -750,6 +787,25 @@ export class For extends Node {
     _ind = i;
     this.block.print()
   }
+  dump() {
+    var self  = this,
+        attrs = ['init', 'cond', 'after'];
+
+    _win("for\n")
+
+    for (var i = 0; i < attrs.length; i++) {
+      var attr = attrs[i]
+
+      if (self[attr]) {
+        _win(`.${attr}\n`)
+        self[attr].dump()
+        _ind -= INDENT
+      }
+    }
+
+    this.block.dump()
+    _ind -= INDENT
+  }
 }
 
 
@@ -794,6 +850,11 @@ export class Return extends Node {
       return 'return '+this.expr.toString()
     }
     return 'return'
+  }
+  dump() {
+    _win("return\n")
+    if (this.expr) { this.expr.dump() }
+    _ind -= INDENT
   }
 }
 

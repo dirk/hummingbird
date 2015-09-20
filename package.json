@@ -25,14 +25,16 @@
     "expect.js": "~0.3.1",
     "blanket": "~1.1.7",
     "mocha-lcov-reporter": "~0.0.2",
-    "coveralls": "~2.11.2",
+    "coveralls": "~2.11.4",
     "glob": "~5.0.5",
     "chokidar": "~1.0.1",
     "chalk": "~1.0.0",
-    "prettyjson": "~1.1.2"
+    "prettyjson": "~1.1.2",
+    "benchmark": "~1.0.0"
   },
   "scripts": {
-    "grammar": "node_modules/.bin/pegjs --cache src/grammar.pegjs",
+    "grammar-pegjs": "node_modules/.bin/pegjs src/grammar.pegjs src/grammar.pegjs.js",
+    "grammar-jison": "node_modules/.bin/jison src/grammar.jison -o src/grammar.jison.js",
     "test": "node_modules/.bin/mocha",
     "test-spec": "node_modules/.bin/mocha test/spec",
     "test-llvm": "node_modules/.bin/mocha test/llvm",

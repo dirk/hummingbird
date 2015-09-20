@@ -405,7 +405,7 @@ TypeSystem.prototype.visitClassFunction = function (node, scope, klass, searchIn
   if (!functionName) {
     throw new TypeError('Missing function name', node)
   }
-  
+
   // Now look up the parent `multi` in the containing block
   var multiNode: AST.Multi = searchInParent(function (stmt) {
     if (stmt.constructor === AST.Multi && stmt.name === functionName) {
@@ -616,7 +616,7 @@ TypeSystem.prototype.visitLet = function (node, scope) {
   var lvalueType: any = new types.Unknown(),
       lvalue          = <AST.Let>node.lvalue,
       name            = lvalue.name
-  
+
   // If we have an explicit type then look it up
   if (lvalue.immediateType) {
     var immediateTypeNode = lvalue.immediateType
