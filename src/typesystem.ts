@@ -206,9 +206,6 @@ TypeSystem.prototype.visitStatement = function (node, scope, parentNode) {
     case AST.Export:
       this.visitExport(node, scope, parentNode)
       break
-    case AST.Property:
-      this.visitProperty(node, scope, parentNode)
-      break
     case AST.Call:
       this.visitCall(node, scope)
       break
@@ -1019,6 +1016,12 @@ TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
 
   // Now compute the ultimate type
   node.initialType = node.type
+  node.type        = getUltimateType(node)
+}
+
+function getUltimateType (root: AST.PathItem): types.Type {
+  var child = root.child
+
   // Descend down the chain
   while (true) {
     if (child.child) {
@@ -1027,10 +1030,12 @@ TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
       break
     }
   }
+
   if (!child || !child.type) {
-    throw new TypeError('Missing child type for ultimate root Identifier type')
+    var name = root.constructor['name']
+    throw new TypeError(`Missing child type for ultimate root ${name} type`)
   }
-  node.type = child.type
+  return child.type
 }
 
 TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {

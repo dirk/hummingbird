@@ -282,16 +282,19 @@ export class Assignment extends Node {
     if (this.rvalue) {
       var op = (this.op === null) ? '?' : this.op.toString()
       out.write(' '+op+' ')
-      // _ind += INDENT
-      this.rvalue.print()
-      // _ind -= INDENT
+
+      var rvalue = this.rvalue
+      if (rvalue instanceof Node) { rvalue.print() }
     }
-  }
+  }//print()
 
   dump() {
+    var rvalue = this.rvalue
     _win(this.type+"\n")
+
     this.lvalue.dump()
-    this.rvalue.dump()
+    if (rvalue instanceof Node) { rvalue.dump() }
+
     _ind -= INDENT
   }
 }
@@ -544,12 +547,12 @@ export class New extends Node {
 }
 
 
-type Pathable = Call|Identifier|Indexer
+export type PathItem = Call|Identifier|Indexer
 
 export class Identifier extends Node {
   name:   string
-  parent: Pathable
-  child:  Pathable
+  parent: PathItem
+  child:  PathItem
   // The initial type
   initialType: any
   // Ultimate type (either the initial if no children or the ultimate type
@@ -600,8 +603,8 @@ export class Identifier extends Node {
 
 export class Call extends Node {
   args:     any
-  parent:   Pathable
-  child:    Pathable
+  parent:   PathItem
+  child:    PathItem
   type:     any
   baseType: any
 
@@ -646,8 +649,8 @@ export class Call extends Node {
 
 export class Indexer extends Node {
   expr:   any
-  parent: Pathable
-  child:  Pathable
+  parent: PathItem
+  child:  PathItem
   type:   any
 
   constructor(expr) {
@@ -683,27 +686,7 @@ export class Indexer extends Node {
   }
 }
 
-
-export class Property extends Node {
-  base:     any
-  property: any
-  parent:   any
-  type:     any
-  baseType: any
-  
-  constructor(base, property) {
-    super()
-    this.base     = base
-    this.property = property
-    this.parent   = null
-    assertPropertyIsInstanceOf(this, 'base', Node)
-    assertPropertyIsInstanceOf(this, 'property', Node)
-  }
-  toString() {
-    return this.base+'.'+this.property.toString()
-  }
-  print() { out.write(this.toString()) }
-}
+export type PathRoot = Identifier
 
 
 export class If extends Node {

@@ -12,7 +12,7 @@ if (!process.browser) {
     grammarStat = fs.statSync(grammarFile)
   } catch (err) {
     if (err.code === 'ENOENT') {
-      process.stderr.write("Missing generated parser file, please run `npm run grammar` to generate it.\n")
+      process.stderr.write("Missing generated parser file, please run `npm run grammar-jison` to generate it.\n")
       process.exit(1)
     }
     // Don't recognize this error, rethrow
@@ -21,7 +21,7 @@ if (!process.browser) {
   // Now check to make sure that it's up-to-date
   grammarSourceStat = fs.statSync(grammarSourceFile)
   if (grammarSourceStat.mtime > grammarStat.mtime) {
-    process.stderr.write("Parser file is out of date, please do `npm run grammar` to re-generate it.\n")
+    process.stderr.write("Parser file is out of date, please do `npm run grammar-jison` to re-generate it.\n")
     process.exit(1)
   }
 }//if !process.browser

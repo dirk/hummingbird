@@ -327,8 +327,7 @@ export class LLVMCompiler {
       var ExpressionStatements: any[] = [
         AST.Call,
         AST.Identifier,
-        AST.New,
-        AST.Property
+        AST.New
       ];
       if (ExpressionStatements.indexOf(stmt.constructor) !== -1) {
         return this.compileExpression(stmt, blockCtx)
@@ -339,8 +338,6 @@ export class LLVMCompiler {
 
   compileExpression(expr: AST.Node, blockCtx: BlockContext, exprCtx?: ExprContext) {
     switch (expr.constructor) {
-    case AST.Property:
-      return this.compileProperty(<AST.Property>expr, blockCtx, exprCtx)
     case AST.Call:
       return this.compileCall(<AST.Call>expr, blockCtx, exprCtx)
     case AST.Identifier:
@@ -428,11 +425,8 @@ export class LLVMCompiler {
     return compiledFn
   }
 
-
   compileAsModuleMember(node: AST.Node, blockCtx: BlockContext, exprCtx: ExprContext) {
     switch (node.constructor) {
-    case AST.Property:
-      return this.compilePropertyAsModuleMember(<AST.Property>node, blockCtx, exprCtx)
     case AST.Identifier:
       return this.compileIdentifierAsModuleMember(<AST.Identifier>node, blockCtx, exprCtx)
     case AST.Call:
@@ -440,47 +434,6 @@ export class LLVMCompiler {
     default:
       throw new ICE('Cannot compile as module member: '+node.constructor['name'])
     }
-  }
-
-  compileProperty(prop: AST.Property, blockCtx: BlockContext, exprCtx?: ExprContext) {
-    var base      = prop.base,
-        parent    = prop.parent,
-        property  = prop.property,
-        type      = null,
-        value     = null
-
-    if (prop.base.type instanceof types.Module) {
-      return this.compileAsModuleMember(prop, blockCtx, exprCtx)
-    }
-    if (parent === null) {
-      var retCtx: any = {}
-      this.compileExpression(prop.base, blockCtx, retCtx)
-      type  = retCtx.type
-      value = retCtx.value
-
-    } else {
-      type  = exprCtx.type
-      value = exprCtx.value
-    }
-    assertInstanceOf(value, Buffer)
-    var ret = this.compileExpression(prop.property, blockCtx, {type: type, value: value})
-    if (!ret) {
-      throw new ICE("Encountered a null return value")
-    }
-    return ret
-  }
-  compilePropertyAsModuleMember(prop: AST.Property, blockCtx: BlockContext, exprCtx: ExprContext) {
-    var parent = null,
-        path   = []
-    if (parent === null) {
-      var retCtx: any = {}
-      this.compileAsModuleMember(prop.base, blockCtx, retCtx)
-      assertInstanceOf(retCtx.path, Array)
-      path = retCtx.path
-    } else {
-      path = exprCtx.path
-    }
-    return this.compileAsModuleMember(prop.property, blockCtx, {path: path})
   }
 
   genericCompileFunction(nativeFn: NativeFunction, node: AST.Function, preStatementsCb?) {
@@ -553,10 +506,19 @@ export class LLVMCompiler {
   compilePathAssignment(assg: AST.Assignment, blockCtx: BlockContext) {
     // Lookup the lvalue into a receiver that we can set
     var recvPtr = this.compileAssignmentToStorable(assg, blockCtx, assg.lvalue)
+
     // Get the rvalue as a value to be stored in the lvalue's receiving pointer
-    var rvalue = this.compileExpression(assg.rvalue, blockCtx)
+    var rvalueNode          = assg.rvalue,
+        rvalueValue: Buffer = null
+
+    if (rvalueNode instanceof AST.Node) {
+      rvalueValue = this.compileExpression(rvalueNode, blockCtx)
+    } else {
+      throw new Error('Cannot compile rvalue of type: '+(typeof rvalueNode))
+    }
+
     // Build the actual store into that pointer
-    this.ctx.builder.buildStore(rvalue, recvPtr)
+    this.ctx.builder.buildStore(rvalueValue, recvPtr)
   }
 
   compileNamedAssignment(assg, blockCtx) {

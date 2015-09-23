@@ -407,18 +407,22 @@ export class JSCompiler {
 
     if (assg.type === 'var' || assg.type === 'let') {
       // TODO: Register name in context scope and check for conflicts.
-      var lvalue = assg.lvalue.name
-      if (assg.rvalue) {
-        var rvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
+      var lvalue     = assg.lvalue.name,
+          rvalueNode = assg.rvalue
+
+      if (rvalueNode instanceof AST.Node) {
+        var rvalue = this.compileExpression(rvalueNode, {omitTerminator: true})
         ret = ['var ', lvalue, ' '+assg.op+' ', rvalue, term]
       } else {
         ret = ['var ', lvalue, term]
       }
     } else {
+      if (!assg.rvalue) {
+        throw new TypeError('Missing rvalue on assignment', assg)
+      }
       // TODO: Handle more complex path assignments
-      // throw new Error('Compilation of path-assignments not yet implemented')
       var compiledLvalue = this.compileExpression(assg.lvalue, {omitTerminator: true}),
-          compiledRvalue = this.compileExpression(assg.rvalue, {omitTerminator: true})
+          compiledRvalue = this.compileExpression(<AST.Node>assg.rvalue, {omitTerminator: true})
       ret = [compiledLvalue, ' '+assg.op+' ', compiledRvalue, term]
     }
     return asSourceNode(assg, ret)
