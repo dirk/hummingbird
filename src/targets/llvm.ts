@@ -703,7 +703,7 @@ export class LLVMCompiler {
     }
     var ultimateMethod = shimMethod.getIntrinsicShim(),
         nativeFn       = ultimateMethod['getNativeFunction']()
-          
+
     var argValues = call.args.map(function (arg) {
       return self.compileExpression(arg, blockCtx)
     })
@@ -742,7 +742,7 @@ export class LLVMCompiler {
 
       if (objType.primitive) {
         var type = objType.getTypeOfProperty(id.name, id)
-        
+
         if (!(type instanceof types.Function)) {
           throw new ICE("Cannot compile non-Function property of primitive")
         }
@@ -872,12 +872,13 @@ export class LLVMCompiler {
     // happen when we start compiling stuff around this class
     sanityCheckInitializers(klass)
 
-    // Then build the native object from this type
+    // Build the native object from this type
     var nativeObject = new NativeObject(type)
     type.setNativeObject(nativeObject)
-    // Define the native object in the context
+
+    // Define native object in the context
     nativeObject.define(this.ctx)
-    // Build the initializers for the class
+
     this.compileClassPreinitializer(klass, blockCtx, nativeObject)
     this.compileClassInitializers(klass, blockCtx, nativeObject)
     this.compileClassInstanceMethods(klass, blockCtx, nativeObject)
@@ -888,6 +889,7 @@ export class LLVMCompiler {
         initRet      = blockCtx.block.scope.get('Void'),
         properties   = klass.properties,
         nativeObject = klass.type.getNativeObject()
+
     // Native function for the pre-initializer
     var fn = new NativeFunction(nativeObject.internalName+'_pi', initArgs, initRet)
     fn.defineBody(this.ctx, function (entry) {
@@ -928,15 +930,16 @@ export class LLVMCompiler {
       initArgs.unshift(new types.Instance(type))
       // Create the native function
       var fn = new NativeFunction(internalName, initArgs, initType.ret)
-      // Need to add a call to the preinitializer
+
       this.genericCompileFunction(fn, init, function (blockCtx, slots) {
         var ptr  = preinitializer.getPtr(),
             recv = GetParam(fn.getPtr(self.ctx), 0)
+        // Add a call to the preinitializer to the beginning of the function.
         self.ctx.builder.buildCall(ptr, [recv], '')
       })
 
       // Add this native function to the native object's list of initializers
-      // and to the initializer function type
+      // and to the initializer function type.
       nativeObject.addInitializer(fn)
       initType.setNativeFunction(fn)
     }
@@ -969,19 +972,15 @@ export class LLVMCompiler {
   }
 
   compileNew(node: AST.New, blockCtx: BlockContext) {
-    var type         = node.constructorType,
+    var self         = this,
+        type         = node.constructorType,
         args         = node.args,
         nativeObject = type.getNativeObject()
     // Look up the initializer determined by the typesystem
     var initializer = node.getInitializer()
     // Figure out the correct NativeFunction to use to initialize this object
-    var init: NativeFunction = initializer['getNativeFunction']()
-    // Compile all of the arguments down to values
-    var argValues = []
-    for (var i = 0; i < args.length; i++) {
-      var arg = args[i]
-      argValues.push(arg.compileToValue(this.ctx, blockCtx))
-    }
+    var init: NativeFunction = initializer['getNativeFunction'](),
+        initFnPtr            = init.getPtr(this.ctx)
 
     // Allocate the new instance of the class through the GC
     var structType   = nativeObject.structType,
@@ -989,15 +988,16 @@ export class LLVMCompiler {
         gcMallocPtr  = this.ctx.extern.GC_malloc.ptr
     // Call the GC allocator
     var objPtr = this.ctx.builder.buildCall(gcMallocPtr, [sizeInt], '')
-    // Cast it to the right type (from just a plain pointer)
+    // Cast it to the right type from just a plain pointer
     objPtr = this.ctx.builder.buildPointerCast(objPtr, LLVM.Types.pointerType(structType), '')
 
-    // Call the initializer function on the object
-    var initFn = init.getPtr(this.ctx)
+    // Compile the arguments down to values with the instance at the head
+    var argValues = args.map(arg => arg.compileToValue(self.ctx, blockCtx))
     argValues.unshift(objPtr)
-    this.ctx.builder.buildCall(initFn, argValues, '')
-    // Return the pointer to the actual object
-    return objPtr
+
+    this.ctx.builder.buildCall(initFnPtr, argValues, '')
+
+    return objPtr // Return the pointer to the actual object
   }
 
   private ifCounter: number = 1
@@ -1250,17 +1250,19 @@ function getAnonymousNativeFunction (ctx: Context, node: AST.Function): NativeFu
   var instance = node.type,
       type     = unboxInstanceType(instance),
       fn       = null
-  // Check if the native function has already been set up
+
   if (type.hasNativeFunction()) {
+    // If the native function has already been set up
     fn = type.getNativeFunction()
+
   } else {
     var prefix = (ctx.targetModule ? ctx.targetModule.getNativeName()+'_' : ''),
         name   = prefix+'A'+(nativeFunctionCounter++),
         args   = type.args,
         ret    = type.ret
-    // Setup the native function
+
+    // Setup the native function and save it on the type
     fn = new NativeFunction(name, args, ret)
-    // Save the native function on the type
     type.setNativeFunction(fn)
   }
   return fn
@@ -1271,9 +1273,11 @@ function sanityCheckInitializers (klass) {
   // initializers on the node match up
   var typeInitializersTypes = klass.type.initializers,
       nodeInitializersTypes = klass.initializers.map(function (i) { return i.type })
+
   if (typeInitializersTypes.length !== nodeInitializersTypes.length) {
     throw new ICE('Type initializers don\'t match AST node initializers')
   }
+
   for (var i = 0; i < typeInitializersTypes.length; i++) {
     var ti = typeInitializersTypes[i],
         ni = nodeInitializersTypes[i]
@@ -1282,4 +1286,3 @@ function sanityCheckInitializers (klass) {
     }
   }
 }
-
