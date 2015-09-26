@@ -1046,7 +1046,7 @@ export class LLVMCompiler {
     if (elseIfConds) {
       afterFirstCond = elseIfConds[0]
     } else if (elseBlock) {
-      afterFirstCond = thenBlock
+      afterFirstCond = elseBlock
     } else if (contBlock) {
       afterFirstCond = contBlock
     } else {
