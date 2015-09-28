@@ -1093,13 +1093,11 @@ export class LLVMCompiler {
   }
 
   compileBinary(binary: AST.Binary, blockCtx: BlockContext, exprCtx: ExprContext) {
-    var lexpr = binary.lexpr,
-        rexpr = binary.rexpr
-    // Check (and unbox) the types
-    var lexprType = lexpr.type,
-        rexprType = rexpr.type
-    lexprType = unboxInstanceType(lexprType)
-    rexprType = unboxInstanceType(rexprType)
+    var lexpr     = binary.lexpr,
+        rexpr     = binary.rexpr,
+        lexprType = unboxInstanceType(lexpr.type),
+        rexprType = unboxInstanceType(rexpr.type)
+
     // Find the binary-op NativeFunction
     var builder = BinaryOps.getBuilder(binary.op, lexprType, rexprType)
     assertInstanceOf(builder, Function)

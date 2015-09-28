@@ -99,6 +99,9 @@ class NativeFunction {
 }// NativeFunction
 
 types.Function.prototype['setNativeFunction'] = function (nf) {
+  if (!(nf instanceof NativeFunction)) {
+    throw new Error('Expected NativeFunction, got '+nf.constructor['name'])
+  }
   this.nativeFunction = nf
 }
 types.Function.prototype['getNativeFunction'] = function () {

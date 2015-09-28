@@ -9,13 +9,15 @@ var LLVM = require('./library'),
 var Int8Type    = LLVM.Types.Int8Type,
     Int8PtrType = LLVM.Types.pointerType(LLVM.Types.Int8Type)
 
-var stdCoreTypesStringConcatFn = null
+var stringConcatFn: NativeFunction = null
 
 export function initialize (ctx, rootScope) {
-  var StringType = rootScope.getLocal('String')
-  stdCoreTypesStringConcatFn = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fconcat', [StringType, StringType], StringType)
-  stdCoreTypesStringConcatFn.defineExternal(ctx)
-  // stdCoreTypesStringConcat = NativeFunction.addExternalFunction(ctx, 'Mstd_Mcore_Mtypes_Mstring_Fconcat', Int8PtrType, [Int8PtrType, Int8PtrType])
+  var StringType         = rootScope.getLocal('String'),
+      stdCoreTypesString = rootScope.get('std').getChild('core').getChild('types').getChild('string');
+
+  stringConcatFn = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fconcat', [StringType, StringType], StringType)
+  stringConcatFn.defineExternal(ctx)
+  stdCoreTypesString.getTypeOfProperty('concat').setNativeFunction(stringConcatFn)
 }
 
 function assertRexprType (rexprType, type) {
@@ -40,7 +42,7 @@ function getAdditionBuilder (lt: types.Type, rt: types.Type) {
   switch (lt.constructor) {
   case types.String:
     assertRexprType(rt, types.String)
-    return buildCallBuilder(stdCoreTypesStringConcatFn, 'concat')
+    return buildCallBuilder(stringConcatFn, 'concat')
   // TODO: Only compile Integers!
   case types.Integer:
     assertRexprType(rt, types.Integer)
@@ -56,22 +58,22 @@ function getSubtractionBuilder (lt: types.Type, rt: types.Type) {
   }
 }
 
-export function getBuilder (op: string, lexprType: types.Type, rexprType: types.Type) {
-  var ret = (function () {
+export function getBuilder (op: string, lexprType: types.Type, rexprType: types.Type): Function {
+  var ret = (function (): Function {
     switch (op) {
     case '+':
       return getAdditionBuilder(lexprType, rexprType)
     case '-':
       return getSubtractionBuilder(lexprType, rexprType)
-    // default:
-    //   throw new ICE('Binary op builder not found: '+op)
+    default:
+      return null
     }
   })()
-  // If a builder was found then return it
+
   if (ret) {
     return ret
   }
-  // Otherwise throw a compilation error
+
   var l = lexprType.inspect(),
       r = rexprType.inspect()
   throw new ICE('Binary op not found: '+l+' '+op+' '+r)

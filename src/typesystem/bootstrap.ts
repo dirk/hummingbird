@@ -76,6 +76,9 @@ module.exports = function (TypeSystem) {
     // Add function to module and the String type
     this.addInstanceMethodAndShim(stringModule, StringType, 'uppercase', StringType)
     this.addInstanceMethodAndShim(stringModule, StringType, 'lowercase', StringType)
+
+    var concatFunction = new types.Function(this.rootObject, [StringType, StringType], StringType)
+    stringModule.setTypeOfProperty('concat', concatFunction)
   }
 
   TypeSystem.prototype.bootstrapStdCoreTypesInteger = function (typs) {
