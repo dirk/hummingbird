@@ -72,19 +72,24 @@ export function compile (ctx, mainEntry, root) {
   ctx.globalSlots.buildDefine(ctx, 'console', LLVM.Types.pointerType(consoleObject.structType))
   // ctx.globalSlots.buildSet(ctx, 'console', consoleValue)
 
-  var typesModule   = rootScope.getLocal('std').getChild('core').getChild('types'),
-      stringModule  = typesModule.getChild('string'),
-      integerModule = typesModule.getChild('integer'),
-      StringType    = rootScope.getLocal('String'),
-      IntegerType   = rootScope.getLocal('Integer')
+  var typesModule      = rootScope.getLocal('std').getChild('core').getChild('types'),
+      stringModule     = typesModule.getChild('string'),
+      stringModuleName = stringModule.getNativeName(),
+      integerModule    = typesModule.getChild('integer'),
+      StringType       = rootScope.getLocal('String'),
+      IntegerType      = rootScope.getLocal('Integer')
   
-  var uppercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fuppercase', [StringType], StringType)
+  var uppercase = new NativeFunction(`${stringModuleName}_Fuppercase`, [StringType], StringType)
   uppercase.defineExternal(ctx)
   stringModule.getTypeOfProperty('uppercase').setNativeFunction(uppercase)
 
-  var lowercase = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Flowercase', [StringType], StringType)
+  var lowercase = new NativeFunction(`${stringModuleName}_Flowercase`, [StringType], StringType)
   lowercase.defineExternal(ctx)
   stringModule.getTypeOfProperty('lowercase').setNativeFunction(lowercase)
+
+  var concat = new NativeFunction(`${stringModuleName}_Fconcat`, [StringType, StringType], StringType)
+  concat.defineExternal(ctx)
+  stringModule.getTypeOfProperty('concat').setNativeFunction(concat)
 
   var integerToString = new NativeFunction('Mstd_Mcore_Mtypes_Minteger_FtoString', [IntegerType], StringType)
   integerToString.defineExternal(ctx)

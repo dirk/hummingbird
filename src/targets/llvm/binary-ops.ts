@@ -15,9 +15,9 @@ export function initialize (ctx, rootScope) {
   var StringType         = rootScope.getLocal('String'),
       stdCoreTypesString = rootScope.get('std').getChild('core').getChild('types').getChild('string');
 
-  stringConcatFn = new NativeFunction('Mstd_Mcore_Mtypes_Mstring_Fconcat', [StringType, StringType], StringType)
-  stringConcatFn.defineExternal(ctx)
-  stdCoreTypesString.getTypeOfProperty('concat').setNativeFunction(stringConcatFn)
+  stringConcatFn = stdCoreTypesString
+    .getTypeOfProperty('concat')
+    .getNativeFunction()
 }
 
 function assertRexprType (rexprType, type) {
