@@ -191,12 +191,23 @@ export class Expression extends Node {}
 
 
 export class Group extends Node {
-  expr: any
+  expr:        any
+  child:       PathItem
+  initialType: any
+  type:        any
+
   constructor(expr) {
     super()
     this.expr = expr
   }
   toString() { return '('+this.expr.toString()+')' }
+
+  dump() {
+    _w("group\n")
+    _ind += INDENT
+    this.child.dump()
+    _ind -= INDENT
+  }
 }
 
 
@@ -686,7 +697,7 @@ export class Indexer extends Node {
   }
 }
 
-export type PathRoot = Identifier
+export type PathRoot = Identifier|Group
 
 
 export class If extends Node {

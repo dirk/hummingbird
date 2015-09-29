@@ -321,7 +321,7 @@ postfix_expression_list
   ;
 
 primary_expression
-  : '(' expression ')'                                  { $$ = $2; }
+  : '(' expression ')'                                  { $$ = yy.node1('Group', @1, $2); }
   | FUNC function_declaration                           { $$ = $2; }
   | new_expression                                      { $$ = $1; }
   | atom                                                { $$ = $1; }

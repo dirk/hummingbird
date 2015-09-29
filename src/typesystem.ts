@@ -64,8 +64,8 @@ class TypeSystem {
   visitFunctionStatement: (node: AST.Function,   scope: scope.Scope, searchInParent: Function) => void
   visitIdentifier:        (node: AST.Identifier, scope: scope.Scope) => void
   visitCall:              (node: AST.Call,       scope: scope.Scope) => void
+  visitGroup:             (node: AST.Group,      scope: scope.Scope) => void
   visitChild:             (node: AST.Node, child: AST.Node, scope: scope.Scope) => void
-  // visitChain:          (node, scope) => void
 }
 // Add the bootstrap methods to the TypeSystem
 require('./typesystem/bootstrap')(TypeSystem)
@@ -692,14 +692,14 @@ TypeSystem.prototype.visitExpression = function (node, scope, immediate) {
     case AST.Binary:
       this.visitBinary(node, scope)
       break
-    // case AST.Chain:
-    //   this.visitChain(node, scope)
-    //   break
     case AST.Literal:
       this.visitLiteral(node, scope)
       break
     case AST.New:
       this.visitNew(node, scope)
+      break
+    case AST.Group:
+      this.visitGroup(node, scope)
       break
     case AST.Identifier:
       this.visitIdentifier(node, scope)
@@ -1019,7 +1019,7 @@ TypeSystem.prototype.visitIdentifier = function (node: AST.Identifier, scope) {
   node.type        = getUltimateType(node)
 }
 
-function getUltimateType (root: AST.PathItem): types.Type {
+function getUltimateType (root: AST.PathRoot): types.Type {
   var child = root.child
 
   // Descend down the chain
@@ -1082,68 +1082,18 @@ TypeSystem.prototype.visitCall = function (node: AST.Call, scope) {
   }
 }
 
-/*
-TypeSystem.prototype.visitChain = function (node, scope) {
-  var self = this,
-      headType = know(node, scope.get(node.name))
-  // Save the type of the head
-  node.headType = headType
-  // Start at the head of the chain
-  var type = headType
-  for (var i = 0; i < node.tail.length; i++) {
-    var item = node.tail[i]
-    if (item instanceof AST.Call) {
-      // Make sure we're trying to call an instance
-      assertInstanceOf(type, types.Instance, 'Unexpected non-Instanced Function')
-      // Get the type of the instance
-      type = type.type
-      assertInstanceOf(type, types.Function, 'Trying to call non-Function')
-      var typeArgs = type.args,
-          itemArgs = item.args
-      // Check to make sure we're getting as many arguments as we expected
-      if (typeArgs.length !== itemArgs.length) {
-        var typeCount = typeArgs.length,
-            itemCount = itemArgs.length
-        throw new TypeError('Wrong number of arguments: expected '+typeCount+', got '+itemCount)
-      }
-      // Then type-check each individual arguments
-      for (var argIdx = itemArgs.length - 1; argIdx >= 0; argIdx--) {
-        // Visit each argument item
-        var itemArg = itemArgs[argIdx]
-        self.visitExpression(itemArg, scope)
-        // Get the Instance type of the passing argument node
-        var itemArgInstance = itemArg.type
-        // Verify that the passed argument's type is an Instance box
-        var failureMessage = 'Expected Instance as function argument, got: '+itemArgInstance.inspect()
-        assertInstanceOf(itemArgInstance, types.Instance, failureMessage)
-        // Unbox the instance
-        var itemArgType = itemArgInstance.type
-        // Then get the type from the function definition to compare to the
-        // passed argument
-        var typeArg = typeArgs[argIdx]
-        if (!typeArg.equals(itemArgType)) {
-          var message  = 'Argument mismatch at argument index '+i,
-              got      = itemArgType.inspect(),
-              expected = typeArg.inspect()
-          message += "\n  expected "+expected+', got '+got
-          throw new TypeError(message, item)
-        }
-      }
-      // Replace current type with an instance of type that's going to be returned
-      var returnType = type.ret
-      type = new types.Instance(returnType)
+TypeSystem.prototype.visitGroup = function (node: AST.Group, scope: scope.Scope) {
+  this.visitExpression(node.expr, scope)
+    node.type = node.expr.type
 
-    } else
-    if (item instanceof AST.Property) {
-      type = this.getTypeOfTypesProperty(type, item.name)
+  if (node.child) {
+    this.visitChild(node, node.child, scope)
 
-    } else {
-      throw new TypeError('Cannot handle Chain item of type: '+item.constructor.name, node)
-    }
+    node.initialType = node.expr.type
+    node.type        = getUltimateType(node)
   }
-  node.type = type
 }
-*/
+
 
 
 // Utility function for resolving the type of a type's property. Handles
