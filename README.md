@@ -86,8 +86,7 @@ bin/hbn examples/simple.hb
 
 Released under the Modified BSD License. See [LICENSE](LICENSE) for details.
 
-[travis-image]: https://img.shields.io/travis/dirk/hummingbird/master.svg?style=flat-square
+[travis-image]: https://travis-ci.org/dirk/hummingbird.svg
 [travis-url]: https://travis-ci.org/dirk/hummingbird
-[coveralls-image]: https://img.shields.io/coveralls/dirk/hummingbird/master.svg?style=flat-square
+[coveralls-image]: https://coveralls.io/repos/github/dirk/hummingbird/badge.svg?branch=master
 [coveralls-url]: https://coveralls.io/r/dirk/hummingbird
-
