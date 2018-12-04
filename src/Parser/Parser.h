@@ -139,6 +139,8 @@ private:
 
 class PRoot {
 public:
+  ~PRoot();
+
   void debugPrint(std::ostream* output, int indent);
 
   std::vector<PNode*> nodes;

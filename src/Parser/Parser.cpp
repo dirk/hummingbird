@@ -315,3 +315,9 @@ void PRoot::debugPrint(std::ostream* output, int indent) {
   }
   *output << ")" << std::endl;
 }
+
+PRoot::~PRoot() {
+  for (auto node : nodes) {
+    delete node;
+  }
+}
