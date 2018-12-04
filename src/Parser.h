@@ -7,23 +7,33 @@
 
 #include "Lexer.h"
 
+// Forward declaration because node types will contain nodes.
+class PNode;
+
 class PVar {
 public:
-  PVar() { };
+  PVar(std::string lhs, PNode* rhs) : lhs(lhs), rhs(rhs) { };
 
-  ~PVar() {
-    if (identifier) {
-      delete identifier;
-    }
-  }
+  void debugPrint(std::ostream* output, int indent);
 
-  std::string* identifier = nullptr;
+  std::string lhs;
+  PNode* rhs;
+};
+
+class PIntegerLiteral {
+public:
+  PIntegerLiteral(long long int value) : value(value) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  long long int value;
 };
 
 typedef struct {} PUnknown;
 
 class PNode {
 public:
+  PNode(PIntegerLiteral integerLiteral) : node(integerLiteral) { };
   PNode(PVar var) : node(var) { };
   PNode() : node((PUnknown){}) { };
 
@@ -31,8 +41,11 @@ public:
     return std::holds_alternative<PUnknown>(node);
   }
 
+  void debugPrint(std::ostream* output, int indent);
+
 private:
   std::variant<
+    PIntegerLiteral,
     PVar,
     PUnknown
   > node;
@@ -40,7 +53,9 @@ private:
 
 class PRoot {
 public:
-  std::vector<PNode> nodes;
+  void debugPrint(std::ostream* output, int indent);
+
+  std::vector<PNode*> nodes;
 };
 
 class Parser {
@@ -57,11 +72,12 @@ private:
   yyFlexLexer* lexer;
 
   PRoot* parseRoot();
-  PNode parseStatement(token_t token);
-  PVar parseVarStatement(token_t token);
+  PNode* parseStatement(token_t token);
+  PNode* parseExpression(token_t token);
+  PVar parseVar(token_t token);
 
   token_t expect(token_t token);
 
-  void fatalNodeError(PNode node);
+  void fatalNodeError(PNode* node);
   void fatalTokenError(token_t t);
 };

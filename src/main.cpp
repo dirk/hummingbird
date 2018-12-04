@@ -21,7 +21,9 @@ int main(int argc, char *argv[]) {
   }
 
   auto parser = Parser(&source);
-  parser.parse();
+  auto root = parser.parse();
+
+  root->debugPrint(&cout, 0);
 
   return 0;
 }
