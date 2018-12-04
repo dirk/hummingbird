@@ -146,17 +146,16 @@ IPN Parser::parseVar(int token) {
 
 std::vector<PNode*> Parser::parseCallArguments() {
   std::vector<PNode*> arguments;
-  int argc = 0;
   while (true) {
     auto nextToken = peek();
     if (nextToken == T_PAREN_RIGHT) {
       break;
     }
-    if (argc > 0) {
+    if (arguments.size() > 0) {
       expect(T_COMMA);
     }
     auto node = parseExpression(next());
-    argc += 1;
+    arguments.push_back(node);
   }
   return arguments;
 }
