@@ -1,6 +1,6 @@
 #pragma once
 
-#if !defined(yyFlexLexerOnce)
+#if ! defined(yyFlexLexerOnce)
 #include <FlexLexer.h>
 #endif
 

@@ -1,6 +1,6 @@
-#line 1 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 1 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 
-#line 3 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 3 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -554,9 +554,9 @@ static const flex_int16_t yy_rule_linenum[27] =
 #include "Lexer.h"
 
 #define yyterminate() return T_EOF
-#line 557 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 557 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 
-#line 559 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 559 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 
 #define INITIAL 0
 #define MULTI_LINE_COMMENT 1
@@ -752,7 +752,7 @@ YY_DECL
 #line 28 "Lexer.l"
 
 
-#line 755 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 755 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -983,7 +983,7 @@ YY_RULE_SETUP
 #line 66 "Lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 986 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 986 "/Users/dirk/Projects/hummingbird/hummingbird/src/Parser/Lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(MULTI_LINE_COMMENT):
 	yyterminate();

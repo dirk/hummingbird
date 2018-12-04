@@ -4,6 +4,9 @@ PRoot* Parser::parse() {
   return parseRoot();
 }
 
+Parser::Parser(std::istream* input) :
+  lexer(new yyFlexLexer(input)) { };
+
 // This is to implement single-depth peeking capability, as that's all we
 // need in our grammar.
 

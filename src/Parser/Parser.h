@@ -146,7 +146,7 @@ public:
 
 class Parser {
 public:
-  Parser(std::istream* input) : lexer(new yyFlexLexer(input)) { };
+  Parser(std::istream* input);
 
   ~Parser() {
     delete lexer;
