@@ -7,6 +7,12 @@ dist
 .srclib-cache
 _site
 coverage.html
+*.a
+*.cmake
+*.ninja*
+.vscode
+bin
+CMakeFiles
 
 # TypeScript-generated files
 src/errors.js

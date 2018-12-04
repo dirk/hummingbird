@@ -4,8 +4,11 @@
 #include <FlexLexer.h>
 #endif
 
+typedef int token_t;
+
 enum Token {
-  T_ABSTRACT = 1,
+  T_EOF = 0,
+  T_ABSTRACT,
   T_CLASS,
   T_COLON,
   T_BRACE_LEFT,

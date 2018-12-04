@@ -213,8 +213,27 @@ extern int yyleng;
 #define EOB_ACT_END_OF_FILE 1
 #define EOB_ACT_LAST_MATCH 2
     
-    #define YY_LESS_LINENO(n)
-    #define YY_LINENO_REWIND_TO(ptr)
+    /* Note: We specifically omit the test for yy_rule_can_match_eol because it requires
+     *       access to the local variable yy_act. Since yyless() is a macro, it would break
+     *       existing scanners that call yyless() from OUTSIDE yylex.
+     *       One obvious solution it to make yy_act a global. I tried that, and saw
+     *       a 5% performance hit in a non-yylineno scanner, because yy_act is
+     *       normally declared as a register variable-- so it is not worth it.
+     */
+    #define  YY_LESS_LINENO(n) \
+            do { \
+                int yyl;\
+                for ( yyl = n; yyl < yyleng; ++yyl )\
+                    if ( yytext[yyl] == '\n' )\
+                        --yylineno;\
+            }while(0)
+    #define YY_LINENO_REWIND_TO(dst) \
+            do {\
+                const char *p;\
+                for ( p = yy_cp-1; p >= (dst); --p)\
+                    if ( *p == '\n' )\
+                        --yylineno;\
+            }while(0)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
@@ -510,11 +529,17 @@ static const flex_int16_t yy_chk[146] =
        69,   69,   69,   69,   69
     } ;
 
+/* Table of booleans, true if rule could match eol. */
+static const flex_int32_t yy_rule_can_match_eol[26] =
+    {   0,
+0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 
+    0, 0, 0, 0, 1, 0,     };
+
 static const flex_int16_t yy_rule_linenum[25] =
     {   0,
-       27,   28,   30,   31,   33,   34,   35,   37,   38,   39,
-       40,   41,   43,   44,   45,   47,   48,   50,   52,   54,
-       56,   57,   58,   60
+       30,   31,   33,   34,   36,   37,   38,   40,   41,   42,
+       43,   44,   46,   47,   48,   50,   51,   53,   55,   57,
+       59,   60,   61,   63
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -529,9 +554,11 @@ static const flex_int16_t yy_rule_linenum[25] =
 #include <string>
 
 #include "Lexer.h"
-#line 532 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
 
-#line 534 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#define yyterminate() return T_EOF
+#line 559 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+
+#line 561 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
 
 #define INITIAL 0
 #define MULTI_LINE_COMMENT 1
@@ -724,10 +751,10 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 25 "Lexer.l"
+#line 28 "Lexer.l"
 
 
-#line 730 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 757 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -778,6 +805,16 @@ yy_find_action:
 
 /* %% [11.0] code for yylineno update goes here */
 
+		if ( yy_act != YY_END_OF_BUFFER && yy_rule_can_match_eol[yy_act] )
+			{
+			int yyl;
+			for ( yyl = 0; yyl < yyleng; ++yyl )
+				if ( yytext[yyl] == '\n' )
+					
+    yylineno++;
+;
+			}
+
 do_action:	/* This label is used only to access EOF actions. */
 
 /* %% [12.0] debug code goes here */
@@ -808,137 +845,137 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 27 "Lexer.l"
+#line 30 "Lexer.l"
 { return T_REAL; }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 28 "Lexer.l"
+#line 31 "Lexer.l"
 { return T_INTEGER; }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 30 "Lexer.l"
+#line 33 "Lexer.l"
 { return T_LET; }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 31 "Lexer.l"
+#line 34 "Lexer.l"
 { return T_VAR; }
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 33 "Lexer.l"
+#line 36 "Lexer.l"
 { return T_ABSTRACT; }
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 34 "Lexer.l"
+#line 37 "Lexer.l"
 { return T_CLASS; }
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 35 "Lexer.l"
+#line 38 "Lexer.l"
 { return T_MIXIN; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 37 "Lexer.l"
+#line 40 "Lexer.l"
 { return T_BRACE_LEFT; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 38 "Lexer.l"
+#line 41 "Lexer.l"
 { return T_BRACE_RIGHT; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 39 "Lexer.l"
+#line 42 "Lexer.l"
 { return T_PARENT_LEFT; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 40 "Lexer.l"
+#line 43 "Lexer.l"
 { return T_PARENT_RIGHT; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 41 "Lexer.l"
+#line 44 "Lexer.l"
 { return T_COLON; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 43 "Lexer.l"
+#line 46 "Lexer.l"
 { return T_LESS_THAN; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 44 "Lexer.l"
+#line 47 "Lexer.l"
 { return T_PLUS; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 45 "Lexer.l"
+#line 48 "Lexer.l"
 { return T_EQUALS; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 47 "Lexer.l"
+#line 50 "Lexer.l"
 { return T_DOT_IDENTIFIER; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 48 "Lexer.l"
+#line 51 "Lexer.l"
 { return T_IDENTIFIER; }
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 50 "Lexer.l"
+#line 53 "Lexer.l"
 { return T_STRING; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 52 "Lexer.l"
+#line 55 "Lexer.l"
 /* Single-line comment */
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 54 "Lexer.l"
+#line 57 "Lexer.l"
 BEGIN(MULTI_LINE_COMMENT);
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 56 "Lexer.l"
+#line 59 "Lexer.l"
 BEGIN(INITIAL);
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 57 "Lexer.l"
+#line 60 "Lexer.l"
 
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 58 "Lexer.l"
+#line 61 "Lexer.l"
 
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 60 "Lexer.l"
+#line 63 "Lexer.l"
 /* Whitespace */
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 61 "Lexer.l"
+#line 64 "Lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 941 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
+#line 978 "/Users/dirk/Projects/hummingbird/hummingbird/src/Lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(MULTI_LINE_COMMENT):
 	yyterminate();
@@ -1459,6 +1496,10 @@ int yyFlexLexer::yy_get_next_buffer()
 
 /* %% [18.0] update yylineno here */
 
+    if ( c == '\n' ){
+        --yylineno;
+    }
+
 	(yytext_ptr) = yy_bp;
 	(yy_hold_char) = *yy_cp;
 	(yy_c_buf_p) = yy_cp;
@@ -1536,6 +1577,10 @@ int yyFlexLexer::yy_get_next_buffer()
 	(yy_hold_char) = *++(yy_c_buf_p);
 
 /* %% [19.0] update BOL and yylineno */
+	if ( c == '\n' )
+		
+    yylineno++;
+;
 
 	return c;
 }
@@ -2057,4 +2102,4 @@ void yyfree (void * ptr )
 
 /* %ok-for-header */
 
-#line 61 "Lexer.l"
+#line 64 "Lexer.l"

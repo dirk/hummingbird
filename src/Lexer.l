@@ -2,12 +2,15 @@
 #include <string>
 
 #include "Lexer.h"
+
+#define yyterminate() return T_EOF
 %}
 
+%option c++
 %option debug
 %option nodefault
 %option noyywrap
-%option c++
+%option yylineno
 
 newline     [\n\r]
 non_newline [^\n\r]
