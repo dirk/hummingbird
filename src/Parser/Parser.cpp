@@ -41,7 +41,7 @@ token_t Parser::peek() {
 // We want every parsing function to be inlined.
 #define IPN inline PNode*
 
-IPN Parser::parseStatement(int token) {
+IPN Parser::parseStatement(token_t token) {
   switch (token) {
     case T_LET:
       return parseLet(token);
@@ -52,11 +52,11 @@ IPN Parser::parseStatement(int token) {
   }
 }
 
-IPN Parser::parseExpression(int token) {
+IPN Parser::parseExpression(token_t token) {
   return parseAddition(token);
 }
 
-IPN Parser::parseAddition(int token) {
+IPN Parser::parseAddition(token_t token) {
   auto lhs = parseMultiplication(token);
   auto nextToken = peek();
   if (nextToken == T_PLUS) {
@@ -67,7 +67,7 @@ IPN Parser::parseAddition(int token) {
   return lhs;
 }
 
-IPN Parser::parseMultiplication(int token) {
+IPN Parser::parseMultiplication(token_t token) {
   auto lhs = parseAssignment(token);
   auto nextToken = peek();
   if (nextToken == T_STAR) {
@@ -78,7 +78,7 @@ IPN Parser::parseMultiplication(int token) {
   return lhs;
 }
 
-IPN Parser::parseAssignment(int token) {
+IPN Parser::parseAssignment(token_t token) {
   auto lhs = parseChain(token);
   auto nextToken = peek();
   if (nextToken == T_EQUALS) {
@@ -111,7 +111,7 @@ IPN Parser::parseChain(token_t token) {
   return node;
 }
 
-IPN Parser::parseLiteral(int token) {
+IPN Parser::parseLiteral(token_t token) {
   switch (token) {
     case T_INTEGER:
       long long int value = std::stoll(text());
@@ -120,7 +120,7 @@ IPN Parser::parseLiteral(int token) {
   return parseIdentifier(token);
 }
 
-IPN Parser::parseIdentifier(int token) {
+IPN Parser::parseIdentifier(token_t token) {
   if (token == T_IDENTIFIER) {
     return new PNode(PIdentifier(text()));
   }
@@ -128,7 +128,7 @@ IPN Parser::parseIdentifier(int token) {
   return new PNode();
 }
 
-IPN Parser::parseLet(int token) {
+IPN Parser::parseLet(token_t token) {
   expect(T_IDENTIFIER);
   auto lhs = text();
   expect(T_EQUALS);
@@ -136,7 +136,7 @@ IPN Parser::parseLet(int token) {
   return new PNode(PLet(lhs, rhs));
 }
 
-IPN Parser::parseVar(int token) {
+IPN Parser::parseVar(token_t token) {
   expect(T_IDENTIFIER);
   auto lhs = text();
   expect(T_EQUALS);
