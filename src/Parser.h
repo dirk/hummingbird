@@ -42,6 +42,18 @@ public:
   PNode* rhs;
 };
 
+class PCall {
+public:
+  PCall(PNode* target, std::vector<PNode*> arguments) :
+    target(target),
+    arguments(arguments) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  PNode* target;
+  std::vector<PNode*> arguments;
+};
+
 class PIdentifier {
 public:
   PIdentifier(std::string value) : value(std::string(value)) { };
@@ -79,15 +91,29 @@ public:
   long long int value;
 };
 
+class PProperty {
+public:
+  PProperty(PNode* receiver, std::string name) :
+    receiver(receiver),
+    name(name) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  PNode* receiver;
+  std::string name;
+};
+
 typedef struct {} PUnknown;
 
 class PNode {
 public:
   PNode(PAssignment assignment) : node(assignment) { };
+  PNode(PCall call) : node(call) { };
   PNode(PIdentifier identifier) : node(identifier) { };
   PNode(PInfix infix) : node(infix) { };
   PNode(PIntegerLiteral integerLiteral) : node(integerLiteral) { };
   PNode(PLet let) : node(let) { };
+  PNode(PProperty property) : node(property) { };
   PNode(PVar var) : node(var) { };
   PNode() : node((PUnknown){}) { };
 
@@ -100,10 +126,12 @@ public:
 private:
   std::variant<
     PAssignment,
+    PCall,
     PIdentifier,
     PInfix,
     PIntegerLiteral,
     PLet,
+    PProperty,
     PVar,
     PUnknown
   > node;
@@ -148,13 +176,20 @@ private:
   PRoot* parseRoot();
   PNode* parseStatement(token_t token);
   PNode* parseExpression(token_t token);
-  PNode* parseAssignment(token_t token);
   PNode* parseAddition(token_t token);
   PNode* parseMultiplication(token_t token);
+  PNode* parseAssignment(token_t token);
+  /// Parses chains off the end:
+  ///   - Properties (eg. `foo.bar`)
+  ///   - Calls (`foo()`)
+  PNode* parseChain(token_t token);
   PNode* parseIdentifier(token_t token);
   PNode* parseLiteral(token_t token);
   PNode* parseLet(token_t token);
   PNode* parseVar(token_t token);
+
+  /// Called *within* a call to parse the arguments.
+  std::vector<PNode*> parseCallArguments();
 
   void fatalNodeError(PNode* node);
   void fatalTokenError(token_t t);

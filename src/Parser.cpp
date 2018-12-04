@@ -65,7 +65,7 @@ IPN Parser::parseAddition(int token) {
 }
 
 IPN Parser::parseMultiplication(int token) {
-  auto lhs = parseLiteral(token);
+  auto lhs = parseAssignment(token);
   auto nextToken = peek();
   if (nextToken == T_STAR) {
     expect(T_STAR);
@@ -75,17 +75,8 @@ IPN Parser::parseMultiplication(int token) {
   return lhs;
 }
 
-IPN Parser::parseLiteral(int token) {
-  switch (token) {
-    case T_INTEGER:
-      long long int value = std::stoll(text());
-      return new PNode(PIntegerLiteral(value));
-  }
-  return parseAssignment(token);
-}
-
 IPN Parser::parseAssignment(int token) {
-  auto lhs = parseIdentifier(token);
+  auto lhs = parseChain(token);
   auto nextToken = peek();
   if (nextToken == T_EQUALS) {
     expect(T_EQUALS);
@@ -94,6 +85,36 @@ IPN Parser::parseAssignment(int token) {
     return new PNode(PAssignment(lhs, rhs));
   }
   return lhs;
+}
+
+IPN Parser::parseChain(token_t token) {
+  auto node = parseLiteral(token);
+  while (true) {
+    auto nextToken = peek();
+    if (nextToken == T_DOT) {
+      expect(T_DOT);
+      expect(T_IDENTIFIER);
+      auto name = text();
+      node = new PNode(PProperty(node, name));
+    } else if (nextToken == T_PAREN_LEFT) {
+      expect(T_PAREN_LEFT);
+      auto arguments = parseCallArguments();
+      expect(T_PAREN_RIGHT);
+      node = new PNode(PCall(node, arguments));
+    } else {
+      break;
+    }
+  }
+  return node;
+}
+
+IPN Parser::parseLiteral(int token) {
+  switch (token) {
+    case T_INTEGER:
+      long long int value = std::stoll(text());
+      return new PNode(PIntegerLiteral(value));
+  }
+  return parseIdentifier(token);
 }
 
 IPN Parser::parseIdentifier(int token) {
@@ -118,6 +139,23 @@ IPN Parser::parseVar(int token) {
   expect(T_EQUALS);
   auto rhs = parseExpression(next());
   return new PNode(PVar(lhs, rhs));
+}
+
+std::vector<PNode*> Parser::parseCallArguments() {
+  std::vector<PNode*> arguments;
+  int argc = 0;
+  while (true) {
+    auto nextToken = peek();
+    if (nextToken == T_PAREN_RIGHT) {
+      break;
+    }
+    if (argc > 0) {
+      expect(T_COMMA);
+    }
+    auto node = parseExpression(next());
+    argc += 1;
+  }
+  return arguments;
 }
 
 PRoot* Parser::parseRoot() {
@@ -183,6 +221,17 @@ void PAssignment::debugPrint(std::ostream* output, int indent) {
   printIndent << ")" << std::endl;
 }
 
+void PCall::debugPrint(std::ostream* output, int indent) {
+  printIndent << "call(" << std::endl;
+  indent += 1;
+  target->debugPrint(output, indent);
+  for (auto argument : arguments) {
+    argument->debugPrint(output, indent);
+  }
+  indent -= 1;
+  printIndent << ")" << std::endl;
+}
+
 void PIdentifier::debugPrint(std::ostream* output, int indent) {
   printIndent << "identifier(" << value << ")" << std::endl;
 }
@@ -219,6 +268,15 @@ void PLet::debugPrint(std::ostream* output, int indent) {
   printIndent << ")" << std::endl;
 }
 
+void PProperty::debugPrint(std::ostream* output, int indent) {
+  printIndent << "property(" << std::endl;
+  indent += 1;
+  receiver->debugPrint(output, indent);
+  printIndent << name << std::endl;
+  indent -= 1;
+  printIndent << ")" << std::endl;
+}
+
 void PVar::debugPrint(std::ostream* output, int indent) {
   printIndent << "var(" << std::endl;
   indent += 1;
@@ -237,10 +295,12 @@ void PVar::debugPrint(std::ostream* output, int indent) {
 void PNode::debugPrint(std::ostream* output, int indent) {
   // printIndent << "node(" << std::endl;
   DEBUG_PRINT_IF(PAssignment);
+  DEBUG_PRINT_IF(PCall);
   DEBUG_PRINT_IF(PIdentifier);
   DEBUG_PRINT_IF(PInfix);
   DEBUG_PRINT_IF(PIntegerLiteral);
   DEBUG_PRINT_IF(PLet);
+  DEBUG_PRINT_IF(PProperty);
   DEBUG_PRINT_IF(PVar);
   // printIndent << ")" << std::endl;
 }

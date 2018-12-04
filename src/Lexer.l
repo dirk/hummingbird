@@ -37,19 +37,20 @@ single_line_comment "//"{non_newline}*
 "class"{one_whitespace}     { return T_CLASS; }
 "mixin"{one_whitespace}     { return T_MIXIN; }
 
+{identifier}                { return T_IDENTIFIER; }
+
 "{"                         { return T_BRACE_LEFT; }
 "}"                         { return T_BRACE_RIGHT; }
-"("                         { return T_PARENT_LEFT; }
-")"                         { return T_PARENT_RIGHT; }
+"("                         { return T_PAREN_LEFT; }
+")"                         { return T_PAREN_RIGHT; }
 ":"                         { return T_COLON; }
 
 "<"                         { return T_LESS_THAN; }
 "+"                         { return T_PLUS; }
 "*"                         { return T_STAR; }
 "="                         { return T_EQUALS; }
-
-"."{identifier}             { return T_DOT_IDENTIFIER; }
-{identifier}                { return T_IDENTIFIER; }
+"."                         { return T_DOT; }
+","                         { return T_COMMA; }
 
 "\""[^"]*"\""               { return T_STRING; }
 
