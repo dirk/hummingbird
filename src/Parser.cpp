@@ -14,18 +14,13 @@ token_t Parser::next() {
     peeking = false;
   } else {
     currentToken = lexer->yylex();
-    if (peekedText) {
-      // Don't leak string after we're done with it.
-      delete peekedText;
-      peekedText = nullptr;
-    }
   }
   return currentToken;
 }
 
 std::string Parser::text() {
   if (peeking) {
-    return *currentText;
+    return std::string(currentText);
   } else {
     return std::string(lexer->YYText());
   }
@@ -35,7 +30,7 @@ token_t Parser::peek() {
   if (!peeking) {
     peeking = true;
     peekedToken = lexer->yylex();
-    peekedText = new std::string(lexer->YYText());
+    peekedText = lexer->YYText();
   }
   return peekedToken;
 }

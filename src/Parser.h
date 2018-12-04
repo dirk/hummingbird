@@ -132,9 +132,9 @@ private:
   // Variables for managing look-ahead;
   bool peeking = false;
   token_t currentToken;
-  std::string* currentText;
+  const char* currentText;
   token_t peekedToken;
-  std::string* peekedText;
+  const char* peekedText;
 
   // Actual interface (it is look-ahead-aware).
   token_t next();
