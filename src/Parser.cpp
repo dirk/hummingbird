@@ -38,9 +38,9 @@ token_t Parser::peek() {
 PNode* Parser::parseStatement(int token) {
   switch (token) {
     case T_LET:
-      return new PNode(parseLet(token));
+      return parseLet(token);
     case T_VAR:
-      return new PNode(parseVar(token));
+      return parseVar(token);
     default:
       return parseExpression(token);
   }
@@ -101,20 +101,20 @@ PNode* Parser::parseIdentifier(int token) {
   return new PNode();
 }
 
-PLet Parser::parseLet(int token) {
+PNode* Parser::parseLet(int token) {
   expect(T_IDENTIFIER);
   auto lhs = text();
   expect(T_EQUALS);
   auto rhs = parseExpression(next());
-  return PLet(lhs, rhs);
+  return new PNode(PLet(lhs, rhs));
 }
 
-PVar Parser::parseVar(int token) {
+PNode* Parser::parseVar(int token) {
   expect(T_IDENTIFIER);
   auto lhs = text();
   expect(T_EQUALS);
   auto rhs = parseExpression(next());
-  return PVar(lhs, rhs);
+  return new PNode(PVar(lhs, rhs));
 }
 
 PRoot* Parser::parseRoot() {

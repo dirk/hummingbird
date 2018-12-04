@@ -141,6 +141,10 @@ private:
   std::string text();
   token_t peek();
 
+  /// Advance the lexer and assert that the token it returns is what
+  /// is expected.
+  token_t expect(token_t token);
+
   PRoot* parseRoot();
   PNode* parseStatement(token_t token);
   PNode* parseExpression(token_t token);
@@ -149,10 +153,8 @@ private:
   PNode* parseMultiplication(token_t token);
   PNode* parseIdentifier(token_t token);
   PNode* parseLiteral(token_t token);
-  PLet parseLet(token_t token);
-  PVar parseVar(token_t token);
-
-  token_t expect(token_t token);
+  PNode* parseLet(token_t token);
+  PNode* parseVar(token_t token);
 
   void fatalNodeError(PNode* node);
   void fatalTokenError(token_t t);
