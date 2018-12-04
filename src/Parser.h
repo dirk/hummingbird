@@ -10,6 +10,16 @@
 // Forward declaration because node types will contain nodes.
 class PNode;
 
+class PLet {
+public:
+  PLet(std::string lhs, PNode* rhs) : lhs(lhs), rhs(rhs) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  std::string lhs;
+  PNode* rhs;
+};
+
 class PVar {
 public:
   PVar(std::string lhs, PNode* rhs) : lhs(lhs), rhs(rhs) { };
@@ -34,6 +44,7 @@ typedef struct {} PUnknown;
 class PNode {
 public:
   PNode(PIntegerLiteral integerLiteral) : node(integerLiteral) { };
+  PNode(PLet let) : node(let) { };
   PNode(PVar var) : node(var) { };
   PNode() : node((PUnknown){}) { };
 
@@ -46,6 +57,7 @@ public:
 private:
   std::variant<
     PIntegerLiteral,
+    PLet,
     PVar,
     PUnknown
   > node;
@@ -74,6 +86,7 @@ private:
   PRoot* parseRoot();
   PNode* parseStatement(token_t token);
   PNode* parseExpression(token_t token);
+  PLet parseLet(token_t token);
   PVar parseVar(token_t token);
 
   token_t expect(token_t token);

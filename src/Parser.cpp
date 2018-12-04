@@ -6,6 +6,8 @@ PRoot* Parser::parse() {
 
 PNode* Parser::parseStatement(int token) {
   switch (token) {
+    case T_LET:
+      return new PNode(parseLet(token));
     case T_VAR:
       return new PNode(parseVar(token));
     default:
@@ -21,6 +23,14 @@ PNode* Parser::parseExpression(int token) {
   }
   fatalTokenError(token);
   return new PNode();
+}
+
+PLet Parser::parseLet(int token) {
+  expect(T_IDENTIFIER);
+  auto lhs = std::string(lexer->YYText());
+  expect(T_EQUALS);
+  auto rhs = parseExpression(lexer->yylex());
+  return PLet(lhs, rhs);
 }
 
 PVar Parser::parseVar(int token) {
@@ -82,10 +92,19 @@ void Parser::fatalTokenError(token_t t) {
   exit(1);
 }
 
-#define printIndent (*output << std::string(indent, ' '))
+#define printIndent (*output << std::string(indent * 2, ' '))
 
 void PIntegerLiteral::debugPrint(std::ostream* output, int indent) {
   printIndent << "integerLiteral(" << value << ")" << std::endl;
+}
+
+void PLet::debugPrint(std::ostream* output, int indent) {
+  printIndent << "let(" << std::endl;
+  indent += 1;
+  printIndent << lhs << "," << std::endl;
+  rhs->debugPrint(output, indent);
+  indent -= 1;
+  printIndent << ")" << std::endl;
 }
 
 void PVar::debugPrint(std::ostream* output, int indent) {
@@ -102,6 +121,10 @@ void PNode::debugPrint(std::ostream* output, int indent) {
   auto integerLiteral = std::get_if<PIntegerLiteral>(&node);
   if (integerLiteral) {
     integerLiteral->debugPrint(output, indent + 1);
+  }
+  auto let = std::get_if<PLet>(&node);
+  if (let) {
+    let->debugPrint(output, indent + 1);
   }
   auto var = std::get_if<PVar>(&node);
   if (var) {
