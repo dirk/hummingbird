@@ -30,6 +30,46 @@ public:
   PNode* rhs;
 };
 
+class PAssignment {
+public:
+  PAssignment(PNode* lhs, PNode *rhs) :
+    lhs(lhs),
+    rhs(rhs) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  PNode* lhs;
+  PNode* rhs;
+};
+
+class PIdentifier {
+public:
+  PIdentifier(std::string value) : value(std::string(value)) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  std::string value;
+};
+
+enum struct PInfixOp {
+  ADD,
+  MULTIPLY,
+};
+
+class PInfix {
+public:
+  PInfix(PNode* lhs, PInfixOp op, PNode* rhs) :
+    lhs(lhs),
+    op(op),
+    rhs(rhs) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  PNode* lhs;
+  PInfixOp op;
+  PNode* rhs;
+};
+
 class PIntegerLiteral {
 public:
   PIntegerLiteral(long long int value) : value(value) { };
@@ -43,6 +83,9 @@ typedef struct {} PUnknown;
 
 class PNode {
 public:
+  PNode(PAssignment assignment) : node(assignment) { };
+  PNode(PIdentifier identifier) : node(identifier) { };
+  PNode(PInfix infix) : node(infix) { };
   PNode(PIntegerLiteral integerLiteral) : node(integerLiteral) { };
   PNode(PLet let) : node(let) { };
   PNode(PVar var) : node(var) { };
@@ -56,6 +99,9 @@ public:
 
 private:
   std::variant<
+    PAssignment,
+    PIdentifier,
+    PInfix,
     PIntegerLiteral,
     PLet,
     PVar,
@@ -83,9 +129,26 @@ public:
 private:
   yyFlexLexer* lexer;
 
+  // Variables for managing look-ahead;
+  bool peeking = false;
+  token_t currentToken;
+  std::string* currentText;
+  token_t peekedToken;
+  std::string* peekedText;
+
+  // Actual interface (it is look-ahead-aware).
+  token_t next();
+  std::string text();
+  token_t peek();
+
   PRoot* parseRoot();
   PNode* parseStatement(token_t token);
   PNode* parseExpression(token_t token);
+  PNode* parseAssignment(token_t token);
+  PNode* parseAddition(token_t token);
+  PNode* parseMultiplication(token_t token);
+  PNode* parseIdentifier(token_t token);
+  PNode* parseLiteral(token_t token);
   PLet parseLet(token_t token);
   PVar parseVar(token_t token);
 

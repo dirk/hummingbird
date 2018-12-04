@@ -45,6 +45,7 @@ single_line_comment "//"{non_newline}*
 
 "<"                         { return T_LESS_THAN; }
 "+"                         { return T_PLUS; }
+"*"                         { return T_STAR; }
 "="                         { return T_EQUALS; }
 
 "."{identifier}             { return T_DOT_IDENTIFIER; }

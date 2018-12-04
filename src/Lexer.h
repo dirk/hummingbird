@@ -24,6 +24,7 @@ enum Token {
   T_PARENT_RIGHT,
   T_PLUS,
   T_REAL,
+  T_STAR,
   T_STRING,
   T_VAR,
   T_UNRECOGNIZED,
