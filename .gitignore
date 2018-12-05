@@ -10,6 +10,7 @@ coverage.html
 *.a
 *.cmake
 *.ninja*
+.DS_Store
 .vscode
 bin
 build
