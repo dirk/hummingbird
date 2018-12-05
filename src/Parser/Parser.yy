@@ -15,6 +15,7 @@
 %define api.value.type variant
 %define parse.assert
 %define parse.error verbose
+%locations
 
 %parse-param { Driver* driver }
 %parse-param { Lexer* lexer }
@@ -26,8 +27,6 @@
   #undef yylex
   #define yylex lexer->lex
 }
-
-%locations
 
 %token EOF_ 0 "end of file"
 %token ABSTRACT
