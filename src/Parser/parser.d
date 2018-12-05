@@ -8,10 +8,10 @@ import std.string : stripLeft;
 import pegged.peg : ParseTree;
 
 import ast;
-import grammar : Grammar;
+import grammar : grammar = Grammar;
 
 Program parse(string input, bool debugPrint = false) {
-  auto tree = Grammar(input);
+  auto tree = grammar(input);
   auto renamedTree = renameTree(tree);
   auto simplifiedTree = simplifyTree(renamedTree);
   if (debugPrint) {
@@ -69,6 +69,16 @@ ParseTree simplifyTree(ref ParseTree tree) {
 }
 
 Node visitTree(ref ParseTree tree) {
+  auto node = visitTreeImpl(tree);
+  // Statements include their terminal in their position, so don't overwrite
+  // their inner node with a position that includes the terminal.
+  if (tree.name != "Statement") {
+    node.location = Location(tree);
+  }
+  return node;
+}
+
+Node visitTreeImpl(ref ParseTree tree) {
   switch (tree.name) {
     case "Assignment":
       return visitAssignment(tree);

@@ -1,14 +1,61 @@
+import std.algorithm.searching : findSkip;
 import std.conv : to;
+import std.typecons : Tuple;
+
+import peg = pegged.peg;
 
 enum Visibility {
   Public,
   Private,
 }
 
+alias Position = Tuple!(size_t, "line", size_t, "column");
+
+struct Location {
+  string source;
+  size_t begin, end;
+
+  static const missing = Location("", -1, -1);
+
+  this(string source, size_t begin, size_t end) {
+    this.source = source;
+    this.begin = begin;
+    this.end = end;
+  }
+
+  this(peg.ParseTree tree) {
+    source = tree.input;
+    begin = tree.begin;
+    end = tree.end;
+  }
+
+  auto position() const {
+    auto resolved = peg.position(source[0..begin]);
+    return Position(resolved.line, resolved.col);
+  }
+
+  bool present() const {
+    return source != "" && begin != -1 && end != -1;
+  }
+}
+
 string defaultIndent = "  ";
 
 class Node {
+  Location location = Location.missing;
+
   abstract string toPrettyString(string indent = "") const;
+
+  string nameAndLocation() const {
+    string name = to!string(this.classinfo.name);
+    name.findSkip(".");
+    auto result = name;
+    if (location.present()) {
+      auto position = location.position();
+      result ~= "{" ~ to!string(position.line) ~ "," ~ to!string(position.column) ~ "}";
+    }
+    return result;
+  }
 }
 
 class Assignment : Node {
@@ -21,7 +68,7 @@ class Assignment : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Assignment(";
+    auto result = nameAndLocation() ~ "(";
     result ~= "\n" ~ indent ~ lhs.toPrettyString(indent ~ defaultIndent);
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
@@ -36,7 +83,7 @@ class Block : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Block(";
+    auto result = nameAndLocation() ~ "(";
     if (this.nodes.length > 0) {
       foreach (node; nodes) {
         result ~= "\n" ~ indent ~ node.toPrettyString(indent ~ defaultIndent);
@@ -54,7 +101,7 @@ class Identifier : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    return "Identifier(" ~ value ~ ")";
+    return nameAndLocation() ~ "(" ~ value ~ ")";
   }
 }
 
@@ -75,7 +122,7 @@ class Infix : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Infix(" ~ to!string(op);
+    auto result = nameAndLocation() ~ "(" ~ to!string(op);
     result ~= "\n" ~ indent ~ lhs.toPrettyString(indent ~ defaultIndent);
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
@@ -90,7 +137,7 @@ class Integer : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    return "Integer(" ~ to!string(value) ~ ")";
+    return nameAndLocation() ~ "(" ~ to!string(value) ~ ")";
   }
 }
 
@@ -106,7 +153,7 @@ class Let : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Let(" ~ to!string(visibility) ~ " " ~ lhs;
+    auto result = nameAndLocation() ~ "(" ~ to!string(visibility) ~ " " ~ lhs;
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
@@ -122,7 +169,7 @@ class PostfixCall : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "PostfixCall([";
+    auto result = nameAndLocation() ~ "([";
     foreach (ref argument; arguments) {
       result ~= "\n" ~ indent ~ argument.toPrettyString(indent ~ defaultIndent);
     }
@@ -141,7 +188,7 @@ class PostfixProperty : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "PostfixProperty(";
+    auto result = nameAndLocation() ~ "(";
     result ~= "\n" ~ indent ~ target.toPrettyString(indent ~ defaultIndent);
     result ~= "\n" ~ indent ~ value;
     return result ~ ")";
@@ -156,7 +203,7 @@ class Program : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Program(";
+    auto result = nameAndLocation() ~ "(";
     if (this.nodes.length > 0) {
       indent ~= defaultIndent;
       foreach (node; nodes) {
@@ -179,7 +226,7 @@ class Var : Node {
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Var(" ~ to!string(visibility) ~ " " ~ lhs;
+    auto result = nameAndLocation() ~ "(" ~ to!string(visibility) ~ " " ~ lhs;
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
