@@ -46,8 +46,9 @@ void main() {
 
     # PEGs parse postfixes more naturally as sequences: we'll convert to a
     # recursive tree in 'visitPostfix'.
-    PostfixList < (PostfixCall / PostfixProperty)*
+    PostfixList < (PostfixCall / PostfixIndex / PostfixProperty)*
     PostfixCall < "(" CallArgs? ")"
+    PostfixIndex < "[" Expression "]"
     PostfixProperty < :AllSpacing :"." Identifier
 
     CallArgs < Expression ("," Expression)* ","?

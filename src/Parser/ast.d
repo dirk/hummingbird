@@ -178,6 +178,23 @@ class PostfixCall : Node {
   }
 }
 
+class PostfixIndex : Node {
+  Node target;
+  Node argument;
+
+  this(Node target, Node argument) {
+    this.target = target;
+    this.argument = argument;
+  }
+
+  override string toPrettyString(string indent = "") const {
+    auto result = nameAndLocation() ~ "(";
+    result ~= "\n" ~ indent ~ argument.toPrettyString(indent ~ defaultIndent);
+    result ~= "\n" ~ indent ~ target.toPrettyString(indent ~ defaultIndent);
+    return result ~ ")";
+  }
+}
+
 class PostfixProperty : Node {
   Node target;
   string value;
@@ -189,8 +206,8 @@ class PostfixProperty : Node {
 
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
-    result ~= "\n" ~ indent ~ target.toPrettyString(indent ~ defaultIndent);
     result ~= "\n" ~ indent ~ value;
+    result ~= "\n" ~ indent ~ target.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
 }

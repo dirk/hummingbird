@@ -38,8 +38,9 @@ string[] keepTreeNames = [
   "Block",
   "CallArgs",
   "Let",
-  "PostfixList",
   "PostfixCall",
+  "PostfixIndex",
+  "PostfixList",
   "PostfixProperty",
   "Program",
   "Statement",
@@ -161,11 +162,14 @@ Node visitPostfix(ref ParseTree tree) {
   // Convert list of postfix operations into a tree.
   foreach (postfixTree; postfixList.children) {
     switch (postfixTree.name) {
+      case "PostfixCall":
+        node = visitPostfixCall(postfixTree, node);
+        break;
       case "PostfixProperty":
         node = visitPostfixProperty(postfixTree, node);
         break;
-      case "PostfixCall":
-        node = visitPostfixCall(postfixTree, node);
+      case "PostfixIndex":
+        node = visitPostfixIndex(postfixTree, node);
         break;
       default:
         throw new Error("Unrecognized postfix tree name: " ~ postfixTree.name);
@@ -174,10 +178,10 @@ Node visitPostfix(ref ParseTree tree) {
   return node;
 }
 
-PostfixProperty visitPostfixProperty(ref ParseTree tree, Node target) {
+PostfixIndex visitPostfixIndex(ref ParseTree tree, Node target) {
   assert(tree.children.length == 1);
-  auto value = identifierTreeToString(tree.children[0]);
-  return new PostfixProperty(target, value);
+  auto argument = visitTree(tree.children[0]);
+  return new PostfixIndex(target, argument);
 }
 
 PostfixCall visitPostfixCall(ref ParseTree tree, Node target) {
@@ -191,6 +195,12 @@ PostfixCall visitPostfixCall(ref ParseTree tree, Node target) {
     }
   }
   return new PostfixCall(target, arguments);
+}
+
+PostfixProperty visitPostfixProperty(ref ParseTree tree, Node target) {
+  assert(tree.children.length == 1);
+  auto value = identifierTreeToString(tree.children[0]);
+  return new PostfixProperty(target, value);
 }
 
 Program visitProgram(ref ParseTree tree) {
