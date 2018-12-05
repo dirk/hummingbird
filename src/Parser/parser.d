@@ -44,7 +44,6 @@ ParseTree simplifyTree(ref ParseTree tree) {
   } else if (keepTreeNames.canFind(tree.name)) {
     return tree;
   } else {
-    // linear tree
     return tree.children[0];
   }
 }

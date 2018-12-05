@@ -38,13 +38,13 @@ void main() {
 
     Terminal < "\n" / ";" / &endOfInput
 
-    AllSpacing <~ blank*
+    AllSpacing <- (endOfLine / Spacing)*
 
-    Spacing <- :(" " / "\t" / Comment)*
+    Spacing <- (" " / "\t" / Comment)*
 
-    Comment <- BlockComment / LineComment
-    BlockComment <- "/*" (!"*/" .)* "*/"
-    LineComment <- "//" (!endOfLine .)*
+    Comment <~ BlockComment / LineComment
+    BlockComment <~ "/*" (!"*/" .)* "*/"
+    LineComment <~ "//" (!endOfLine .)*
   `;
   asModule("grammar", "../../src/parser/grammar", source);
 }
