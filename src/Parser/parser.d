@@ -38,6 +38,7 @@ string[] keepTreeNames = [
   "Block",
   "CallArgs",
   "Let",
+  "PostfixList",
   "PostfixCall",
   "PostfixProperty",
   "Program",
@@ -96,10 +97,8 @@ Node visitTreeImpl(ref ParseTree tree) {
       return visitInteger(tree);
     case "Let":
       return visitLet(tree);
-    case "PostfixCall":
-      return visitPostfixCall(tree);
-    case "PostfixProperty":
-      return visitPostfixProperty(tree);
+    case "Postfix":
+      return visitPostfix(tree);
     case "Var":
       return visitVar(tree);
     default:
@@ -154,19 +153,38 @@ Let visitLet(ref ParseTree tree) {
   return new Let(lhs, rhs, visibility);
 }
 
-PostfixProperty visitPostfixProperty(ref ParseTree tree) {
+Node visitPostfix(ref ParseTree tree) {
   assert(tree.children.length == 2);
-  auto target = visitTree(tree.children[0]);
-  auto value = identifierTreeToString(tree.children[1]);
+  assert(tree.children[1].name == "PostfixList");
+  auto node = visitTree(tree.children[0]);
+  auto postfixList = tree.children[1];
+  // Convert list of postfix operations into a tree.
+  foreach (postfixTree; postfixList.children) {
+    switch (postfixTree.name) {
+      case "PostfixProperty":
+        node = visitPostfixProperty(postfixTree, node);
+        break;
+      case "PostfixCall":
+        node = visitPostfixCall(postfixTree, node);
+        break;
+      default:
+        throw new Error("Unrecognized postfix tree name: " ~ postfixTree.name);
+    }
+  }
+  return node;
+}
+
+PostfixProperty visitPostfixProperty(ref ParseTree tree, Node target) {
+  assert(tree.children.length == 1);
+  auto value = identifierTreeToString(tree.children[0]);
   return new PostfixProperty(target, value);
 }
 
-PostfixCall visitPostfixCall(ref ParseTree tree) {
-  assert(tree.children.length == 1 || tree.children.length == 2);
-  auto target = visitTree(tree.children[0]);
+PostfixCall visitPostfixCall(ref ParseTree tree, Node target) {
+  assert(tree.children.length == 0 || tree.children.length == 1);
   Node[] arguments;
-  if (tree.children.length == 2) {
-    auto argumentsTree = tree.children[1];
+  if (tree.children.length == 1) {
+    auto argumentsTree = tree.children[0];
     assert(argumentsTree.name == "CallArgs");
     foreach (ref argumentTree; argumentsTree.children) {
       arguments ~= visitTree(argumentTree);

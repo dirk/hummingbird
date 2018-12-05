@@ -42,14 +42,13 @@ void main() {
 
     Prefix < "!"? Postfix
 
-    Postfix < (
-        / PostfixCall
-        / PostfixProperty
-        / Atom
-      )
+    Postfix < Atom PostfixList
 
-    PostfixCall < Postfix "(" CallArgs? ")"
-    PostfixProperty < Postfix :"." Identifier
+    # PEGs parse postfixes more naturally as sequences: we'll convert to a
+    # recursive tree in 'visitPostfix'.
+    PostfixList < (PostfixCall / PostfixProperty)*
+    PostfixCall < "(" CallArgs? ")"
+    PostfixProperty < :AllSpacing :"." Identifier
 
     CallArgs < Expression ("," Expression)* ","?
 
