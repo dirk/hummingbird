@@ -23,7 +23,7 @@ ParseTree renameTree(ref ParseTree tree) {
   foreach (ref child; tree.children) {
     renameTree(child);
   }
-  tree.name = tree.name.stripLeft("hummingbird.");
+  tree.name = tree.name.stripLeft("Grammar.");
   return tree;
 }
 
