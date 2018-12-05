@@ -1,0 +1,7 @@
+name "hummingbird"
+description "A minimal D application."
+authors "Dirk Gadsden"
+copyright "Copyright © 2018, Dirk Gadsden"
+license "proprietary"
+
+dependency "pegged" version="~>0.4.4"
