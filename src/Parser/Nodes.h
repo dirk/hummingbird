@@ -30,9 +30,7 @@ public:
 
 class PAssignment {
 public:
-  PAssignment(PNode* lhs, PNode *rhs) :
-    lhs(lhs),
-    rhs(rhs) { };
+  PAssignment(PNode* lhs, PNode *rhs);
 
   void debugPrint(std::ostream* output, int indent);
 
@@ -80,9 +78,9 @@ public:
   PNode* rhs;
 };
 
-class PIntegerLiteral {
+class PInteger {
 public:
-  PIntegerLiteral(long long int value) : value(value) { };
+  PInteger(long long int value) : value(value) { };
 
   void debugPrint(std::ostream* output, int indent);
 
@@ -109,15 +107,14 @@ public:
   PNode(PCall call) : node(call) { };
   PNode(PIdentifier identifier) : node(identifier) { };
   PNode(PInfix infix) : node(infix) { };
-  PNode(PIntegerLiteral integerLiteral) : node(integerLiteral) { };
+  PNode(PInteger integerLiteral) : node(integerLiteral) { };
   PNode(PLet let) : node(let) { };
   PNode(PProperty property) : node(property) { };
   PNode(PVar var) : node(var) { };
   PNode() : node((PUnknown){}) { };
 
-  bool isUnknown() {
-    return std::holds_alternative<PUnknown>(node);
-  }
+  bool isUnknown() { return std::holds_alternative<PUnknown>(node); }
+  bool isCall() { return std::holds_alternative<PCall>(node); }
 
   void debugPrint(std::ostream* output, int indent);
 
@@ -127,7 +124,7 @@ private:
     PCall,
     PIdentifier,
     PInfix,
-    PIntegerLiteral,
+    PInteger,
     PLet,
     PProperty,
     PVar,

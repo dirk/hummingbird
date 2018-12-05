@@ -777,7 +777,7 @@ namespace yy {
 
   case 24:
 
-    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+    { yylhs.value.as< std::vector<PNode*> > () = {}; }
 
     break;
 
@@ -789,13 +789,19 @@ namespace yy {
 
   case 26:
 
-    { yylhs.value.as< PNode* > () = new PNode(PIdentifier(yystack_[0].value.as< std::string > ())); }
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
 
     break;
 
   case 27:
 
-    { yylhs.value.as< PNode* > () = new PNode(PIntegerLiteral(yystack_[0].value.as< long long int > ())); }
+    { yylhs.value.as< PNode* > () = new PNode(PIdentifier(yystack_[0].value.as< std::string > ())); }
+
+    break;
+
+  case 28:
+
+    { yylhs.value.as< PNode* > () = new PNode(PInteger(yystack_[0].value.as< long long int > ())); }
 
     break;
 
@@ -1075,11 +1081,11 @@ namespace yy {
   const unsigned char
   parser::yydefact_[] =
   {
-       0,    26,    27,     0,     0,     0,     2,     4,     0,     0,
-       0,    10,    12,    16,    19,    24,    25,     0,     0,     1,
-       3,    29,     6,     7,     5,    13,    14,     0,     0,     0,
-       0,    17,    18,     0,     0,    28,    11,    21,    15,    23,
-       0,     8,     9,     0,    20,    22
+       0,    27,    28,     0,     0,     0,     2,     4,     0,     0,
+       0,    10,    12,    16,    19,    25,    26,     0,     0,     1,
+       3,    30,     6,     7,     5,    13,    14,     0,     0,     0,
+      24,    17,    18,     0,     0,    29,    11,    21,    15,    23,
+       0,     8,     9,    24,    20,    22
   };
 
   const signed char
@@ -1129,7 +1135,8 @@ namespace yy {
   {
        0,    25,    26,    27,    27,    28,    28,    28,    29,    30,
       31,    32,    32,    33,    33,    34,    34,    35,    35,    35,
-      36,    37,    38,    38,    39,    39,    40,    41,    42,    42
+      36,    37,    38,    38,    38,    39,    39,    40,    41,    42,
+      42
   };
 
   const unsigned char
@@ -1137,7 +1144,8 @@ namespace yy {
   {
        0,     2,     1,     2,     1,     2,     2,     2,     4,     4,
        1,     3,     1,     1,     1,     3,     1,     2,     2,     1,
-       3,     2,     3,     1,     1,     1,     1,     1,     2,     1
+       3,     2,     3,     1,     0,     1,     1,     1,     1,     2,
+       1
   };
 
 
@@ -1163,7 +1171,8 @@ namespace yy {
   {
        0,    87,    87,    89,    90,    93,    94,    95,    97,    98,
      100,   102,   103,   105,   105,   107,   108,   110,   111,   112,
-     114,   115,   117,   118,   120,   120,   122,   124,   126,   127
+     114,   115,   117,   118,   119,   121,   121,   123,   125,   127,
+     128
   };
 
   // Print the state stack on the debug stream.

@@ -1,4 +1,16 @@
+#include <iostream>
+
 #include "Nodes.h"
+
+PAssignment::PAssignment(PNode* lhs, PNode *rhs) :
+  lhs(lhs),
+  rhs(rhs) {
+  if (lhs->isCall()) {
+    // FIXME: Catch and return a parse error.
+    std::cerr << "Cannot assign to result of a call" << std::endl;
+    exit(1);
+  }
+};
 
 PRoot::PRoot(std::vector<PNode*> nodes) : nodes(nodes) { };
 
@@ -54,8 +66,8 @@ void PInfix::debugPrint(std::ostream* output, int indent) {
   printIndent << ")" << std::endl;
 }
 
-void PIntegerLiteral::debugPrint(std::ostream* output, int indent) {
-  printIndent << "integerLiteral(" << value << ")" << std::endl;
+void PInteger::debugPrint(std::ostream* output, int indent) {
+  printIndent << "integer(" << value << ")" << std::endl;
 }
 
 void PLet::debugPrint(std::ostream* output, int indent) {
@@ -97,7 +109,7 @@ void PNode::debugPrint(std::ostream* output, int indent) {
   DEBUG_PRINT_IF(PCall);
   DEBUG_PRINT_IF(PIdentifier);
   DEBUG_PRINT_IF(PInfix);
-  DEBUG_PRINT_IF(PIntegerLiteral);
+  DEBUG_PRINT_IF(PInteger);
   DEBUG_PRINT_IF(PLet);
   DEBUG_PRINT_IF(PProperty);
   DEBUG_PRINT_IF(PVar);

@@ -116,12 +116,13 @@ chain_property: DOT IDENTIFIER { $$ = $2; };
 
 call_arguments: expression COMMA call_arguments { $$ = push_front($3, $1); };
 call_arguments: expression { $$ = {$1}; };
+call_arguments: { $$ = {}; };
 
 atom: identifier | literal;
 
 identifier: IDENTIFIER { $$ = new PNode(PIdentifier($1)); };
 
-literal: INTEGER { $$ = new PNode(PIntegerLiteral($1)); };
+literal: INTEGER { $$ = new PNode(PInteger($1)); };
 
 terminals: terminals TERMINAL;
 terminals: TERMINAL;
