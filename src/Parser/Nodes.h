@@ -28,6 +28,15 @@ public:
   PNode* rhs;
 };
 
+class PArray {
+public:
+  PArray(std::vector<PNode*> nodes) : nodes(nodes) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  std::vector<PNode*> nodes;
+};
+
 class PAssignment {
 public:
   PAssignment(PNode* lhs, PNode *rhs);
@@ -113,6 +122,7 @@ typedef struct {} PUnknown;
 
 class PNode {
 public:
+  PNode(PArray array) : node(array) { };
   PNode(PAssignment assignment) : node(assignment) { };
   PNode(PCall call) : node(call) { };
   PNode(PIdentifier identifier) : node(identifier) { };
@@ -131,6 +141,7 @@ public:
 
 private:
   std::variant<
+    PArray,
     PAssignment,
     PCall,
     PIndexer,

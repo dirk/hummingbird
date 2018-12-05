@@ -258,14 +258,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.YY_MOVE_OR_COPY< PNode* > (YY_MOVE (that.value));
         break;
 
@@ -274,13 +275,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (that.value));
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.YY_MOVE_OR_COPY< std::vector<PNode*> > (YY_MOVE (that.value));
         break;
 
@@ -303,14 +305,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.move< PNode* > (YY_MOVE (that.value));
         break;
 
@@ -319,13 +322,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.move< std::string > (YY_MOVE (that.value));
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.move< std::vector<PNode*> > (YY_MOVE (that.value));
         break;
 
@@ -348,14 +352,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.move< PNode* > (that.value);
         break;
 
@@ -364,13 +369,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.move< std::string > (that.value);
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.move< std::vector<PNode*> > (that.value);
         break;
 
@@ -617,14 +623,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         yylhs.value.emplace< PNode* > ();
         break;
 
@@ -633,13 +640,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         yylhs.value.emplace< std::string > ();
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         yylhs.value.emplace< std::vector<PNode*> > ();
         break;
 
@@ -719,47 +727,47 @@ namespace yy {
 
   case 11:
 
-    { yylhs.value.as< PNode* > () = yystack_[2].value.as< PNode* > (); }
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
 
     break;
 
   case 12:
 
-    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+    { yylhs.value.as< PNode* > () = new PNode(PArray(yystack_[1].value.as< std::vector<PNode*> > ())); }
+
+    break;
+
+  case 13:
+
+    { yylhs.value.as< PNode* > () = new PNode(PArray(yystack_[2].value.as< std::vector<PNode*> > ())); }
+
+    break;
+
+  case 14:
+
+    { yylhs.value.as< std::vector<PNode*> > () = push_front(yystack_[0].value.as< std::vector<PNode*> > (), yystack_[2].value.as< PNode* > ()); }
 
     break;
 
   case 15:
 
-    { yylhs.value.as< PNode* > () = new PNode(PAssignment(yystack_[2].value.as< PNode* > (), yystack_[0].value.as< PNode* > ())); }
+    { yylhs.value.as< std::vector<PNode*> > () = {yystack_[0].value.as< PNode* > ()}; }
 
     break;
 
   case 16:
 
-    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+    { yylhs.value.as< std::vector<PNode*> > () = {}; }
 
     break;
 
   case 17:
 
-    { yylhs.value.as< PNode* > () = new PNode(PCall(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< std::vector<PNode*> > ())); }
+    { yylhs.value.as< PNode* > () = yystack_[2].value.as< PNode* > (); }
 
     break;
 
   case 18:
-
-    { yylhs.value.as< PNode* > () = new PNode(PProperty(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< std::string > ())); }
-
-    break;
-
-  case 19:
-
-    { yylhs.value.as< PNode* > () = new PNode(PIndexer(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< PNode* > ())); }
-
-    break;
-
-  case 20:
 
     { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
 
@@ -767,55 +775,55 @@ namespace yy {
 
   case 21:
 
-    { yylhs.value.as< std::vector<PNode*> > () = yystack_[1].value.as< std::vector<PNode*> > (); }
+    { yylhs.value.as< PNode* > () = new PNode(PAssignment(yystack_[2].value.as< PNode* > (), yystack_[0].value.as< PNode* > ())); }
 
     break;
 
   case 22:
 
-    { yylhs.value.as< std::string > () = yystack_[0].value.as< std::string > (); }
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
 
     break;
 
   case 23:
 
-    { yylhs.value.as< PNode* > () = yystack_[1].value.as< PNode* > (); }
+    { yylhs.value.as< PNode* > () = new PNode(PCall(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< std::vector<PNode*> > ())); }
 
     break;
 
   case 24:
 
-    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+    { yylhs.value.as< PNode* > () = new PNode(PProperty(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< std::string > ())); }
 
     break;
 
   case 25:
 
-    { yylhs.value.as< PNode* > () = nullptr; }
+    { yylhs.value.as< PNode* > () = new PNode(PIndexer(yystack_[1].value.as< PNode* > (), yystack_[0].value.as< PNode* > ())); }
 
     break;
 
   case 26:
 
-    { yylhs.value.as< std::vector<PNode*> > () = push_front(yystack_[0].value.as< std::vector<PNode*> > (), yystack_[2].value.as< PNode* > ()); }
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
 
     break;
 
   case 27:
 
-    { yylhs.value.as< std::vector<PNode*> > () = {yystack_[0].value.as< PNode* > ()}; }
+    { yylhs.value.as< std::vector<PNode*> > () = yystack_[1].value.as< std::vector<PNode*> > (); }
 
     break;
 
   case 28:
 
-    { yylhs.value.as< std::vector<PNode*> > () = {}; }
+    { yylhs.value.as< std::string > () = yystack_[0].value.as< std::string > (); }
 
     break;
 
   case 29:
 
-    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+    { yylhs.value.as< PNode* > () = yystack_[1].value.as< PNode* > (); }
 
     break;
 
@@ -827,11 +835,47 @@ namespace yy {
 
   case 31:
 
-    { yylhs.value.as< PNode* > () = new PNode(PIdentifier(yystack_[0].value.as< std::string > ())); }
+    { yylhs.value.as< PNode* > () = nullptr; }
 
     break;
 
   case 32:
+
+    { yylhs.value.as< std::vector<PNode*> > () = push_front(yystack_[0].value.as< std::vector<PNode*> > (), yystack_[2].value.as< PNode* > ()); }
+
+    break;
+
+  case 33:
+
+    { yylhs.value.as< std::vector<PNode*> > () = {yystack_[0].value.as< PNode* > ()}; }
+
+    break;
+
+  case 34:
+
+    { yylhs.value.as< std::vector<PNode*> > () = {}; }
+
+    break;
+
+  case 35:
+
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+
+    break;
+
+  case 36:
+
+    { yylhs.value.as< PNode* > () = yystack_[0].value.as< PNode* > (); }
+
+    break;
+
+  case 37:
+
+    { yylhs.value.as< PNode* > () = new PNode(PIdentifier(yystack_[0].value.as< std::string > ())); }
+
+    break;
+
+  case 38:
 
     { yylhs.value.as< PNode* > () = new PNode(PInteger(yystack_[0].value.as< long long int > ())); }
 
@@ -1096,91 +1140,99 @@ namespace yy {
   }
 
 
-  const signed char parser::yypact_ninf_ = -30;
+  const signed char parser::yypact_ninf_ = -14;
 
   const signed char parser::yytable_ninf_ = -1;
 
   const signed char
   parser::yypact_[] =
   {
-      -3,   -30,   -30,    -8,     6,    21,   -30,    -3,    -2,    -2,
-      -2,   -30,    -6,    -5,   -30,   -30,   -30,    14,    15,   -30,
-     -30,   -30,     3,     3,     3,   -30,   -30,     2,    17,     2,
-       2,     2,   -30,   -30,   -30,     2,     2,   -30,   -30,   -30,
-     -30,    20,    12,   -30,     9,   -30,   -30,     2,   -30,   -30,
-     -30
+     -10,   -14,   -14,     7,     0,    12,     8,   -14,   -10,     1,
+       1,     1,   -14,   -14,   -13,    -3,   -14,   -14,   -14,    14,
+      20,    -2,    17,   -14,   -14,   -14,     4,     4,     4,   -14,
+     -14,     3,    21,     0,     0,     0,   -14,   -14,   -14,     0,
+       0,    13,   -14,     0,   -14,   -14,   -14,   -14,    27,    23,
+     -14,    16,   -14,   -14,   -14,   -14,     0,   -14,   -14,   -14
   };
 
   const unsigned char
   parser::yydefact_[] =
   {
-       0,    31,    32,     0,     0,     0,     2,     4,     0,     0,
-       0,    10,    12,    16,    20,    29,    30,     0,     0,     1,
-       3,    34,     6,     7,     5,    13,    14,     0,     0,     0,
-      28,    25,    17,    18,    19,     0,     0,    33,    11,    22,
-      15,    27,     0,    24,     0,     8,     9,    28,    21,    23,
-      26
+       0,    37,    38,     0,    16,     0,     0,     2,     4,     0,
+       0,     0,    10,    11,    18,    22,    26,    35,    36,     0,
+      15,     0,     0,     1,     3,    40,     6,     7,     5,    19,
+      20,     0,     0,     0,    34,    31,    23,    24,    25,     0,
+      16,     0,    12,     0,    39,    17,    28,    21,    33,     0,
+      30,     0,     8,    14,    13,     9,    34,    27,    29,    32
   };
 
   const signed char
   parser::yypgoto_[] =
   {
-     -30,   -30,    24,   -30,   -30,   -30,   -29,     5,   -30,   -30,
-     -30,   -30,   -30,   -30,   -30,   -14,   -30,   -30,   -30,    10
+     -14,   -14,    30,   -14,   -14,   -14,    -4,   -14,     2,    10,
+     -14,   -14,   -14,   -14,   -14,   -14,   -14,   -12,   -14,   -14,
+     -14,    11
   };
 
   const signed char
   parser::yydefgoto_[] =
   {
-      -1,     5,     6,     7,     8,     9,    10,    11,    27,    12,
-      13,    32,    33,    34,    44,    42,    14,    15,    16,    22
+      -1,     6,     7,     8,     9,    10,    11,    12,    21,    13,
+      31,    14,    15,    36,    37,    38,    51,    49,    16,    17,
+      18,    26
   };
 
   const unsigned char
   parser::yytable_[] =
   {
-      40,    41,    43,    17,    28,    29,    45,    46,     1,     2,
-       3,    30,    25,     1,     2,    31,    26,    18,    41,    23,
-      24,    19,    21,     4,    35,    36,    47,    37,    39,    48,
-      49,    20,    38,    50
+      20,     1,     2,     3,    41,    29,    32,    33,    23,    30,
+       4,     1,     2,    34,     1,     2,     5,    35,    19,    42,
+       4,    27,    28,    22,    39,    25,    40,    43,    44,    47,
+      48,    50,    46,    56,    54,    52,    20,    58,    24,    55,
+      57,    45,    53,     0,    59,     0,     0,     0,     0,     0,
+       0,     0,    48
   };
 
-  const unsigned char
+  const signed char
   parser::yycheck_[] =
   {
-      29,    30,    31,    11,     9,    10,    35,    36,    11,    12,
-      13,    16,    18,    11,    12,    20,    22,    11,    47,     9,
-      10,     0,    24,    26,    10,    10,     6,    24,    11,    17,
-      21,     7,    27,    47
+       4,    11,    12,    13,     6,    18,     9,    10,     0,    22,
+      20,    11,    12,    16,    11,    12,    26,    20,    11,    21,
+      20,    10,    11,    11,    10,    24,     6,    10,    24,    33,
+      34,    35,    11,     6,    21,    39,    40,    21,     8,    43,
+      17,    31,    40,    -1,    56,    -1,    -1,    -1,    -1,    -1,
+      -1,    -1,    56
   };
 
   const unsigned char
   parser::yystos_[] =
   {
-       0,    11,    12,    13,    26,    28,    29,    30,    31,    32,
-      33,    34,    36,    37,    43,    44,    45,    11,    11,     0,
-      29,    24,    46,    46,    46,    18,    22,    35,     9,    10,
-      16,    20,    38,    39,    40,    10,    10,    24,    34,    11,
-      33,    33,    42,    33,    41,    33,    33,     6,    17,    21,
-      42
+       0,    11,    12,    13,    20,    26,    28,    29,    30,    31,
+      32,    33,    34,    36,    38,    39,    45,    46,    47,    11,
+      33,    35,    11,     0,    29,    24,    48,    48,    48,    18,
+      22,    37,     9,    10,    16,    20,    40,    41,    42,    10,
+       6,     6,    21,    10,    24,    36,    11,    33,    33,    44,
+      33,    43,    33,    35,    21,    33,     6,    17,    21,    44
   };
 
   const unsigned char
   parser::yyr1_[] =
   {
        0,    27,    28,    29,    29,    30,    30,    30,    31,    32,
-      33,    34,    34,    35,    35,    36,    36,    37,    37,    37,
-      37,    38,    39,    40,    41,    41,    42,    42,    42,    43,
-      43,    44,    45,    46,    46
+      33,    33,    34,    34,    35,    35,    35,    36,    36,    37,
+      37,    38,    38,    39,    39,    39,    39,    40,    41,    42,
+      43,    43,    44,    44,    44,    45,    45,    46,    47,    48,
+      48
   };
 
   const unsigned char
   parser::yyr2_[] =
   {
        0,     2,     1,     2,     1,     2,     2,     2,     4,     4,
-       1,     3,     1,     1,     1,     3,     1,     2,     2,     2,
-       1,     3,     2,     3,     1,     0,     3,     1,     0,     1,
-       1,     1,     1,     2,     1
+       1,     1,     3,     4,     3,     1,     0,     3,     1,     1,
+       1,     3,     1,     2,     2,     2,     1,     3,     2,     3,
+       1,     0,     3,     1,     0,     1,     1,     1,     1,     2,
+       1
   };
 
 
@@ -1195,20 +1247,21 @@ namespace yy {
   "INTEGER", "LET", "LESS_THAN", "MIXIN", "PAREN_LEFT", "PAREN_RIGHT",
   "PLUS", "REAL", "SQUARE_LEFT", "SQUARE_RIGHT", "STAR", "STRING",
   "TERMINAL", "UNRECOGNIZED", "VAR", "$accept", "program", "statements",
-  "statement", "let", "var", "expression", "infix", "infix_op",
-  "assignment", "postfix", "postfix_call", "postfix_property",
-  "postfix_indexer", "postfix_indexer_expression", "call_arguments",
-  "atom", "identifier", "literal", "terminals", YY_NULLPTR
+  "statement", "let", "var", "expression", "array", "array_arguments",
+  "infix", "infix_op", "assignment", "postfix", "postfix_call",
+  "postfix_property", "postfix_indexer", "postfix_indexer_expression",
+  "call_arguments", "atom", "identifier", "literal", "terminals", YY_NULLPTR
   };
 
 #if YYDEBUG
   const unsigned char
   parser::yyrline_[] =
   {
-       0,    91,    91,    93,    94,    97,    98,    99,   101,   102,
-     104,   106,   107,   109,   109,   111,   112,   114,   115,   116,
-     117,   119,   120,   121,   122,   123,   125,   126,   127,   129,
-     129,   131,   133,   135,   136
+       0,    93,    93,    95,    96,    99,   100,   101,   103,   104,
+     107,   108,   111,   112,   115,   116,   117,   119,   120,   122,
+     122,   124,   125,   127,   128,   129,   130,   132,   133,   134,
+     135,   136,   138,   139,   140,   142,   142,   144,   146,   148,
+     149
   };
 
   // Print the state stack on the debug stream.

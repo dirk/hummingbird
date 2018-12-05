@@ -22,6 +22,14 @@ PRoot::~PRoot() {
 
 #define printIndent (*output << std::string(indent * 2, ' '))
 
+void PArray::debugPrint(std::ostream* output, int indent) {
+  printIndent << "array(" << std::endl;
+  for (auto node : nodes) {
+    node->debugPrint(output, indent + 1);
+  }
+  printIndent << ")" << std::endl;
+}
+
 void PAssignment::debugPrint(std::ostream* output, int indent) {
   printIndent << "assignment(" << std::endl;
   indent += 1;
@@ -116,6 +124,7 @@ void PVar::debugPrint(std::ostream* output, int indent) {
 
 void PNode::debugPrint(std::ostream* output, int indent) {
   // printIndent << "node(" << std::endl;
+  DEBUG_PRINT_IF(PArray);
   DEBUG_PRINT_IF(PAssignment);
   DEBUG_PRINT_IF(PCall);
   DEBUG_PRINT_IF(PIdentifier);

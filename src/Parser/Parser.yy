@@ -58,6 +58,7 @@
 %left PLUS
 %left STAR
 
+%type <PNode*> array
 %type <PNode*> assignment
 %type <PNode*> atom
 %type <PNode*> postfix
@@ -71,6 +72,7 @@
 %type <PNode*> statement
 %type <PNode*> var
 
+%type <std::vector<PNode*>> array_arguments
 %type <std::vector<PNode*>> call_arguments
 %type <std::vector<PNode*>> postfix_call
 %type <std::vector<PNode*>> statements
@@ -101,7 +103,18 @@ statement:
 let: LET IDENTIFIER EQUALS expression { $$ = new PNode(PLet($2, $4)); };
 var: VAR IDENTIFIER EQUALS expression { $$ = new PNode(PVar($2, $4)); };
 
-expression: infix;
+expression:
+    array
+  | infix;
+
+array:
+    SQUARE_LEFT array_arguments SQUARE_RIGHT       { $$ = new PNode(PArray($2)); }
+  | SQUARE_LEFT array_arguments COMMA SQUARE_RIGHT { $$ = new PNode(PArray($2)); };
+
+array_arguments:
+    expression COMMA array_arguments { $$ = push_front($3, $1); }
+  | expression { $$ = {$1}; }
+  | { $$ = {}; };
 
 infix: assignment infix_op infix;
 infix: assignment;
@@ -113,7 +126,7 @@ assignment: postfix;
 
 postfix: postfix postfix_call { $$ = new PNode(PCall($1, $2)); };
 postfix: postfix postfix_property { $$ = new PNode(PProperty($1, $2)); };
-postfix: postfix postfix_indexer { $$ = new PNode(PIndexer($1, $2)); }
+postfix: postfix postfix_indexer { $$ = new PNode(PIndexer($1, $2)); };
 postfix: atom;
 
 postfix_call: PAREN_LEFT call_arguments PAREN_RIGHT { $$ = $2; };

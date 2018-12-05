@@ -490,6 +490,7 @@ namespace yy {
       // let
       // var
       // expression
+      // array
       // infix
       // assignment
       // postfix
@@ -508,6 +509,7 @@ namespace yy {
       char dummy3[sizeof (std::string)];
 
       // statements
+      // array_arguments
       // postfix_call
       // call_arguments
       char dummy4[sizeof (std::vector<PNode*>)];
@@ -873,7 +875,7 @@ namespace yy {
   // number is the opposite.  If YYTABLE_NINF, syntax error.
   static const unsigned char yytable_[];
 
-  static const unsigned char yycheck_[];
+  static const signed char yycheck_[];
 
   // YYSTOS[STATE-NUM] -- The (internal number of the) accessing
   // symbol of state STATE-NUM.
@@ -999,9 +1001,9 @@ namespace yy {
     enum
     {
       yyeof_ = 0,
-      yylast_ = 33,     ///< Last index in yytable_.
-      yynnts_ = 20,  ///< Number of nonterminal symbols.
-      yyfinal_ = 19, ///< Termination state number.
+      yylast_ = 52,     ///< Last index in yytable_.
+      yynnts_ = 22,  ///< Number of nonterminal symbols.
+      yyfinal_ = 23, ///< Termination state number.
       yyterror_ = 1,
       yyerrcode_ = 256,
       yyntokens_ = 27  ///< Number of tokens.
@@ -1088,14 +1090,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.YY_MOVE_OR_COPY< PNode* > (YY_MOVE (other.value));
         break;
 
@@ -1104,13 +1107,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (other.value));
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.YY_MOVE_OR_COPY< std::vector<PNode*> > (YY_MOVE (other.value));
         break;
 
@@ -1224,14 +1228,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.template destroy< PNode* > ();
         break;
 
@@ -1240,13 +1245,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.template destroy< std::string > ();
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.template destroy< std::vector<PNode*> > ();
         break;
 
@@ -1275,14 +1281,15 @@ namespace yy {
       case 31: // let
       case 32: // var
       case 33: // expression
-      case 34: // infix
-      case 36: // assignment
-      case 37: // postfix
-      case 40: // postfix_indexer
-      case 41: // postfix_indexer_expression
-      case 43: // atom
-      case 44: // identifier
-      case 45: // literal
+      case 34: // array
+      case 36: // infix
+      case 38: // assignment
+      case 39: // postfix
+      case 42: // postfix_indexer
+      case 43: // postfix_indexer_expression
+      case 45: // atom
+      case 46: // identifier
+      case 47: // literal
         value.move< PNode* > (YY_MOVE (s.value));
         break;
 
@@ -1291,13 +1298,14 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 39: // postfix_property
+      case 41: // postfix_property
         value.move< std::string > (YY_MOVE (s.value));
         break;
 
       case 29: // statements
-      case 38: // postfix_call
-      case 42: // call_arguments
+      case 35: // array_arguments
+      case 40: // postfix_call
+      case 44: // call_arguments
         value.move< std::vector<PNode*> > (YY_MOVE (s.value));
         break;
 
