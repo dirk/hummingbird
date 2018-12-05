@@ -267,8 +267,11 @@ namespace yy {
         value.YY_MOVE_OR_COPY< PNode* > (YY_MOVE (that.value));
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.YY_MOVE_OR_COPY< long long int > (YY_MOVE (that.value));
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (that.value));
         break;
@@ -307,8 +310,11 @@ namespace yy {
         value.move< PNode* > (YY_MOVE (that.value));
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.move< long long int > (YY_MOVE (that.value));
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.move< std::string > (YY_MOVE (that.value));
         break;
@@ -347,8 +353,11 @@ namespace yy {
         value.move< PNode* > (that.value);
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.move< long long int > (that.value);
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.move< std::string > (that.value);
         break;
@@ -611,8 +620,11 @@ namespace yy {
         yylhs.value.emplace< PNode* > ();
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        yylhs.value.emplace< long long int > ();
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         yylhs.value.emplace< std::string > ();
         break;
@@ -783,7 +795,7 @@ namespace yy {
 
   case 27:
 
-    { yylhs.value.as< PNode* > () = new PNode(PIntegerLiteral(yystack_[0].value.as< std::string > ())); }
+    { yylhs.value.as< PNode* > () = new PNode(PIntegerLiteral(yystack_[0].value.as< long long int > ())); }
 
     break;
 

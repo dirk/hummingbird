@@ -856,7 +856,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-{ return parser::make_INTEGER(YYText(), location); }
+{ return parser::make_INTEGER(std::stoll(YYText()), location); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP

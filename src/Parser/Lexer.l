@@ -40,7 +40,7 @@ single_line_comment "//"{non_newline}*
 %}
 
 {integer}{fractional}       { return parser::make_REAL(location); }
-{integer}                   { return parser::make_INTEGER(YYText(), location); }
+{integer}                   { return parser::make_INTEGER(std::stoll(YYText()), location); }
 
 "let"{one_whitespace}       { return parser::make_LET(location); }
 "var"{one_whitespace}       { return parser::make_VAR(location); }

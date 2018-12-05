@@ -1,9 +1,5 @@
 #include "Nodes.h"
 
-PIntegerLiteral::PIntegerLiteral(std::string rawValue) {
-  this->value = std::stoll(rawValue);
-}
-
 PRoot::PRoot(std::vector<PNode*> nodes) : nodes(nodes) { };
 
 PRoot::~PRoot() {

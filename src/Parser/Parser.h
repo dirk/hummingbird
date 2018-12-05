@@ -498,15 +498,17 @@ namespace yy {
       // literal
       char dummy1[sizeof (PNode*)];
 
-      // IDENTIFIER
       // INTEGER
+      char dummy2[sizeof (long long int)];
+
+      // IDENTIFIER
       // chain_property
-      char dummy2[sizeof (std::string)];
+      char dummy3[sizeof (std::string)];
 
       // statements
       // chain_call
       // call_arguments
-      char dummy3[sizeof (std::vector<PNode*>)];
+      char dummy4[sizeof (std::vector<PNode*>)];
 };
 
     /// Symbol semantic values.
@@ -596,6 +598,11 @@ namespace yy {
       basic_symbol (typename Base::kind_type t, PNode*&& v, location_type&& l);
 #else
       basic_symbol (typename Base::kind_type t, const PNode*& v, const location_type& l);
+#endif
+# if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, long long int&& v, location_type&& l);
+#else
+      basic_symbol (typename Base::kind_type t, const long long int& v, const location_type& l);
 #endif
 # if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, std::string&& v, location_type&& l);
@@ -748,7 +755,7 @@ namespace yy {
 
     static
     symbol_type
-    make_INTEGER (YY_COPY (std::string) v, YY_COPY (location_type) l);
+    make_INTEGER (YY_COPY (long long int) v, YY_COPY (location_type) l);
 
     static
     symbol_type
@@ -1077,8 +1084,11 @@ namespace yy {
         value.YY_MOVE_OR_COPY< PNode* > (YY_MOVE (other.value));
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.YY_MOVE_OR_COPY< long long int > (YY_MOVE (other.value));
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (other.value));
         break;
@@ -1120,6 +1130,21 @@ namespace yy {
 #else
   template <typename Base>
   parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, const PNode*& v, const location_type& l)
+    : Base (t)
+    , value (v)
+    , location (l)
+  {}
+#endif
+# if 201103L <= YY_CPLUSPLUS
+  template <typename Base>
+  parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, long long int&& v, location_type&& l)
+    : Base (t)
+    , value (std::move (v))
+    , location (std::move (l))
+  {}
+#else
+  template <typename Base>
+  parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, const long long int& v, const location_type& l)
     : Base (t)
     , value (v)
     , location (l)
@@ -1193,8 +1218,11 @@ namespace yy {
         value.template destroy< PNode* > ();
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.template destroy< long long int > ();
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.template destroy< std::string > ();
         break;
@@ -1239,8 +1267,11 @@ namespace yy {
         value.move< PNode* > (YY_MOVE (s.value));
         break;
 
-      case 11: // IDENTIFIER
       case 12: // INTEGER
+        value.move< long long int > (YY_MOVE (s.value));
+        break;
+
+      case 11: // IDENTIFIER
       case 37: // chain_property
         value.move< std::string > (YY_MOVE (s.value));
         break;
@@ -1386,7 +1417,7 @@ namespace yy {
 
   inline
   parser::symbol_type
-  parser::make_INTEGER (YY_COPY (std::string) v, YY_COPY (location_type) l)
+  parser::make_INTEGER (YY_COPY (long long int) v, YY_COPY (location_type) l)
   {
     return symbol_type (token::INTEGER, YY_MOVE (v), YY_MOVE (l));
   }

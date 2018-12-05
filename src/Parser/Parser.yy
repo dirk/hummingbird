@@ -38,7 +38,7 @@
 %token DOT
 %token EQUALS
 %token <std::string> IDENTIFIER
-%token <std::string> INTEGER
+%token <long long int> INTEGER
 %token LET
 %token LESS_THAN
 %token MIXIN
@@ -90,9 +90,9 @@ statements: statement statements { $$ = push_front($2, $1); };
 statements: statement { $$ = {$1}; };
 
 statement:
-    expression terminals { $$ = $1; };
+    expression terminals { $$ = $1; }
   | let terminals        { $$ = $1; }
-  | var terminals        { $$ = $1; }
+  | var terminals        { $$ = $1; };
 
 let: LET IDENTIFIER EQUALS expression { $$ = new PNode(PLet($2, $4)); };
 var: VAR IDENTIFIER EQUALS expression { $$ = new PNode(PVar($2, $4)); };

@@ -82,7 +82,7 @@ public:
 
 class PIntegerLiteral {
 public:
-  PIntegerLiteral(std::string rawValue);
+  PIntegerLiteral(long long int value) : value(value) { };
 
   void debugPrint(std::ostream* output, int indent);
 
