@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "Parser/Parser.h"
+#include "Parser/Driver.h"
 
 using namespace std;
 
@@ -20,9 +20,9 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  auto parser = Parser(&source);
+  auto driver = Driver();
   {
-    auto root = *parser.parse();
+    auto root = *driver.parse(&source);
     root.debugPrint(&cout, 0);
   }
 

@@ -3,19 +3,28 @@
 
 #include "Lexer.h"
 
-#define yyterminate() return T_EOF
+#undef YY_DECL
+#define YY_DECL yy::parser::symbol_type Lexer::lex()
+
+#define yyterminate() return parser::make_EOF_(location)
+
+#define YY_USER_ACTION location.step(); location.columns(yyleng);
+
+using parser = yy::parser;
 %}
 
 %option c++
 %option debug
 %option nodefault
+%option noline
 %option noyywrap
+%option yyclass="Lexer"
 %option yylineno
 
-newline     [\n\r]
-non_newline [^\n\r]
+newline     [\n]
+non_newline [^\n]
 
-one_whitespace [ \t\n\r]
+one_whitespace [ \t\r]
 
 integer     -?0|([1-9][0-9]*)
 fractional  \.[0-9]+
@@ -26,33 +35,38 @@ single_line_comment "//"{non_newline}*
 %x MULTI_LINE_COMMENT
 
 %%
+%{
+  location.step();
+%}
 
-{integer}{fractional}       { return T_REAL; }
-{integer}                   { return T_INTEGER; }
+{integer}{fractional}       { return parser::make_REAL(location); }
+{integer}                   { return parser::make_INTEGER(YYText(), location); }
 
-"let"{one_whitespace}       { return T_LET; }
-"var"{one_whitespace}       { return T_VAR; }
+"let"{one_whitespace}       { return parser::make_LET(location); }
+"var"{one_whitespace}       { return parser::make_VAR(location); }
 
-"abstract"{one_whitespace}  { return T_ABSTRACT; }
-"class"{one_whitespace}     { return T_CLASS; }
-"mixin"{one_whitespace}     { return T_MIXIN; }
+"abstract"{one_whitespace}  { return parser::make_ABSTRACT(location); }
+"class"{one_whitespace}     { return parser::make_CLASS(location); }
+"mixin"{one_whitespace}     { return parser::make_MIXIN(location); }
 
-{identifier}                { return T_IDENTIFIER; }
+{identifier}                { return parser::make_IDENTIFIER(YYText(), location); }
 
-"{"                         { return T_BRACE_LEFT; }
-"}"                         { return T_BRACE_RIGHT; }
-"("                         { return T_PAREN_LEFT; }
-")"                         { return T_PAREN_RIGHT; }
-":"                         { return T_COLON; }
+"{"                         { return parser::make_BRACE_LEFT(location); }
+"}"                         { return parser::make_BRACE_RIGHT(location); }
+"("                         { return parser::make_PAREN_LEFT(location); }
+")"                         { return parser::make_PAREN_RIGHT(location); }
+":"                         { return parser::make_COLON(location); }
 
-"<"                         { return T_LESS_THAN; }
-"+"                         { return T_PLUS; }
-"*"                         { return T_STAR; }
-"="                         { return T_EQUALS; }
-"."                         { return T_DOT; }
-","                         { return T_COMMA; }
+"<"                         { return parser::make_LESS_THAN(location); }
+"+"                         { return parser::make_PLUS(location); }
+"*"                         { return parser::make_STAR(location); }
+"="                         { return parser::make_EQUALS(location); }
+"."                         { return parser::make_DOT(location); }
+","                         { return parser::make_COMMA(location); }
 
-"\""[^"]*"\""               { return T_STRING; }
+"\""[^"]*"\""               { return parser::make_STRING(location); }
+
+[;\n]                       { location.lines(); return parser::make_TERMINAL(location); }
 
 "//"{non_newline}* /* Single-line comment */
 
