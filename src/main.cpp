@@ -21,9 +21,10 @@ int main(int argc, char *argv[]) {
   }
 
   auto driver = Driver();
-  {
-    auto root = *driver.parse(&source);
-    root.debugPrint(&cout, 0);
+  auto root = driver.parse(&source);
+  if (root) {
+    root->debugPrint(&cout, 0);
+    delete root;
   }
 
   return 0;
