@@ -1,4 +1,5 @@
 import core.stdc.stdlib;
+import std.file : readText;
 import std.stdio : File, writeln;
 
 import parser;
@@ -9,18 +10,8 @@ void main(string[] args) {
     exit(-1);
   }
 
-  auto input = File(args[1], "r");
+  auto source = readText!string(args[1]);
 
-  auto program = parser.parse(
-    "
-      1 * 2 + a = 3;
-      a = 4
-      /**
-       * Comment
-       */
-      let b = a /* Comment */ + 5 // Comment
-    ",
-    true,
-  );
+  auto program = parser.parse(source, true);
   writeln(program.toPrettyString());
 }

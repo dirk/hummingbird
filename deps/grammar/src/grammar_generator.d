@@ -12,8 +12,8 @@ void main() {
         / Expression
       ) Terminal :AllSpacing
 
-    Let < "let" Identifier "=" Expression
-    Var < "var" Identifier "=" Expression
+    Let < "let " Identifier "=" Expression
+    Var < "var " Identifier "=" Expression
 
     Expression < Infix
 
@@ -26,11 +26,22 @@ void main() {
 
     Assignment < Prefix ("=" Expression)?
 
-    Prefix < Atom
+    Prefix < "!"? Postfix
+
+    Postfix < (
+        / PostfixCall
+        / PostfixProperty
+        / Atom
+      )
+
+    PostfixCall < Postfix "(" CallArgs? ")"
+    PostfixProperty < Postfix :"." Identifier
+
+    CallArgs < Expression ("," Expression)* ","?
 
     Atom < Identifier / Literal
 
-    Identifier < [A-Za-z][A-Za-z0-9_]*
+    Identifier <~ [A-Za-z][A-Za-z0-9_]*
 
     Literal < Integer
 

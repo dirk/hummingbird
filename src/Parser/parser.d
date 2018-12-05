@@ -28,7 +28,10 @@ ParseTree renameTree(ref ParseTree tree) {
 }
 
 string[] keepTreeNames = [
+  "CallArgs",
   "Let",
+  "PostfixCall",
+  "PostfixProperty",
   "Program",
   "Statement",
   "Var",
@@ -64,6 +67,10 @@ Node visitTree(ref ParseTree tree) {
       return visitInteger(tree);
     case "Let":
       return visitLet(tree);
+    case "PostfixCall":
+      return visitPostfixCall(tree);
+    case "PostfixProperty":
+      return visitPostfixProperty(tree);
     default:
       throw new Error("Unknown tree name " ~ tree.name);
   }
@@ -98,11 +105,30 @@ Integer visitInteger(ref ParseTree tree) {
 
 Let visitLet(ref ParseTree tree) {
   assert(tree.children.length == 2);
-  assert(tree.children[0].name == "Identifier");
-  assert(tree.children[0].matches.length == 1);
-  auto lhs = tree.children[0].matches[0];
+  auto lhs = identifierTreeToString(tree.children[0]);
   auto rhs = visitTree(tree.children[1]);
   return new Let(lhs, rhs);
+}
+
+PostfixProperty visitPostfixProperty(ref ParseTree tree) {
+  assert(tree.children.length == 2);
+  auto target = visitTree(tree.children[0]);
+  auto value = identifierTreeToString(tree.children[1]);
+  return new PostfixProperty(target, value);
+}
+
+PostfixCall visitPostfixCall(ref ParseTree tree) {
+  assert(tree.children.length == 1 || tree.children.length == 2);
+  auto target = visitTree(tree.children[0]);
+  Node[] arguments;
+  if (tree.children.length == 2) {
+    auto argumentsTree = tree.children[1];
+    assert(argumentsTree.name == "CallArgs");
+    foreach (ref argumentTree; argumentsTree.children) {
+      arguments ~= visitTree(argumentTree);
+    }
+  }
+  return new PostfixCall(target, arguments);
 }
 
 Program visitProgram(ref ParseTree tree) {
@@ -114,4 +140,10 @@ Node visitStatement(ref ParseTree tree) {
   assert(tree.children.length == 2);
   assert(tree.children[1].name == "Terminal");
   return visitTree(tree.children[0]);
+}
+
+string identifierTreeToString(ref ParseTree tree) {
+  assert(tree.name == "Identifier");
+  assert(tree.matches.length == 1);
+  return tree.matches[0];
 }
