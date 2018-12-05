@@ -6,7 +6,10 @@ void main() {
 
     Program < :AllSpacing Statement* endOfInput
 
+    Block < "{" :AllSpacing Statement* "}"
+
     Statement < (
+        / Block
         / Let
         / Var
         / Expression

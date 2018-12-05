@@ -23,6 +23,24 @@ class Assignment : Node {
   }
 }
 
+class Block : Node {
+  Node[] nodes;
+
+  this(Node[] nodes) {
+    this.nodes = nodes;
+  }
+
+  override string toPrettyString(string indent = "") const {
+    auto result = "Block(";
+    if (this.nodes.length > 0) {
+      foreach (node; nodes) {
+        result ~= "\n" ~ indent ~ node.toPrettyString(indent ~ defaultIndent);
+      }
+    }
+    return result ~ ")";
+  }
+}
+
 class Identifier : Node {
   string value;
 
@@ -138,6 +156,22 @@ class Program : Node {
         result ~= "\n" ~ indent ~ node.toPrettyString(indent ~ defaultIndent);
       }
     }
+    return result ~ ")";
+  }
+}
+
+class Var : Node {
+  string lhs;
+  Node rhs;
+
+  this(string lhs, Node rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+
+  override string toPrettyString(string indent = "") const {
+    auto result = "Var(" ~ lhs;
+    result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
 }

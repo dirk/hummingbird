@@ -28,6 +28,7 @@ ParseTree renameTree(ref ParseTree tree) {
 }
 
 string[] keepTreeNames = [
+  "Block",
   "CallArgs",
   "Let",
   "PostfixCall",
@@ -55,6 +56,8 @@ Node visitTree(ref ParseTree tree) {
   switch (tree.name) {
     case "Assignment":
       return visitAssignment(tree);
+    case "Block":
+      return visitBlock(tree);
     case "Statement":
       return visitStatement(tree);
     case "Identifier":
@@ -71,6 +74,8 @@ Node visitTree(ref ParseTree tree) {
       return visitPostfixCall(tree);
     case "PostfixProperty":
       return visitPostfixProperty(tree);
+    case "Var":
+      return visitVar(tree);
     default:
       throw new Error("Unknown tree name " ~ tree.name);
   }
@@ -81,6 +86,17 @@ Assignment visitAssignment(ref ParseTree tree) {
   Node lhs = visitTree(tree.children[0]);
   Node rhs = visitTree(tree.children[1]);
   return new Assignment(lhs, rhs);
+}
+
+Block visitBlock(ref ParseTree tree) {
+  assert(tree.children.length == 0 || tree.children.length == 1);
+  Node[] statements;
+  if (tree.children.length == 1) {
+    foreach (ref child; tree.children) {
+      statements ~= visitTree(child);
+    }
+  }
+  return new Block(statements);
 }
 
 Identifier visitIdentifier(ref ParseTree tree) {
@@ -140,6 +156,13 @@ Node visitStatement(ref ParseTree tree) {
   assert(tree.children.length == 2);
   assert(tree.children[1].name == "Terminal");
   return visitTree(tree.children[0]);
+}
+
+Var visitVar(ref ParseTree tree) {
+  assert(tree.children.length == 2);
+  auto lhs = identifierTreeToString(tree.children[0]);
+  auto rhs = visitTree(tree.children[1]);
+  return new Var(lhs, rhs);
 }
 
 string identifierTreeToString(ref ParseTree tree) {
