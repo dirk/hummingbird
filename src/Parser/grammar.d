@@ -48,7 +48,7 @@ This module was automatically generated from the following grammar:
     # recursive tree in 'visitPostfix'.
     PostfixList < (PostfixCall / PostfixProperty)*
     PostfixCall < "(" CallArgs? ")"
-    PostfixProperty < endOfLine? :"." Identifier
+    PostfixProperty < :AllSpacing :"." Identifier
 
     CallArgs < Expression ("," Expression)* ","?
 
@@ -946,7 +946,7 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, endOfLine, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty")(p);
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty")(p);
         }
         else
         {
@@ -954,7 +954,7 @@ struct GenericGrammar(TParseTree)
                 return *m;
             else
             {
-                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, endOfLine, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty"), "PostfixProperty")(p);
+                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty"), "PostfixProperty")(p);
                 memo[tuple(`PostfixProperty`, p.end)] = result;
                 return result;
             }
@@ -965,12 +965,12 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, endOfLine, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty")(TParseTree("", false,[], s));
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty")(TParseTree("", false,[], s));
         }
         else
         {
             forgetMemo();
-            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, endOfLine, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty"), "PostfixProperty")(TParseTree("", false,[], s));
+            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing)), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("."), Spacing)), pegged.peg.wrapAround!(Spacing, Identifier, Spacing)), "Grammar.PostfixProperty"), "PostfixProperty")(TParseTree("", false,[], s));
         }
     }
     static string PostfixProperty(GetName g)
