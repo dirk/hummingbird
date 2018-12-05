@@ -1,6 +1,7 @@
 import std.algorithm : canFind, map, startsWith;
 import std.array : array;
 import std.conv : to;
+import std.range.primitives : popFront;
 import std.stdio : writeln;
 import std.string : stripLeft;
 
@@ -27,6 +28,12 @@ ParseTree renameTree(ref ParseTree tree) {
   return tree;
 }
 
+enum {
+  TAbstractModifier = "AbstractModifier",
+  TClassModifiers = "ClassModifiers",
+  TVisibilityModifier = "VisibilityModifier",
+}
+
 string[] keepTreeNames = [
   "Block",
   "CallArgs",
@@ -38,12 +45,21 @@ string[] keepTreeNames = [
   "Var",
 ];
 
+string[] discardChildrenTreeNames = [
+  TAbstractModifier,
+  TClassModifiers,
+  TVisibilityModifier,
+];
+
 ParseTree simplifyTree(ref ParseTree tree) {
   foreach (ref child; tree.children) {
     child = simplifyTree(child);
   }
 
   if (tree.children.length != 1) {
+    return tree;
+  } else if (discardChildrenTreeNames.canFind(tree.name)) {
+    tree.children = [];
     return tree;
   } else if (keepTreeNames.canFind(tree.name)) {
     return tree;
@@ -63,9 +79,9 @@ Node visitTree(ref ParseTree tree) {
     case "Identifier":
       return visitIdentifier(tree);
     case "InfixAdd":
-      return visitInfix(tree, InfixOp.add);
+      return visitInfix(tree, InfixOp.Add);
     case "InfixMultiply":
-      return visitInfix(tree, InfixOp.multiply);
+      return visitInfix(tree, InfixOp.Multiply);
     case "Integer":
       return visitInteger(tree);
     case "Let":
@@ -120,10 +136,12 @@ Integer visitInteger(ref ParseTree tree) {
 }
 
 Let visitLet(ref ParseTree tree) {
-  assert(tree.children.length == 2);
-  auto lhs = identifierTreeToString(tree.children[0]);
-  auto rhs = visitTree(tree.children[1]);
-  return new Let(lhs, rhs);
+  auto children = tree.children.dup();
+  auto visibility = shiftVisibility(children);
+  assert(children.length == 2);
+  auto lhs = identifierTreeToString(children[0]);
+  auto rhs = visitTree(children[1]);
+  return new Let(lhs, rhs, visibility);
 }
 
 PostfixProperty visitPostfixProperty(ref ParseTree tree) {
@@ -159,10 +177,42 @@ Node visitStatement(ref ParseTree tree) {
 }
 
 Var visitVar(ref ParseTree tree) {
-  assert(tree.children.length == 2);
-  auto lhs = identifierTreeToString(tree.children[0]);
-  auto rhs = visitTree(tree.children[1]);
-  return new Var(lhs, rhs);
+  auto children = tree.children.dup();
+  auto visibility = shiftVisibility(children);
+  assert(children.length == 2);
+  auto lhs = identifierTreeToString(children[0]);
+  auto rhs = visitTree(children[1]);
+  return new Var(lhs, rhs, visibility);
+}
+
+Visibility shiftVisibility(ref ParseTree[] children) {
+  auto child = children.shiftChildIf(TVisibilityModifier);
+  if (child) {
+    assert(child.matches.length == 1);
+    auto match = child.matches[0];
+    switch (match) {
+      case "public":
+        return Visibility.Public;
+      case "private":
+        return Visibility.Private;
+      default:
+        throw new Error("Unrecognized visibility: " ~ match);
+    }
+  }
+  return Visibility.Public;
+}
+
+ParseTree* shiftChild(ref ParseTree[] children) {
+  auto child = &children[0];
+  children.popFront();
+  return child;
+}
+
+ParseTree* shiftChildIf(ref ParseTree[] children, string name) {
+  if (children[0].name == name) {
+    return shiftChild(children);
+  }
+  return null;
 }
 
 string identifierTreeToString(ref ParseTree tree) {

@@ -1,5 +1,10 @@
 import std.conv : to;
 
+enum Visibility {
+  Public,
+  Private,
+}
+
 string defaultIndent = "  ";
 
 class Node {
@@ -54,8 +59,8 @@ class Identifier : Node {
 }
 
 enum InfixOp {
-  add,
-  multiply,
+  Add,
+  Multiply,
 }
 
 class Infix : Node {
@@ -92,14 +97,16 @@ class Integer : Node {
 class Let : Node {
   string lhs;
   Node rhs;
+  Visibility visibility;
 
-  this(string lhs, Node rhs) {
+  this(string lhs, Node rhs, Visibility visibility) {
     this.lhs = lhs;
     this.rhs = rhs;
+    this.visibility = visibility;
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Let(" ~ lhs;
+    auto result = "Let(" ~ to!string(visibility) ~ " " ~ lhs;
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
@@ -163,14 +170,16 @@ class Program : Node {
 class Var : Node {
   string lhs;
   Node rhs;
+  Visibility visibility;
 
-  this(string lhs, Node rhs) {
+  this(string lhs, Node rhs, Visibility visibility) {
     this.lhs = lhs;
     this.rhs = rhs;
+    this.visibility = visibility;
   }
 
   override string toPrettyString(string indent = "") const {
-    auto result = "Var(" ~ lhs;
+    auto result = "Var(" ~ to!string(visibility) ~ " " ~ lhs;
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }

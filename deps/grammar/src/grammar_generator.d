@@ -6,17 +6,28 @@ void main() {
 
     Program < :AllSpacing Statement* endOfInput
 
-    Block < "{" :AllSpacing Statement* "}"
-
     Statement < (
         / Block
+        / Class
         / Let
         / Var
         / Expression
       ) Terminal :AllSpacing
 
-    Let < "let " Identifier "=" Expression
-    Var < "var " Identifier "=" Expression
+    Block < "{" :AllSpacing Statement* :endOfBlock
+
+    # Keywords that must either have a space or newline after them.
+    MLKW(kw) <- kw :(" " Spacing endOfLine? / Spacing endOfLine) Spacing
+
+    VisibilityModifier <- MLKW("private")
+    AbstractModifier <- MLKW("abstract")
+
+    ClassModifiers <- (VisibilityModifier / AbstractModifier)*
+    Class <- ClassModifiers :MLKW("class") Identifier :AllSpacing Block
+
+    Let <- VisibilityModifier? :MLKW("let") Identifier :Spacing "=" :Spacing Expression
+
+    Var <- VisibilityModifier? :MLKW("var") Identifier :Spacing "=" :Spacing Expression
 
     Expression < Infix
 
@@ -44,13 +55,14 @@ void main() {
 
     Atom < Identifier / Literal
 
+    # TODO: Check that identifier is not a keyword.
     Identifier <~ [A-Za-z][A-Za-z0-9_]*
 
     Literal < Integer
 
     Integer < "-"? ("0" / [1-9][0-9]*)
 
-    Terminal < "\n" / ";" / &endOfInput
+    Terminal < "\n" / ";" / &endOfInput / &endOfBlock
 
     AllSpacing <- (endOfLine / Spacing)*
 
@@ -59,6 +71,8 @@ void main() {
     Comment <~ BlockComment / LineComment
     BlockComment <~ "/*" (!"*/" .)* "*/"
     LineComment <~ "//" (!endOfLine .)*
+
+    endOfBlock <- "}"
   `;
   asModule("grammar", "../../src/parser/grammar", source);
 }
