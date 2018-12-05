@@ -4,55 +4,13 @@ import std.conv : to;
 import std.stdio : writeln;
 import std.string : stripLeft;
 
-import pegged.grammar;
 import pegged.peg : ParseTree;
 
 import ast;
-
-private mixin(grammar(`
-hummingbird:
-
-Program < :AllSpacing Statement* endOfInput
-
-Statement < (
-    / Let
-    / Var
-    / Expression
-  ) Terminal :AllSpacing
-
-Let < "let" Identifier "=" Expression
-Var < "var" Identifier "=" Expression
-
-Expression < Infix
-
-Infix < InfixEquality
-
-InfixEquality     < InfixComparison (("==" / "!=") InfixEquality)*
-InfixComparison   < InfixAdd (("<=" / ">=" / "<" / ">") InfixComparison)*
-InfixAdd          < InfixMultiply ([-+] InfixAdd)*
-InfixMultiply     < Assignment ([*%/] InfixMultiply)*
-
-Assignment < Prefix ("=" Expression)?
-
-Prefix < Atom
-
-Atom < Identifier / Literal
-
-Identifier < [A-Za-z][A-Za-z0-9_]*
-
-Literal < Integer
-
-Integer < "-"? ("0" / [1-9][0-9]*)
-
-Terminal < "\n" / ";" / &endOfInput
-
-AllSpacing <~ blank*
-
-Spacing <- :(' ' / '\t')*
-`));
+import grammar : Grammar;
 
 Program parse(string input, bool debugPrint = false) {
-  auto tree = hummingbird(input);
+  auto tree = Grammar(input);
   auto renamedTree = renameTree(tree);
   auto simplifiedTree = simplifyTree(renamedTree);
   if (debugPrint) {

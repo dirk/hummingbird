@@ -15,7 +15,10 @@ void main(string[] args) {
     "
       1 * 2 + a = 3;
       a = 4
-      let b = a + 5
+      /**
+       * Comment
+       */
+      let b = a /* Comment */ + 5 // Comment
     ",
     true,
   );
