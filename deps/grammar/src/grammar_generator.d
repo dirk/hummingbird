@@ -48,7 +48,7 @@ void main() {
     # recursive tree in 'visitPostfix'.
     PostfixList < (PostfixCall / PostfixProperty)*
     PostfixCall < "(" CallArgs? ")"
-    PostfixProperty < :AllSpacing :"." Identifier
+    PostfixProperty < endOfLine? :"." Identifier
 
     CallArgs < Expression ("," Expression)* ","?
 
