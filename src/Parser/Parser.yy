@@ -46,6 +46,8 @@
 %token PAREN_RIGHT
 %token PLUS
 %token REAL
+%token SQUARE_LEFT
+%token SQUARE_RIGHT
 %token STAR
 %token STRING
 %token TERMINAL
@@ -58,7 +60,9 @@
 
 %type <PNode*> assignment
 %type <PNode*> atom
-%type <PNode*> chain
+%type <PNode*> postfix
+%type <PNode*> postfix_indexer
+%type <PNode*> postfix_indexer_expression
 %type <PNode*> expression
 %type <PNode*> identifier
 %type <PNode*> infix
@@ -68,10 +72,10 @@
 %type <PNode*> var
 
 %type <std::vector<PNode*>> call_arguments
-%type <std::vector<PNode*>> chain_call
+%type <std::vector<PNode*>> postfix_call
 %type <std::vector<PNode*>> statements
 
-%type <std::string> chain_property
+%type <std::string> postfix_property
 
 %start program
 
@@ -104,15 +108,19 @@ infix: assignment;
 
 infix_op: PLUS | STAR;
 
-assignment: chain EQUALS expression { $$ = new PNode(PAssignment($1, $3)); };
-assignment: chain;
+assignment: postfix EQUALS expression { $$ = new PNode(PAssignment($1, $3)); };
+assignment: postfix;
 
-chain: chain chain_call { $$ = new PNode(PCall($1, $2)); };
-chain: chain chain_property { $$ = new PNode(PProperty($1, $2)); };
-chain: atom;
+postfix: postfix postfix_call { $$ = new PNode(PCall($1, $2)); };
+postfix: postfix postfix_property { $$ = new PNode(PProperty($1, $2)); };
+postfix: postfix postfix_indexer { $$ = new PNode(PIndexer($1, $2)); }
+postfix: atom;
 
-chain_call: PAREN_LEFT call_arguments PAREN_RIGHT { $$ = $2; };
-chain_property: DOT IDENTIFIER { $$ = $2; };
+postfix_call: PAREN_LEFT call_arguments PAREN_RIGHT { $$ = $2; };
+postfix_property: DOT IDENTIFIER { $$ = $2; };
+postfix_indexer: SQUARE_LEFT postfix_indexer_expression SQUARE_RIGHT { $$ = $2; };
+postfix_indexer_expression: expression;
+postfix_indexer_expression: { $$ = nullptr; };
 
 call_arguments: expression COMMA call_arguments { $$ = push_front($3, $1); };
 call_arguments: expression { $$ = {$1}; };

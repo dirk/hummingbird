@@ -492,7 +492,9 @@ namespace yy {
       // expression
       // infix
       // assignment
-      // chain
+      // postfix
+      // postfix_indexer
+      // postfix_indexer_expression
       // atom
       // identifier
       // literal
@@ -502,11 +504,11 @@ namespace yy {
       char dummy2[sizeof (long long int)];
 
       // IDENTIFIER
-      // chain_property
+      // postfix_property
       char dummy3[sizeof (std::string)];
 
       // statements
-      // chain_call
+      // postfix_call
       // call_arguments
       char dummy4[sizeof (std::vector<PNode*>)];
 };
@@ -549,11 +551,13 @@ namespace yy {
         PAREN_RIGHT = 272,
         PLUS = 273,
         REAL = 274,
-        STAR = 275,
-        STRING = 276,
-        TERMINAL = 277,
-        UNRECOGNIZED = 278,
-        VAR = 279
+        SQUARE_LEFT = 275,
+        SQUARE_RIGHT = 276,
+        STAR = 277,
+        STRING = 278,
+        TERMINAL = 279,
+        UNRECOGNIZED = 280,
+        VAR = 281
       };
     };
 
@@ -787,6 +791,14 @@ namespace yy {
 
     static
     symbol_type
+    make_SQUARE_LEFT (YY_COPY (location_type) l);
+
+    static
+    symbol_type
+    make_SQUARE_RIGHT (YY_COPY (location_type) l);
+
+    static
+    symbol_type
     make_STAR (YY_COPY (location_type) l);
 
     static
@@ -861,7 +873,7 @@ namespace yy {
   // number is the opposite.  If YYTABLE_NINF, syntax error.
   static const unsigned char yytable_[];
 
-  static const signed char yycheck_[];
+  static const unsigned char yycheck_[];
 
   // YYSTOS[STATE-NUM] -- The (internal number of the) accessing
   // symbol of state STATE-NUM.
@@ -987,12 +999,12 @@ namespace yy {
     enum
     {
       yyeof_ = 0,
-      yylast_ = 32,     ///< Last index in yytable_.
-      yynnts_ = 18,  ///< Number of nonterminal symbols.
+      yylast_ = 33,     ///< Last index in yytable_.
+      yynnts_ = 20,  ///< Number of nonterminal symbols.
       yyfinal_ = 19, ///< Termination state number.
       yyterror_ = 1,
       yyerrcode_ = 256,
-      yyntokens_ = 25  ///< Number of tokens.
+      yyntokens_ = 27  ///< Number of tokens.
     };
 
 
@@ -1037,9 +1049,10 @@ namespace yy {
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
-      15,    16,    17,    18,    19,    20,    21,    22,    23,    24
+      15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
+      25,    26
     };
-    const unsigned user_token_number_max_ = 279;
+    const unsigned user_token_number_max_ = 281;
     const token_number_type undef_token_ = 2;
 
     if (static_cast<int> (t) <= yyeof_)
@@ -1071,16 +1084,18 @@ namespace yy {
   {
     switch (other.type_get ())
     {
-      case 28: // statement
-      case 29: // let
-      case 30: // var
-      case 31: // expression
-      case 32: // infix
-      case 34: // assignment
-      case 35: // chain
-      case 39: // atom
-      case 40: // identifier
-      case 41: // literal
+      case 30: // statement
+      case 31: // let
+      case 32: // var
+      case 33: // expression
+      case 34: // infix
+      case 36: // assignment
+      case 37: // postfix
+      case 40: // postfix_indexer
+      case 41: // postfix_indexer_expression
+      case 43: // atom
+      case 44: // identifier
+      case 45: // literal
         value.YY_MOVE_OR_COPY< PNode* > (YY_MOVE (other.value));
         break;
 
@@ -1089,13 +1104,13 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 37: // chain_property
+      case 39: // postfix_property
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (other.value));
         break;
 
-      case 27: // statements
-      case 36: // chain_call
-      case 38: // call_arguments
+      case 29: // statements
+      case 38: // postfix_call
+      case 42: // call_arguments
         value.YY_MOVE_OR_COPY< std::vector<PNode*> > (YY_MOVE (other.value));
         break;
 
@@ -1205,16 +1220,18 @@ namespace yy {
     // Type destructor.
   switch (yytype)
     {
-      case 28: // statement
-      case 29: // let
-      case 30: // var
-      case 31: // expression
-      case 32: // infix
-      case 34: // assignment
-      case 35: // chain
-      case 39: // atom
-      case 40: // identifier
-      case 41: // literal
+      case 30: // statement
+      case 31: // let
+      case 32: // var
+      case 33: // expression
+      case 34: // infix
+      case 36: // assignment
+      case 37: // postfix
+      case 40: // postfix_indexer
+      case 41: // postfix_indexer_expression
+      case 43: // atom
+      case 44: // identifier
+      case 45: // literal
         value.template destroy< PNode* > ();
         break;
 
@@ -1223,13 +1240,13 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 37: // chain_property
+      case 39: // postfix_property
         value.template destroy< std::string > ();
         break;
 
-      case 27: // statements
-      case 36: // chain_call
-      case 38: // call_arguments
+      case 29: // statements
+      case 38: // postfix_call
+      case 42: // call_arguments
         value.template destroy< std::vector<PNode*> > ();
         break;
 
@@ -1254,16 +1271,18 @@ namespace yy {
     super_type::move (s);
     switch (this->type_get ())
     {
-      case 28: // statement
-      case 29: // let
-      case 30: // var
-      case 31: // expression
-      case 32: // infix
-      case 34: // assignment
-      case 35: // chain
-      case 39: // atom
-      case 40: // identifier
-      case 41: // literal
+      case 30: // statement
+      case 31: // let
+      case 32: // var
+      case 33: // expression
+      case 34: // infix
+      case 36: // assignment
+      case 37: // postfix
+      case 40: // postfix_indexer
+      case 41: // postfix_indexer_expression
+      case 43: // atom
+      case 44: // identifier
+      case 45: // literal
         value.move< PNode* > (YY_MOVE (s.value));
         break;
 
@@ -1272,13 +1291,13 @@ namespace yy {
         break;
 
       case 11: // IDENTIFIER
-      case 37: // chain_property
+      case 39: // postfix_property
         value.move< std::string > (YY_MOVE (s.value));
         break;
 
-      case 27: // statements
-      case 36: // chain_call
-      case 38: // call_arguments
+      case 29: // statements
+      case 38: // postfix_call
+      case 42: // call_arguments
         value.move< std::vector<PNode*> > (YY_MOVE (s.value));
         break;
 
@@ -1339,7 +1358,7 @@ namespace yy {
     {
        0,   256,   257,   258,   259,   260,   261,   262,   263,   264,
      265,   266,   267,   268,   269,   270,   271,   272,   273,   274,
-     275,   276,   277,   278,   279
+     275,   276,   277,   278,   279,   280,   281
     };
     return static_cast<token_type> (yytoken_number_[type]);
   }
@@ -1469,6 +1488,20 @@ namespace yy {
   parser::make_REAL (YY_COPY (location_type) l)
   {
     return symbol_type (token::REAL, YY_MOVE (l));
+  }
+
+  inline
+  parser::symbol_type
+  parser::make_SQUARE_LEFT (YY_COPY (location_type) l)
+  {
+    return symbol_type (token::SQUARE_LEFT, YY_MOVE (l));
+  }
+
+  inline
+  parser::symbol_type
+  parser::make_SQUARE_RIGHT (YY_COPY (location_type) l)
+  {
+    return symbol_type (token::SQUARE_RIGHT, YY_MOVE (l));
   }
 
   inline

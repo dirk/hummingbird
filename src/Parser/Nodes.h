@@ -59,6 +59,16 @@ public:
   std::string value;
 };
 
+class PIndexer {
+public:
+  PIndexer(PNode* receiver, PNode* expression) : receiver(receiver), expression(expression) { };
+
+  void debugPrint(std::ostream* output, int indent);
+
+  PNode* receiver;
+  PNode* expression;
+};
+
 enum struct PInfixOp {
   ADD,
   MULTIPLY,
@@ -106,6 +116,7 @@ public:
   PNode(PAssignment assignment) : node(assignment) { };
   PNode(PCall call) : node(call) { };
   PNode(PIdentifier identifier) : node(identifier) { };
+  PNode(PIndexer indexer) : node(indexer) { };
   PNode(PInfix infix) : node(infix) { };
   PNode(PInteger integerLiteral) : node(integerLiteral) { };
   PNode(PLet let) : node(let) { };
@@ -122,6 +133,7 @@ private:
   std::variant<
     PAssignment,
     PCall,
+    PIndexer,
     PIdentifier,
     PInfix,
     PInteger,

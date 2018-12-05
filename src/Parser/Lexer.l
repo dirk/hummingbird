@@ -55,6 +55,8 @@ single_line_comment "//"{non_newline}*
 "}"                         { return parser::make_BRACE_RIGHT(location); }
 "("                         { return parser::make_PAREN_LEFT(location); }
 ")"                         { return parser::make_PAREN_RIGHT(location); }
+"["                         { return parser::make_SQUARE_LEFT(location); }
+"]"                         { return parser::make_SQUARE_RIGHT(location); }
 ":"                         { return parser::make_COLON(location); }
 
 "<"                         { return parser::make_LESS_THAN(location); }

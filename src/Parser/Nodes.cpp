@@ -47,6 +47,17 @@ void PIdentifier::debugPrint(std::ostream* output, int indent) {
   printIndent << "identifier(" << value << ")" << std::endl;
 }
 
+void PIndexer::debugPrint(std::ostream* output, int indent) {
+  printIndent << "indexer(" << std::endl;
+  indent += 1;
+  receiver->debugPrint(output, indent);
+  if (expression) {
+    expression->debugPrint(output, indent);
+  }
+  indent -= 1;
+  printIndent << ")" << std::endl;
+}
+
 void PInfix::debugPrint(std::ostream* output, int indent) {
   printIndent << "infix(" << std::endl;
   indent += 1;
@@ -108,6 +119,7 @@ void PNode::debugPrint(std::ostream* output, int indent) {
   DEBUG_PRINT_IF(PAssignment);
   DEBUG_PRINT_IF(PCall);
   DEBUG_PRINT_IF(PIdentifier);
+  DEBUG_PRINT_IF(PIndexer);
   DEBUG_PRINT_IF(PInfix);
   DEBUG_PRINT_IF(PInteger);
   DEBUG_PRINT_IF(PLet);
