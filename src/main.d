@@ -2,7 +2,7 @@ import core.stdc.stdlib;
 import std.file : readText;
 import std.stdio : File, writeln;
 
-import parser;
+import parser = parser.parser;
 
 void main(string[] args) {
   if (args.length != 2) {

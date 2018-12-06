@@ -1,3 +1,5 @@
+module bb.instructions;
+
 import std.variant : Algebraic;
 
 struct GetLocal { ubyte index; }
@@ -8,7 +10,8 @@ alias Instruction = Algebraic!(
   SetLocal,
 );
 
-alias UnitFunction = Algebraic!(
+alias UnitDeclarations = Algebraic!(
+  // TODO: Class
   InlineFunction,
   Function,
 );
@@ -23,10 +26,12 @@ struct Unit {
   ubyte inlineLocals;
   string[] inlineLocalsNames;
 
-  UnitFunction[] functions;
+  UnitDeclarations[] declarations;
+
+  // TODO: Exports
 }
 
-// Not actually a function: this is 
+// Not actually a function: these will be interpreted as the unit is loaded.
 struct InlineFunction {
   BasicBlock[] basicBlocks;
 }

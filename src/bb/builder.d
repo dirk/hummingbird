@@ -1,3 +1,5 @@
+module bb.builder;
+
 class UnitBuilder {
 }
 

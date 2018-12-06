@@ -1,3 +1,5 @@
+module parser.parser;
+
 import std.algorithm : canFind, map, startsWith;
 import std.array : array;
 import std.conv : to;
@@ -7,7 +9,7 @@ import std.string : stripLeft;
 
 import pegged.peg : ParseTree;
 
-import ast;
+import ast.ast;
 import grammar : grammar = Grammar;
 
 Program parse(string input, bool debugPrint = false) {
