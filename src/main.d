@@ -3,6 +3,7 @@ import std.file : readText;
 import std.stdio : File, writeln;
 
 import parser = parser.parser;
+import ast.compiler : Compiler;
 
 void main(string[] args) {
   if (args.length != 2) {
@@ -14,4 +15,7 @@ void main(string[] args) {
 
   auto program = parser.parse(source, true);
   writeln(program.toPrettyString());
+
+  auto compiler = new Compiler();
+  compiler.compile(program);
 }

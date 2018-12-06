@@ -2,18 +2,14 @@ module bb.instructions;
 
 import std.variant : Algebraic;
 
-struct GetLocal { ubyte index; }
-struct SetLocal { ubyte index; }
+alias reg_t = ubyte;
+
+struct GetLocal { reg_t lval; ubyte index; }
+struct SetLocal { ubyte index; reg_t rval; }
 
 alias Instruction = Algebraic!(
   GetLocal,
   SetLocal,
-);
-
-alias UnitDeclarations = Algebraic!(
-  // TODO: Class
-  InlineFunction,
-  Function,
 );
 
 // A single compiled file to be evaluated.
@@ -22,18 +18,11 @@ struct Unit {
   // means it can be (re)loaded just by copying: no evaluation required.
   bool constant;
 
-  // Number of local variables at the top-level scope of the unit.
-  ubyte inlineLocals;
-  string[] inlineLocalsNames;
-
-  UnitDeclarations[] declarations;
+  Function[] functions;
+  // The "main" (like in C) function to evaluate the unit.
+  Function* mainFunction;
 
   // TODO: Exports
-}
-
-// Not actually a function: these will be interpreted as the unit is loaded.
-struct InlineFunction {
-  BasicBlock[] basicBlocks;
 }
 
 struct Function {
@@ -45,5 +34,7 @@ struct Function {
 struct BasicBlock {
   // It's index/identifier in the compilation unit.
   ubyte id;
+  // A human-friendly name of the block.
+  string name;
   Instruction[] instructions;
 }
