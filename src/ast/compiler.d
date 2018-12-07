@@ -21,7 +21,7 @@ class Compiler {
     writeln(unit.toPrettyString());
   }
 
-  Value compileNode(ast.Node node, FunctionBuilder* func) {
+  Value compileNode(ast.Node node, FunctionBuilder func) {
     // Roll-your-own dynamic dispatch!
     string buildDynamicDispatches(string[] typeNames ...) {
       string result = "";
@@ -51,9 +51,9 @@ class Compiler {
   }
 
   // Compile a block that doesn't appear as part of a function, clsas, etc.
-  Value compileAnonymousBlock(ast.Block node, FunctionBuilder* func) {
-    BasicBlockBuilder* enteringFrom = func.current;
-    BasicBlockBuilder* block = func.newBlock();
+  Value compileAnonymousBlock(ast.Block node, FunctionBuilder func) {
+    BasicBlockBuilder enteringFrom = func.current;
+    BasicBlockBuilder block = func.newBlock();
     // Make the block we just left branch into us.
     enteringFrom.buildBranch(block);
 
@@ -61,12 +61,12 @@ class Compiler {
       compileNode(childNode, func);
     }
 
-    BasicBlockBuilder* leavingTo = func.newBlock();
+    BasicBlockBuilder leavingTo = func.newBlock();
     block.buildBranch(leavingTo);
     return func.nullValue();
   }
 
-  Value compileAssignment(ast.Assignment node, FunctionBuilder* func) {
+  Value compileAssignment(ast.Assignment node, FunctionBuilder func) {
     auto head = node.lhs;
     Value delegate(Value rval) compileAssigner;
 
@@ -93,7 +93,7 @@ class Compiler {
     return compileAssigner(rval);
   }
 
-  Value compileIdentifier(ast.Identifier identifier, FunctionBuilder* func) {
+  Value compileIdentifier(ast.Identifier identifier, FunctionBuilder func) {
     auto local = identifier.value;
     if (func.haveLocal(local)) {
       auto index = func.getLocal(local);
@@ -104,11 +104,11 @@ class Compiler {
     assert(0);
   }
 
-  Value compileInteger(ast.Integer node, FunctionBuilder* func) {
+  Value compileInteger(ast.Integer node, FunctionBuilder func) {
     return func.current.buildMakeInteger(node.value);
   }
 
-  Value compilePostfixCall(ast.PostfixCall node, FunctionBuilder* func) {
+  Value compilePostfixCall(ast.PostfixCall node, FunctionBuilder func) {
     auto target = compileNode(node.target, func);
     Value[] arguments;
     foreach (argumentNode; node.arguments) {
@@ -117,7 +117,7 @@ class Compiler {
     return func.current.buildCall(target, arguments);
   }
 
-  Value compileVar(ast.Var node, FunctionBuilder* func) {
+  Value compileVar(ast.Var node, FunctionBuilder func) {
     auto index = func.getOrAddLocal(node.lhs);
     if (node.rhs) {
       auto rval = compileNode(node.rhs, func);

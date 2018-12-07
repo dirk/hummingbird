@@ -3,17 +3,19 @@ module bb.builder;
 import std.algorithm.mutation : move;
 import std.algorithm.searching : canFind, countUntil;
 import std.conv : to;
+import std.stdio : writeln;
+import std.typecons : Tuple;
 import std.variant : Algebraic;
 
 class UnitBuilder {
   string[] inlineLocals;
 
   FunctionBuilder[] functions;
-  FunctionBuilder* mainFunction;
+  FunctionBuilder mainFunction;
 
   this() {
     this.functions ~= new FunctionBuilder("main");
-    this.mainFunction = &this.functions[$-1];
+    this.mainFunction = this.functions[$-1];
   }
 
   FunctionBuilder newFunction(string name) {
@@ -31,8 +33,8 @@ class UnitBuilder {
 
 class FunctionBuilder {
   string name;
-  BasicBlockBuilder* entry;
-  BasicBlockBuilder* current;
+  BasicBlockBuilder entry;
+  BasicBlockBuilder current;
   BasicBlockBuilder[] basicBlocks;
   string[] locals;
 
@@ -41,8 +43,8 @@ class FunctionBuilder {
   this(string name) {
     this.name = name;
     this.basicBlocks ~= new BasicBlockBuilder("entry", this);
-    this.entry = &this.basicBlocks[$-1];
-    this.current = &this.basicBlocks[$-1];
+    this.entry = this.basicBlocks[$-1];
+    this.current = this.basicBlocks[$-1];
   }
 
   ubyte getOrAddLocal(string local) {
@@ -67,10 +69,10 @@ class FunctionBuilder {
     return locals.canFind(local);
   }
 
-  BasicBlockBuilder* newBlock() {
+  BasicBlockBuilder newBlock() {
     auto name = "anonymous." ~ to!string(this.basicBlocks.length + 1);
     this.basicBlocks ~= new BasicBlockBuilder(name, this);
-    this.current = &this.basicBlocks[$-1];
+    this.current = this.basicBlocks[$-1];
     return this.current;
   }
 
@@ -83,21 +85,48 @@ class FunctionBuilder {
   }
 
   Value nullValue() {
-    return Value(0);
+    return Value.NULL;
   }
 
   Value newValue() {
-    auto value = Value(valueCounter);
+    auto value = new Value(valueCounter);
     valueCounter += 1;
     return value;
   }
 }
 
-struct Value {
-  uint id;
+alias InstructionAddress = Tuple!(BasicBlockBuilder, "block", int, "instruction");
 
-  string toString() {
+class Value {
+  private __gshared Value nullInstance;
+  static Value NULL() {
+    synchronized {
+      if (nullInstance !is null) {
+        nullInstance = new Value(0);
+      }
+    }
+    return nullInstance;
+  }
+
+  uint id;
+  // List of all the instructions that use this value.
+  InstructionAddress[] dependencies;
+
+  this(uint id) {
+    this.id = id;
+  }
+
+  override string toString() const {
     return "$" ~ to!string(id);
+  }
+
+  // Call this to track an instruction that uses this value. This is critical
+  // for fast register allocation.
+  void usedBy(BasicBlockBuilder builder, int instruction) {
+    auto dependency = InstructionAddress(builder, instruction);
+    if (!dependencies.canFind(dependency)) {
+      dependencies ~= dependency;
+    }
   }
 }
 
@@ -105,7 +134,7 @@ struct GetLocal {
   Value lval;
   ubyte index;
 
-  string toString() {
+  string toString() const {
     return lval.toString() ~ " = GetLocal(" ~ to!string(index) ~ ")";
   }
 }
@@ -118,15 +147,15 @@ struct MakeInteger {
   Value lval;
   long value;
 
-  string toString() {
+  string toString() const {
     return lval.toString() ~ " = MakeInteger(" ~ to!string(value) ~ ")";
   }
 }
 
 struct Branch {
-  BasicBlockBuilder* destination;
+  BasicBlockBuilder destination;
 
-  string toString() {
+  string toString() const {
     return "Branch(" ~ destination.name ~ ")";
   }
 }
@@ -136,7 +165,7 @@ struct Call {
   Value target;
   Value[] arguments;
 
-  string toString() {
+  string toString() const {
     return lval.toString() ~ " = " ~ target.toString() ~ ".Call(" ~ to!string(arguments) ~ ")";
   }
 }
@@ -168,11 +197,11 @@ class BasicBlockBuilder {
   }
 
   void buildSetLocal(ubyte index, Value rval) {
-    push(SetLocal(index, rval));
+    pushAndTrack!SetLocal(index, rval);
   }
 
   void buildSetLocalLexical(string name, Value rval) {
-    push(SetLocalLexical(name, rval));
+    pushAndTrack!SetLocalLexical(name, rval);
   }
 
   Value buildMakeInteger(long value) {
@@ -181,21 +210,52 @@ class BasicBlockBuilder {
     return lval;
   }
 
-  void buildBranch(BasicBlockBuilder* destination) {
+  void buildBranch(BasicBlockBuilder destination) {
     push(Branch(destination));
   }
 
   Value buildCall(Value target, Value[] arguments) {
     auto lval = parent.newValue();
     push(Call(lval, target, arguments));
+    trackUse(target);
+    trackUse(arguments);
     return lval;
   }
 
-  private void push(T)(T instruction) {
+  // Must be called immediately after the instruction using the Value has been
+  // pushed onto the instruction sequence.
+  private void trackUse(T : Value)(T value) {
+    auto index = (cast(int)instructions.length - 1);
+    value.usedBy(this, index);
+  }
+
+  private void trackUse(T : Value[])(T values) {
+    foreach (value; values) {
+      trackUse(value);
+    }
+  }
+
+  private void trackUse(T)(T) {
+    return;
+  }
+
+  // All of the arguments will be scanned and automatically tracked as used.
+  // Don't use this if the instruction being pushed "returns" an lval (if we
+  // do we'll get a self-referential dependency).
+  private void pushAndTrack(Type, Args...)(Args args) {
+    instructions ~= Instruction(Type(args));
+    static foreach (arg; args) {
+      trackUse(arg);
+    }
+  }
+
+  // You must manually call `trackUse` after calling this on any values which
+  // are used by the instruction that was just pushed.
+  private void push(Type)(Type instruction) {
     instructions ~= Instruction(instruction);
   }
 
-  override string toString() {
+  override string toString() const {
     return name;
   }
 
