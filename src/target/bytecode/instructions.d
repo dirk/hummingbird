@@ -1,4 +1,4 @@
-module bb.instructions;
+module target.bytecode.instructions;
 
 import std.variant : Algebraic;
 
@@ -6,10 +6,18 @@ alias reg_t = ubyte;
 
 struct GetLocal { reg_t lval; ubyte index; }
 struct SetLocal { ubyte index; reg_t rval; }
+struct SetLocalLexical { string name; reg_t rval; }
+struct MakeInteger { reg_t lval; long value; }
+struct Branch { ubyte id; }
+struct Call { reg_t lval; reg_t target; reg_t[] arguments; }
 
 alias Instruction = Algebraic!(
   GetLocal,
   SetLocal,
+  SetLocalLexical,
+  MakeInteger,
+  Branch,
+  Call,
 );
 
 // A single compiled file to be evaluated.
@@ -18,14 +26,14 @@ struct Unit {
   // means it can be (re)loaded just by copying: no evaluation required.
   bool constant;
 
+  // The "main" function to evaluate the unit must be the first function.
   Function[] functions;
-  // The "main" (like in C) function to evaluate the unit.
-  Function* mainFunction;
 
   // TODO: Exports
 }
 
 struct Function {
+  string name;
   BasicBlock[] basicBlocks;
   ubyte locals;
   string[] localsNames;

@@ -1,4 +1,4 @@
-module bb.builder;
+module ir.builder;
 
 import std.algorithm.mutation : move;
 import std.algorithm.searching : canFind, countUntil;
@@ -14,18 +14,22 @@ class UnitBuilder {
   FunctionBuilder mainFunction;
 
   this() {
-    this.functions ~= new FunctionBuilder("main");
-    this.mainFunction = this.functions[$-1];
+    this.mainFunction = new FunctionBuilder("main");
+    this.functions = [this.mainFunction];
   }
 
   FunctionBuilder newFunction(string name) {
-    return new FunctionBuilder(name);
+    this.functions ~= new FunctionBuilder(name);
+    return this.functions[$-1];
   }
 
   string toPrettyString() {
-    auto result = "unit:";
-    foreach (func; functions) {
-      result ~= "\n" ~ func.toPrettyString();
+    auto result = "";
+    foreach (index, func; functions) {
+      if (index > 0) {
+        result ~= "\n";
+      }
+      result ~= func.toPrettyString();
     }
     return result;
   }
@@ -95,7 +99,7 @@ class FunctionBuilder {
   }
 }
 
-alias InstructionAddress = Tuple!(BasicBlockBuilder, "block", int, "instruction");
+alias InstructionAddress = Tuple!(BasicBlockBuilder, "block", ulong, "instruction");
 
 class Value {
   private __gshared Value nullInstance;
@@ -122,7 +126,7 @@ class Value {
 
   // Call this to track an instruction that uses this value. This is critical
   // for fast register allocation.
-  void usedBy(BasicBlockBuilder builder, int instruction) {
+  void usedBy(BasicBlockBuilder builder, ulong instruction) {
     auto dependency = InstructionAddress(builder, instruction);
     if (!dependencies.canFind(dependency)) {
       dependencies ~= dependency;
@@ -225,7 +229,7 @@ class BasicBlockBuilder {
   // Must be called immediately after the instruction using the Value has been
   // pushed onto the instruction sequence.
   private void trackUse(T : Value)(T value) {
-    auto index = (cast(int)instructions.length - 1);
+    auto index = (instructions.length - 1);
     value.usedBy(this, index);
   }
 
@@ -260,9 +264,9 @@ class BasicBlockBuilder {
   }
 
   string toPrettyString() {
-    auto result = name ~ ":";
+    auto result = "  " ~ name ~ ":";
     foreach (instruction; instructions) {
-      result ~= "\n  " ~ instruction.toString();
+      result ~= "\n    " ~ instruction.toString();
     }
     return result;
   }

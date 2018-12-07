@@ -6,19 +6,25 @@ import std.conv : to;
 import std.stdio : writeln;
 
 import ast = ast.ast;
-import bb.builder;
+import ir.builder;
 
 bool isLast(ast.Node[] nodes, ast.Node node) {
   return (nodes[$-1] == node);
 }
 
-class Compiler {
-  void compile(ast.Program program) {
+class UnitCompiler {
+  ast.Program program;
+
+  this(ast.Program program) {
+    this.program = program;
+  }
+
+  UnitBuilder compile() {
     auto unit = new UnitBuilder();
     foreach(node; program.nodes) {
       compileNode(node, unit.mainFunction);
     }
-    writeln(unit.toPrettyString());
+    return unit;
   }
 
   Value compileNode(ast.Node node, FunctionBuilder func) {
@@ -46,8 +52,7 @@ class Compiler {
       compileAnonymousBlock(lhs, func);
       return func.nullValue();
     }
-    writeln("Not implemented for: " ~ to!string(node.classinfo.name));
-    return func.nullValue();
+    throw new Error("Not implemented for: " ~ to!string(node.classinfo.name));
   }
 
   // Compile a block that doesn't appear as part of a function, clsas, etc.

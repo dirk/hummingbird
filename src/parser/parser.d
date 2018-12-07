@@ -117,12 +117,9 @@ Assignment visitAssignment(ref ParseTree tree) {
 }
 
 Block visitBlock(ref ParseTree tree) {
-  assert(tree.children.length == 0 || tree.children.length == 1);
   Node[] statements;
-  if (tree.children.length == 1) {
-    foreach (ref child; tree.children) {
-      statements ~= visitTree(child);
-    }
+  foreach (ref child; tree.children) {
+    statements ~= visitStatement(child);
   }
   return new Block(statements);
 }
