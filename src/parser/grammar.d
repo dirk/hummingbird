@@ -10,6 +10,7 @@ This module was automatically generated from the following grammar:
         / Class
         / Let
         / Var
+        / Return
         / Expression
       ) Terminal :AllSpacing
 
@@ -27,6 +28,8 @@ This module was automatically generated from the following grammar:
     Let <- VisibilityModifier? :MLKW("let") Identifier :Spacing "=" :Spacing Expression
 
     Var <- VisibilityModifier? :MLKW("var") Identifier :Spacing "=" :Spacing Expression
+
+    Return < "return" Expression
 
     Expression < Infix
 
@@ -109,6 +112,7 @@ struct GenericGrammar(TParseTree)
         rules["Class"] = toDelegate(&Class);
         rules["Let"] = toDelegate(&Let);
         rules["Var"] = toDelegate(&Var);
+        rules["Return"] = toDelegate(&Return);
         rules["Expression"] = toDelegate(&Expression);
         rules["Infix"] = toDelegate(&Infix);
         rules["InfixEquality"] = toDelegate(&InfixEquality);
@@ -230,7 +234,7 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement")(p);
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Return, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement")(p);
         }
         else
         {
@@ -238,7 +242,7 @@ struct GenericGrammar(TParseTree)
                 return *m;
             else
             {
-                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement"), "Statement")(p);
+                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Return, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement"), "Statement")(p);
                 memo[tuple(`Statement`, p.end)] = result;
                 return result;
             }
@@ -249,12 +253,12 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement")(TParseTree("", false,[], s));
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Return, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement")(TParseTree("", false,[], s));
         }
         else
         {
             forgetMemo();
-            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement"), "Statement")(TParseTree("", false,[], s));
+            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, Class, Spacing), pegged.peg.wrapAround!(Spacing, Let, Spacing), pegged.peg.wrapAround!(Spacing, Var, Spacing), pegged.peg.wrapAround!(Spacing, Return, Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), Spacing), pegged.peg.wrapAround!(Spacing, Terminal, Spacing), pegged.peg.discard!(pegged.peg.wrapAround!(Spacing, AllSpacing, Spacing))), "Grammar.Statement"), "Statement")(TParseTree("", false,[], s));
         }
     }
     static string Statement(GetName g)
@@ -551,6 +555,42 @@ struct GenericGrammar(TParseTree)
     static string Var(GetName g)
     {
         return "Grammar.Var";
+    }
+
+    static TParseTree Return(TParseTree p)
+    {
+        if(__ctfe)
+        {
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return")(p);
+        }
+        else
+        {
+            if (auto m = tuple(`Return`, p.end) in memo)
+                return *m;
+            else
+            {
+                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return"), "Return")(p);
+                memo[tuple(`Return`, p.end)] = result;
+                return result;
+            }
+        }
+    }
+
+    static TParseTree Return(string s)
+    {
+        if(__ctfe)
+        {
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return")(TParseTree("", false,[], s));
+        }
+        else
+        {
+            forgetMemo();
+            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return"), "Return")(TParseTree("", false,[], s));
+        }
+    }
+    static string Return(GetName g)
+    {
+        return "Grammar.Return";
     }
 
     static TParseTree Expression(TParseTree p)

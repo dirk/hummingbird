@@ -45,6 +45,7 @@ string[] keepTreeNames = [
   "PostfixList",
   "PostfixProperty",
   "Program",
+  "Return",
   "Statement",
   "Var",
 ];
@@ -102,6 +103,8 @@ Node visitTreeImpl(ref ParseTree tree) {
       return visitLet(tree);
     case "Postfix":
       return visitPostfix(tree);
+    case "Return":
+      return visitReturn(tree);
     case "Var":
       return visitVar(tree);
     default:
@@ -211,6 +214,12 @@ Node visitStatement(ref ParseTree tree) {
   assert(tree.children.length == 1 || tree.children.length == 2);
   if (tree.children.length == 2) assert(tree.children[1].name == "Terminal");
   return visitTree(tree.children[0]);
+}
+
+Return visitReturn(ref ParseTree tree) {
+  assert(tree.children.length == 1);
+  auto rhs = visitTree(tree.children[0]);
+  return new Return(rhs);
 }
 
 Var visitVar(ref ParseTree tree) {

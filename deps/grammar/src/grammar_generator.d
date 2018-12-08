@@ -10,6 +10,7 @@ void main() {
         / Class
         / Let
         / Var
+        / Return
         / Expression
       ) Terminal :AllSpacing
 
@@ -27,6 +28,8 @@ void main() {
     Let <- VisibilityModifier? :MLKW("let") Identifier :Spacing "=" :Spacing Expression
 
     Var <- VisibilityModifier? :MLKW("var") Identifier :Spacing "=" :Spacing Expression
+
+    Return < "return" Expression
 
     Expression < Infix
 

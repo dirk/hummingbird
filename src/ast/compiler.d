@@ -48,6 +48,7 @@ class UnitCompiler {
       "ast.Identifier",
       "ast.Integer",
       "ast.PostfixCall",
+      "ast.Return",
       "ast.Var",
     ));
     if (auto lhs = cast(ast.Block)node) {
@@ -130,6 +131,12 @@ class UnitCompiler {
       arguments ~= compileNode(argumentNode, func);
     }
     return func.current.buildCall(target, arguments);
+  }
+
+  Value compileReturn(ast.Return ret, FunctionBuilder func) {
+    auto rval = compileNode(ret.rhs, func);
+    func.current.buildReturn(rval);
+    return func.nullValue();
   }
 
   Value compileVar(ast.Var node, FunctionBuilder func) {

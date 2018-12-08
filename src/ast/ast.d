@@ -233,6 +233,20 @@ class Program : Node {
   }
 }
 
+class Return : Node {
+  Node rhs;
+
+  this(Node rhs) {
+    this.rhs = rhs;
+  }
+
+  override string toPrettyString(string indent = "") const {
+    auto result = nameAndLocation() ~ "(";
+    result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
+    return result ~ ")";
+  }
+}
+
 class Var : Node {
   string lhs;
   Node rhs;
