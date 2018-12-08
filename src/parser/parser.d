@@ -217,8 +217,13 @@ Node visitStatement(ref ParseTree tree) {
 }
 
 Return visitReturn(ref ParseTree tree) {
-  assert(tree.children.length == 1);
-  auto rhs = visitTree(tree.children[0]);
+  assert(tree.children.length == 0 || tree.children.length == 1);
+  Node rhs;
+  if (tree.children.length == 1) {
+    rhs = visitTree(tree.children[0]);
+  } else {
+    rhs = null;
+  }
   return new Return(rhs);
 }
 

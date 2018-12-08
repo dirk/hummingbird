@@ -242,7 +242,9 @@ class Return : Node {
 
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
-    result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
+    if (rhs !is null) {
+      result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
+    }
     return result ~ ")";
   }
 }

@@ -134,8 +134,12 @@ class UnitCompiler {
   }
 
   Value compileReturn(ast.Return ret, FunctionBuilder func) {
-    auto rval = compileNode(ret.rhs, func);
-    func.current.buildReturn(rval);
+    if (ret.rhs is null) {
+      func.current.buildReturnNull();
+    } else {
+      auto rval = compileNode(ret.rhs, func);
+      func.current.buildReturn(rval);
+    }
     return func.nullValue();
   }
 

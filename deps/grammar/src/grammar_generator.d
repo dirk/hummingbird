@@ -29,7 +29,7 @@ void main() {
 
     Var <- VisibilityModifier? :MLKW("var") Identifier :Spacing "=" :Spacing Expression
 
-    Return < "return" Expression
+    Return <- "return" ((" " / "\t") Expression)?
 
     Expression < Infix
 

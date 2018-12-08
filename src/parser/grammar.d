@@ -29,7 +29,7 @@ This module was automatically generated from the following grammar:
 
     Var <- VisibilityModifier? :MLKW("var") Identifier :Spacing "=" :Spacing Expression
 
-    Return < "return" Expression
+    Return <- "return" ((" " / "\t") Expression)?
 
     Expression < Infix
 
@@ -561,7 +561,7 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return")(p);
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.literal!("return"), pegged.peg.option!(pegged.peg.and!(pegged.peg.keywords!(" ", "\t"), Expression))), "Grammar.Return")(p);
         }
         else
         {
@@ -569,7 +569,7 @@ struct GenericGrammar(TParseTree)
                 return *m;
             else
             {
-                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return"), "Return")(p);
+                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.literal!("return"), pegged.peg.option!(pegged.peg.and!(pegged.peg.keywords!(" ", "\t"), Expression))), "Grammar.Return"), "Return")(p);
                 memo[tuple(`Return`, p.end)] = result;
                 return result;
             }
@@ -580,12 +580,12 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return")(TParseTree("", false,[], s));
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.literal!("return"), pegged.peg.option!(pegged.peg.and!(pegged.peg.keywords!(" ", "\t"), Expression))), "Grammar.Return")(TParseTree("", false,[], s));
         }
         else
         {
             forgetMemo();
-            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("return"), Spacing), pegged.peg.wrapAround!(Spacing, Expression, Spacing)), "Grammar.Return"), "Return")(TParseTree("", false,[], s));
+            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.literal!("return"), pegged.peg.option!(pegged.peg.and!(pegged.peg.keywords!(" ", "\t"), Expression))), "Grammar.Return"), "Return")(TParseTree("", false,[], s));
         }
     }
     static string Return(GetName g)
