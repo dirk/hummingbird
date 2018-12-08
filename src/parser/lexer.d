@@ -68,6 +68,7 @@ string[] KEYWORDS = [
 
 enum TokenType {
   BINARY_OP,
+  COMMA,
   DOT,
   IDENTIFIER,
   INTEGER,
@@ -84,6 +85,7 @@ immutable TokenType[char] characterMap;
 
 static this() {
   characterMap = [
+    ','  : TokenType.COMMA,
     '.'  : TokenType.DOT,
     '\0' : TokenType.EOF,
     '='  : TokenType.EQUALS_OP,
@@ -102,6 +104,7 @@ struct Token {
 
   this(TokenType type) {
     assert(
+      type == TokenType.COMMA ||
       type == TokenType.DOT ||
       type == TokenType.EOF ||
       type == TokenType.EQUALS_OP ||

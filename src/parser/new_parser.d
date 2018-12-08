@@ -121,17 +121,47 @@ class Parser {
     auto target = parseAtom();
     Node newTarget;
     while (true) {
-      newTarget = tryParseProperty(target);
+      newTarget = tryParsePostfixProperty(target);
       if (newTarget !is null) {
         target = newTarget;
         continue;
+      }
+      if (input.peek().type == TokenType.PARENTHESES_LEFT) {
+        target = parsePostfixProperty(target);
       }
       break;
     }
     return target;
   }
 
-  Node tryParseProperty(Node target) {
+  Node parsePostfixProperty(Node target) {
+    input.read(); // Left parentheses
+    Node[] arguments;
+    if (input.peek().type == TokenType.PARENTHESES_RIGHT) {
+      input.read();
+      goto end;
+    }
+    while (true) {
+      auto argument = parseExpression();
+      arguments ~= argument;
+      auto next = input.peek();
+      if (next.type == TokenType.COMMA) {
+        input.read(); // Comma
+        // Allow a trailing comma before the closing parentheses.
+        if (input.peek().type == TokenType.PARENTHESES_RIGHT) goto end;
+        continue;
+      } else if (next.type == TokenType.PARENTHESES_RIGHT) {
+        goto end;
+      } else {
+        throwUnexpected(next);
+      }
+    }
+  end:
+    input.read(); // Right parentheses
+    return new PostfixCall(target, arguments);
+  }
+
+  Node tryParsePostfixProperty(Node target) {
     bool needsBacktrack = false;
     auto savepoint = new TokenStream(input);
     Token identifier;
@@ -244,11 +274,34 @@ unittest {
     new PostfixProperty(new Identifier("a"), "b"),
   );
 
-  // Test multi-line call.
-  // testParse("a\n .b()",
-  //   new PostfixCall(
-  //     new PostfixProperty(new Identifier("a"), "b"),
-  //     [],
-  //   ),
-  // );
+  testParse("a(1)",
+    new PostfixCall(
+      new Identifier("a"),
+      [ new Integer(1) ],
+    ),
+  );
+  testParse("a(1,)",
+    new PostfixCall(
+      new Identifier("a"),
+      [ new Integer(1) ],
+    ),
+  );
+  testParse("a(1,2)",
+    new PostfixCall(
+      new Identifier("a"),
+      [ new Integer(1), new Integer(2) ],
+    ),
+  );
+  testParse("a(1,2,)",
+    new PostfixCall(
+      new Identifier("a"),
+      [ new Integer(1), new Integer(2) ],
+    ),
+  );
+  testParse("a\n .b()",
+    new PostfixCall(
+      new PostfixProperty(new Identifier("a"), "b"),
+      [],
+    ),
+  );
 }
