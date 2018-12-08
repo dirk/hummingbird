@@ -1,4 +1,4 @@
-module target.bytecode.instructions;
+module target.bytecode.definitions;
 
 import std.variant : Algebraic;
 

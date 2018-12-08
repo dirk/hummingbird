@@ -14,7 +14,7 @@ import ir.builder :
   FunctionBuilder,
   UnitBuilder,
   Value;
-import target.bytecode.instructions;
+import target.bytecode.definitions;
 
 class UnitCompiler {
   UnitBuilder builder;

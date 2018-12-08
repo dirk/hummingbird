@@ -6,7 +6,7 @@ import std.format : format;
 import std.stdio : writeln;
 import std.variant : visit;
 
-import target.bytecode.instructions;
+import target.bytecode.definitions;
 
 class UnitPrinter {
   static void print(immutable Unit unit) {
