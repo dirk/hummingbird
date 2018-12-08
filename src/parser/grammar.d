@@ -66,7 +66,7 @@ This module was automatically generated from the following grammar:
 
     Literal < Integer
 
-    Integer < "-"? ("0" / [1-9][0-9]*)
+    Integer < "-"? ~("0" / [1-9][0-9]*)
 
     Terminal < "\n" / ";" / &endOfInput / &endOfBlock
 
@@ -1281,7 +1281,7 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing)), "Grammar.Integer")(p);
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.fuse!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing))), "Grammar.Integer")(p);
         }
         else
         {
@@ -1289,7 +1289,7 @@ struct GenericGrammar(TParseTree)
                 return *m;
             else
             {
-                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing)), "Grammar.Integer"), "Integer")(p);
+                TParseTree result = hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.fuse!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing))), "Grammar.Integer"), "Integer")(p);
                 memo[tuple(`Integer`, p.end)] = result;
                 return result;
             }
@@ -1300,12 +1300,12 @@ struct GenericGrammar(TParseTree)
     {
         if(__ctfe)
         {
-            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing)), "Grammar.Integer")(TParseTree("", false,[], s));
+            return         pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.fuse!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing))), "Grammar.Integer")(TParseTree("", false,[], s));
         }
         else
         {
             forgetMemo();
-            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing)), "Grammar.Integer"), "Integer")(TParseTree("", false,[], s));
+            return hooked!(pegged.peg.defined!(pegged.peg.and!(pegged.peg.option!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("-"), Spacing)), pegged.peg.fuse!(pegged.peg.wrapAround!(Spacing, pegged.peg.or!(pegged.peg.wrapAround!(Spacing, pegged.peg.literal!("0"), Spacing), pegged.peg.and!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('1', '9'), Spacing), pegged.peg.zeroOrMore!(pegged.peg.wrapAround!(Spacing, pegged.peg.charRange!('0', '9'), Spacing)))), Spacing))), "Grammar.Integer"), "Integer")(TParseTree("", false,[], s));
         }
     }
     static string Integer(GetName g)

@@ -66,7 +66,7 @@ void main() {
 
     Literal < Integer
 
-    Integer < "-"? ("0" / [1-9][0-9]*)
+    Integer < "-"? ~("0" / [1-9][0-9]*)
 
     Terminal < "\n" / ";" / &endOfInput / &endOfBlock
 
