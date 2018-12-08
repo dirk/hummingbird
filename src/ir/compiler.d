@@ -47,7 +47,7 @@ class RegisterAllocator {
   // Used for sanity checks.
   Value[] allocated;
 
-  ir.InstructionAddress[][Value] liveDependencies;
+  ir.Address[][Value] liveDependencies;
 
   reg_t allocate(Value value) {
     // Allocation can only happen once (due values being SSA-form).
@@ -75,11 +75,8 @@ class RegisterAllocator {
     return offsetRegister(cast(int)registers.length - 1);
   }
 
-  reg_t use(Value value, BasicBlockBuilder block, ulong instruction) {
-    auto dependencyIndex = liveDependencies[value].countUntil!(address => (
-      address.block == block &&
-      address.instruction == instruction
-    ));
+  reg_t use(Value value, ir.Address address) {
+    auto dependencyIndex = liveDependencies[value].countUntil!(dependency => (dependency == address));
     // We have to have found the dependency.
     assert(dependencyIndex > -1);
     // Remove the dependency now that we've used it.
@@ -154,7 +151,7 @@ class BasicBlockCompiler {
   BasicBlockFinder* basicBlockFinder;
   RegisterAllocator registerAllocator;
 
-  ulong currentInstruction;
+  ir.Address currentAddress;
 
   this(
     BasicBlockBuilder builder,
@@ -170,9 +167,9 @@ class BasicBlockCompiler {
     auto id = basicBlockFinder.find(builder);
 
     Instruction[] instructions;
-    foreach (index, instruction; builder.instructions) {
-      currentInstruction = index;
-      instructions ~= compileInstruction(instruction);
+    foreach (index, addressedInstruction; builder.instructions) {
+      currentAddress = addressedInstruction.address;
+      instructions ~= compileInstruction(addressedInstruction);
     }
 
     return BasicBlock(
@@ -182,7 +179,8 @@ class BasicBlockCompiler {
     );
   }
 
-  Instruction compileInstruction(ir.Instruction instruction) {
+  Instruction compileInstruction(ir.AddressedInstruction addressedInstruction) {
+    auto instruction = addressedInstruction.instruction;
     return instruction.visit!(
       (ir.GetLocal getLocal) => wrap(
         GetLocal(allocate(getLocal.lval), getLocal.index),
@@ -218,6 +216,6 @@ class BasicBlockCompiler {
   }
 
   private reg_t use(Value value) {
-    return registerAllocator.use(value, builder, currentInstruction);
+    return registerAllocator.use(value, currentAddress);
   }
 }

@@ -1,9 +1,13 @@
 module ir.builder;
 
+import std.algorithm : map;
 import std.algorithm.mutation : move;
 import std.algorithm.searching : canFind, countUntil;
+import std.array : join;
 import std.conv : to;
+import std.format : format;
 import std.stdio : writeln;
+import std.string : leftJustify;
 import std.typecons : Tuple;
 import std.variant : Algebraic;
 
@@ -42,7 +46,8 @@ class FunctionBuilder {
   BasicBlockBuilder[] basicBlocks;
   string[] locals;
 
-  uint valueCounter = 1;
+  Value[] values;
+  uint instructionCounter = 1;
 
   this(string name) {
     this.name = name;
@@ -80,10 +85,30 @@ class FunctionBuilder {
     return this.current;
   }
 
+  // TODO: Define printer in a separate module.
   string toPrettyString() {
     auto result = name ~ "() {";
+    result ~= "\n  blocks {";
     foreach (basicBlock; basicBlocks) {
       result ~= "\n" ~ basicBlock.toPrettyString();
+    }
+    result ~= "\n  }";
+    if (values.length > 0) {
+      result ~= "\n  values {";
+      foreach (value; values) {
+        if (value.dependencies.length > 0) {
+          auto dependencies = value.dependencies
+            .map!(dependency => format!"%04d"(dependency))
+            .join(" ");
+          result ~= format!"\n    %s -> %s"(
+            value.toString().leftJustify(5),
+            dependencies,
+          );
+        } else {
+          result ~= "\n    " ~ value.toString();
+        }
+      }
+      result ~= "\n  }";
     }
     return result ~ "\n}";
   }
@@ -93,13 +118,17 @@ class FunctionBuilder {
   }
 
   Value newValue() {
-    auto value = new Value(valueCounter);
-    valueCounter += 1;
-    return value;
+    auto id = cast(uint)(values.length + 1);
+    values ~= new Value(id);
+    return values[$-1];
+  }
+
+  Address nextAddress() {
+    auto address = instructionCounter;
+    instructionCounter += 1;
+    return address;
   }
 }
-
-alias InstructionAddress = Tuple!(BasicBlockBuilder, "block", ulong, "instruction");
 
 class Value {
   private __gshared Value nullInstance;
@@ -114,7 +143,7 @@ class Value {
 
   uint id;
   // List of all the instructions that use this value.
-  InstructionAddress[] dependencies;
+  Address[] dependencies;
 
   this(uint id) {
     this.id = id;
@@ -124,12 +153,18 @@ class Value {
     return "$" ~ to!string(id);
   }
 
+  bool isNull() const {
+    return id == 0;
+  }
+
   // Call this to track an instruction that uses this value. This is critical
   // for fast register allocation.
-  void usedBy(BasicBlockBuilder builder, ulong instruction) {
-    auto dependency = InstructionAddress(builder, instruction);
-    if (!dependencies.canFind(dependency)) {
-      dependencies ~= dependency;
+  void usedBy(Address address) {
+    if (isNull()) {
+      throw new Error("Null Value cannot be used");
+    }
+    if (!dependencies.canFind(address)) {
+      dependencies ~= address;
     }
   }
 }
@@ -183,11 +218,25 @@ alias Instruction = Algebraic!(
   Call,
 );
 
+alias Address = uint;
+
+struct AddressedInstruction {
+  Address address;
+  Instruction instruction;
+
+  string toString() {
+    return format!"%04d %s"(
+      address,
+      instruction.toString(),
+    );
+  }
+}
+
 class BasicBlockBuilder {
   FunctionBuilder parent;
 
   string name;
-  Instruction[] instructions;
+  AddressedInstruction[] instructions;
 
   this(string name, FunctionBuilder parent) {
     this.name = name;
@@ -229,8 +278,8 @@ class BasicBlockBuilder {
   // Must be called immediately after the instruction using the Value has been
   // pushed onto the instruction sequence.
   private void trackUse(T : Value)(T value) {
-    auto index = (instructions.length - 1);
-    value.usedBy(this, index);
+    auto addressedInstruction = instructions[$-1];
+    value.usedBy(addressedInstruction.address);
   }
 
   private void trackUse(T : Value[])(T values) {
@@ -247,7 +296,7 @@ class BasicBlockBuilder {
   // Don't use this if the instruction being pushed "returns" an lval (if we
   // do we'll get a self-referential dependency).
   private void pushAndTrack(Type, Args...)(Args args) {
-    instructions ~= Instruction(Type(args));
+    push(Type(args));
     static foreach (arg; args) {
       trackUse(arg);
     }
@@ -256,7 +305,8 @@ class BasicBlockBuilder {
   // You must manually call `trackUse` after calling this on any values which
   // are used by the instruction that was just pushed.
   private void push(Type)(Type instruction) {
-    instructions ~= Instruction(instruction);
+    auto address = parent.nextAddress();
+    instructions ~= AddressedInstruction(address, Instruction(instruction));
   }
 
   override string toString() const {
@@ -264,9 +314,9 @@ class BasicBlockBuilder {
   }
 
   string toPrettyString() {
-    auto result = "  " ~ name ~ ":";
+    auto result = "    " ~ name ~ ":";
     foreach (instruction; instructions) {
-      result ~= "\n    " ~ instruction.toString();
+      result ~= "\n      " ~ instruction.toString();
     }
     return result;
   }
