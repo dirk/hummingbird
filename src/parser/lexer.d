@@ -68,6 +68,8 @@ string[] KEYWORDS = [
 
 enum TokenType {
   BINARY_OP,
+  BRACE_LEFT,
+  BRACE_RIGHT,
   COMMA,
   DOT,
   IDENTIFIER,
@@ -85,6 +87,8 @@ immutable TokenType[char] characterMap;
 
 static this() {
   characterMap = [
+    '{'  : TokenType.BRACE_LEFT,
+    '}'  : TokenType.BRACE_RIGHT,
     ','  : TokenType.COMMA,
     '.'  : TokenType.DOT,
     '\0' : TokenType.EOF,
@@ -104,6 +108,8 @@ struct Token {
 
   this(TokenType type) {
     assert(
+      type == TokenType.BRACE_LEFT ||
+      type == TokenType.BRACE_RIGHT ||
       type == TokenType.COMMA ||
       type == TokenType.DOT ||
       type == TokenType.EOF ||
@@ -237,6 +243,7 @@ class TokenStream {
       }
 
       if (character == ';') {
+        input.read();
         return Token(TokenType.TERMINAL, ";");
       }
 
@@ -439,6 +446,15 @@ unittest {
     Token(TokenType.IDENTIFIER, "bar"),
     Token(TokenType.PARENTHESES_LEFT),
     Token(TokenType.PARENTHESES_RIGHT),
+    Token(TokenType.EOF),
+  );
+
+  testReads(
+    "{ 1; }",
+    Token(TokenType.BRACE_LEFT),
+    Token(TokenType.INTEGER, 1),
+    Token(TokenType.TERMINAL, ";"),
+    Token(TokenType.BRACE_RIGHT),
     Token(TokenType.EOF),
   );
 }

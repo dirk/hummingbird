@@ -1,6 +1,7 @@
 module parser.new_parser;
 
 import std.algorithm.mutation : remove;
+import std.algorithm.searching : canFind;
 import std.array : replaceInPlace;
 import std.format : format;
 import std.stdio : writeln;
@@ -23,15 +24,34 @@ class Parser {
   Program parseProgram() {
     Node[] statements;
     while (!input.peekEof()) {
-      statements ~= parseStatement(true);
+      statements ~= parseStatements(TokenType.EOF);
     }
     return new Program(statements);
   }
 
-  Node parseStatement(bool allowEofAsTerminal = false) {
+  // Parses a sequence of statements: will only halt when it encounters the
+  // `terminator`. Note that it will leave that on the input, so the caller
+  // needs to do its own `input.read()`.
+  Node[] parseStatements(TokenType terminator) {
+    Node[] nodes;
+    while (true) {
+      consumeTerminals();
+      if (input.peek().type == terminator) break;
+
+      nodes ~= parseStatement(terminator);
+
+      consumeTerminals();
+      if (input.peek().type == terminator) break;
+    }
+    return nodes;
+  }
+
+  // `terminator` is a pseudo-terminal that can act like a terminal. However it
+  // will peeked for, not read, from the input.
+  Node parseStatement(TokenType terminator) {
     Node node;
 
-    auto next = input.peek();
+    auto const next = input.peek();
     if (next.type == TokenType.KEYWORD) {
       if (next.stringValue == "var") {
         node = parseVar();
@@ -41,10 +61,12 @@ class Parser {
     node = parseExpression();
 
   terminal:
+    // Treat the statement as fully parsed if we encounter the terminator.
+    if (input.peek().type == terminator) {
+      return node;
+    }
     auto token = input.read();
-    auto const isTerminal = (token.type == TokenType.TERMINAL);
-    auto const isEof = (token.type == TokenType.EOF);
-    if (!isTerminal && (allowEofAsTerminal && !isEof)) {
+    if (token.type != TokenType.TERMINAL) {
       throwUnexpected(token);
     }
     return node;
@@ -89,10 +111,10 @@ class Parser {
       }
     }
 
-    Subnode[] nodes = [Subnode(parseAssignment())];
+    Subnode[] nodes = [Subnode(parseBlock())];
     while (input.peek().type == TokenType.BINARY_OP) {
       nodes ~= Subnode(input.read().stringValue);
-      nodes ~= Subnode(parseAssignment());
+      nodes ~= Subnode(parseBlock());
     }
     if (nodes.length == 1) {
       // Don't bother reducing if there weren't any operations.
@@ -105,6 +127,16 @@ class Parser {
     assert(nodes.length == 1, "Failed to reduce infix nodes");
   end:
     return nodes[0].get!(Node);
+  }
+
+  Node parseBlock() {
+    if (input.peek().type != TokenType.BRACE_LEFT) {
+      return parseAssignment();
+    }
+    input.read(); // Opening brace
+    auto nodes = parseStatements(TokenType.BRACE_RIGHT);
+    input.read(); // Closing brace
+    return new Block(nodes);
   }
 
   Node parseAssignment() {
@@ -199,6 +231,12 @@ class Parser {
     return null;
   }
 
+  void consumeTerminals() {
+    while (input.peek().type == TokenType.TERMINAL) {
+      input.read();
+    }
+  }
+
   void throwUnexpected(Token token) {
     throw new Error("Unexpected token: " ~ format!"%s"(token));
   }
@@ -274,6 +312,7 @@ unittest {
     new PostfixProperty(new Identifier("a"), "b"),
   );
 
+  // Test calls.
   testParse("a(1)",
     new PostfixCall(
       new Identifier("a"),
@@ -303,5 +342,60 @@ unittest {
       new PostfixProperty(new Identifier("a"), "b"),
       [],
     ),
+  );
+
+  // Test blocks.
+  testParse(
+    "{}",
+    new Block([]),
+  );
+  testParse(
+    "{ 1 }",
+    new Block([ new Integer(1) ]),
+  );
+  testParse(
+    "{ 1; }",
+    new Block([ new Integer(1) ]),
+  );
+  testParse(
+    "{ 1; 2 }",
+    new Block([
+      new Integer(1),
+      new Integer(2),
+    ]),
+  );
+  testParse(
+    "{ 1; 2; }",
+    new Block([
+      new Integer(1),
+      new Integer(2),
+    ]),
+  );
+  testParse(
+    "
+    {
+      1
+      2;
+    }",
+    new Block([
+      new Integer(1),
+      new Integer(2),
+    ]),
+  );
+
+  // Test handling of multiple newlines (terminals).
+  testParse("
+    1
+
+    2
+
+    ",
+    new Integer(1),
+    new Integer(2),
+  );
+
+  // Test spamming terminals.
+  testParse("1;// Comment\n;;",
+    new Integer(1),
   );
 }
