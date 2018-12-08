@@ -53,8 +53,8 @@ class Parser {
 
     auto const next = input.peek();
     if (next.type == TokenType.KEYWORD) {
-      if (next.stringValue == "var") {
-        node = parseVar();
+      if (next.stringValue == "let" || next.stringValue == "var") {
+        node = parseLetAndVar();
         goto terminal;
       }
     }
@@ -72,8 +72,8 @@ class Parser {
     return node;
   }
 
-  Node parseVar() {
-    input.read(); // `var` keyword
+  Node parseLetAndVar() {
+    auto keyword = input.read(); // `let` or `var` keyword
 
     auto lhs = input.read();
     if (lhs.type != TokenType.IDENTIFIER) throwUnexpected(lhs);
@@ -84,7 +84,13 @@ class Parser {
       rhs = parseExpression();
     }
 
-    return new Var(lhs.stringValue, rhs, Visibility.Public);
+    if (keyword.stringValue == "let") {
+      return new Let(lhs.stringValue, rhs, Visibility.Public);
+    } else if (keyword.stringValue == "var") {
+      return new Var(lhs.stringValue, rhs, Visibility.Public);
+    } else {
+      throw new Error("Unrecognized keyword: " ~ keyword.stringValue);
+    }
   }
 
   Node parseExpression() {
