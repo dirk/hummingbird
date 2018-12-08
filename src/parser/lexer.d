@@ -12,6 +12,11 @@ class StringStream {
     this.input = input;
   }
 
+  this(StringStream copyable) {
+    input = copyable.input;
+    index = copyable.index;
+  }
+
   char read() {
     auto character = safePeek(index);
     index += 1;
@@ -62,14 +67,29 @@ string[] KEYWORDS = [
 ];
 
 enum TokenType {
+  BINARY_OP,
+  DOT,
   IDENTIFIER,
   INTEGER,
   KEYWORD,
   EOF,
   EQUALS_OP,
   ERROR,
-  BINARY_OP,
+  PARENTHESES_LEFT,
+  PARENTHESES_RIGHT,
   TERMINAL,
+}
+
+immutable TokenType[char] characterMap;
+
+static this() {
+  characterMap = [
+    '.'  : TokenType.DOT,
+    '\0' : TokenType.EOF,
+    '='  : TokenType.EQUALS_OP,
+    '('  : TokenType.PARENTHESES_LEFT,
+    ')'  : TokenType.PARENTHESES_RIGHT,
+  ];
 }
 
 struct Token {
@@ -82,9 +102,11 @@ struct Token {
 
   this(TokenType type) {
     assert(
+      type == TokenType.DOT ||
       type == TokenType.EOF ||
       type == TokenType.EQUALS_OP ||
-      type == TokenType.TERMINAL
+      type == TokenType.PARENTHESES_LEFT ||
+      type == TokenType.PARENTHESES_RIGHT
     );
     this.type = type;
   }
@@ -116,7 +138,8 @@ struct Token {
   string toString() const {
     auto result = to!string(type);
     if (stringValueType(type)) {
-      result ~= "(" ~ stringValue ~ ")";
+      auto inspected = (stringValue == "\n") ? "\\n" : stringValue;
+      result ~= "(" ~ inspected ~ ")";
     } else if (integerValueType(type)) {
       result ~= "(" ~ to!string(integerValue) ~ ")";
     }
@@ -125,15 +148,23 @@ struct Token {
 
   bool stringValueType(TokenType type) const {
     return (
+      type == TokenType.BINARY_OP ||
       type == TokenType.IDENTIFIER ||
       type == TokenType.KEYWORD ||
-      type == TokenType.BINARY_OP
+      type == TokenType.TERMINAL
     );
   }
 
   bool integerValueType(TokenType type) const {
     return (
       type == TokenType.INTEGER
+    );
+  }
+
+  bool newline() const {
+    return (
+      type == TokenType.TERMINAL &&
+      stringValue == "\n"
     );
   }
 }
@@ -146,6 +177,18 @@ class TokenStream {
 
   this(StringStream input) {
     this.input = input;
+  }
+
+  this(TokenStream copyable) {
+    input = new StringStream(copyable.input);
+    peeking = copyable.peeking;
+    nextToken = copyable.nextToken;
+  }
+
+  void backtrack(TokenStream destination) {
+    input = destination.input;
+    peeking = destination.peeking;
+    nextToken = destination.nextToken;
   }
 
   Token peek() {
@@ -174,24 +217,44 @@ class TokenStream {
     while (true) {
       character = input.peek();
 
-      if (identifierHead(character)) {
+      if (identifierHead(character))
         return lexIdentifier();
-      } else if (numericHead(character)) {
+
+      if (numericHead(character))
         return lexNumeric();
-      } else if (character == '+' || character == '*') {
+
+      if (character == '+' || character == '*')
         // Not checking for '-' because it's already handled by `lexNumeric`.
         return Token(TokenType.BINARY_OP, to!string(input.read()));
-      } else if (character == ';' || character == '\n') {
+
+      if (character == '\n') {
         input.read();
-        return Token(TokenType.TERMINAL);
-      } else if (character == '=') {
+        consumeMoreNewlineTerminals();
+        return Token(TokenType.TERMINAL, "\n");
+      }
+
+      if (character == ';') {
+        return Token(TokenType.TERMINAL, ";");
+      }
+
+      auto mapped = (character in characterMap);
+      if (mapped !is null) {
         input.read();
-        return Token(TokenType.EQUALS_OP);
-      } else if (character == '\0') {
+        return Token(*mapped);
+      }
+
+      throw new Error("Unrecognized character: " ~ character);
+    }
+  }
+
+  private void consumeMoreNewlineTerminals() {
+    while (true) {
+      consumeSpaceAndComments();
+      if (input.peek() == '\n') {
         input.read();
-        return Token(TokenType.EOF);
+        continue;
       } else {
-        throw new Error("Unrecognized character: " ~ character);
+        break;
       }
     }
   }
@@ -358,8 +421,21 @@ unittest {
 
   testReads("foo // Comment \n bar",
     Token(TokenType.IDENTIFIER, "foo"),
-    Token(TokenType.TERMINAL),
+    Token(TokenType.TERMINAL, "\n"),
     Token(TokenType.IDENTIFIER, "bar"),
+    Token(TokenType.EOF),
+  );
+
+  testReads(
+    "foo
+      // Comment about the call
+      // Another comment about the call
+      bar()",
+    Token(TokenType.IDENTIFIER, "foo"),
+    Token(TokenType.TERMINAL, "\n"),
+    Token(TokenType.IDENTIFIER, "bar"),
+    Token(TokenType.PARENTHESES_LEFT),
+    Token(TokenType.PARENTHESES_RIGHT),
     Token(TokenType.EOF),
   );
 }

@@ -108,13 +108,53 @@ class Parser {
   }
 
   Node parseAssignment() {
-    auto lhs = parseAtom();
+    auto lhs = parsePostfix();
     if (input.peek().type == TokenType.EQUALS_OP) {
       input.read();
       auto rhs = parseExpression();
       return new Assignment(lhs, rhs);
     }
     return lhs;
+  }
+
+  Node parsePostfix() {
+    auto target = parseAtom();
+    Node newTarget;
+    while (true) {
+      newTarget = tryParseProperty(target);
+      if (newTarget !is null) {
+        target = newTarget;
+        continue;
+      }
+      break;
+    }
+    return target;
+  }
+
+  Node tryParseProperty(Node target) {
+    bool needsBacktrack = false;
+    auto savepoint = new TokenStream(input);
+    Token identifier;
+
+    // Lookahead to for subsequent-line properties, eg:
+    //   myCoolVariable
+    //     .myCoolProperty
+    if (input.peek().newline()) {
+      input.read(); // Newline
+      needsBacktrack = true;
+    }
+
+    if (input.peek().type != TokenType.DOT) goto backtrack;
+    input.read(); // Dot
+    needsBacktrack = true;
+
+    if (input.peek().type != TokenType.IDENTIFIER) goto backtrack;
+    identifier = input.read();
+    return new PostfixProperty(target, identifier.stringValue);
+
+  backtrack:
+    if (needsBacktrack) input.backtrack(savepoint);
+    return null;
   }
 
   Node parseAtom() {
@@ -195,4 +235,20 @@ unittest {
       ),
     ),
   );
+
+  testParse("a.b",
+    new PostfixProperty(new Identifier("a"), "b"),
+  );
+  // Test mulit-line properties.
+  testParse("a\n  .b",
+    new PostfixProperty(new Identifier("a"), "b"),
+  );
+
+  // Test multi-line call.
+  // testParse("a\n .b()",
+  //   new PostfixCall(
+  //     new PostfixProperty(new Identifier("a"), "b"),
+  //     [],
+  //   ),
+  // );
 }
