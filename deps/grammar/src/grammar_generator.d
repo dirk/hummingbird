@@ -7,7 +7,6 @@ void main() {
     Program < :AllSpacing Statement* endOfInput
 
     Statement < (
-        / Block
         / Class
         / Let
         / Var
@@ -36,7 +35,11 @@ void main() {
     InfixEquality     < InfixComparison (("==" / "!=") InfixEquality)*
     InfixComparison   < InfixAdd (("<=" / ">=" / "<" / ">") InfixComparison)*
     InfixAdd          < InfixMultiply ([-+] InfixAdd)*
-    InfixMultiply     < Assignment ([*%/] InfixMultiply)*
+    InfixMultiply     < BlockSubexpression ([*%/] InfixMultiply)*
+
+    BlockSubexpression < Block / ParenthesesSubexpression
+
+    ParenthesesSubexpression < "(" Expression ")" / Assignment
 
     Assignment < Prefix ("=" Expression)?
 

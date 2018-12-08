@@ -208,8 +208,8 @@ Program visitProgram(ref ParseTree tree) {
 }
 
 Node visitStatement(ref ParseTree tree) {
-  assert(tree.children.length == 2);
-  assert(tree.children[1].name == "Terminal");
+  assert(tree.children.length == 1 || tree.children.length == 2);
+  if (tree.children.length == 2) assert(tree.children[1].name == "Terminal");
   return visitTree(tree.children[0]);
 }
 

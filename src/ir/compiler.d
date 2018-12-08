@@ -50,14 +50,14 @@ class RegisterAllocator {
   ir.Address[][Value] liveDependencies;
 
   reg_t allocate(Value value) {
+    if (value.isNull()) return 0;
+
     // Allocation can only happen once (due values being SSA-form).
     assert(!allocated.canFind(value));
     allocated ~= value;
 
     // If no one is going to read us then we can allocate to the null register.
-    if (value.dependencies.length == 0) {
-      return 0;
-    }
+    if (value.dependencies.length == 0) return 0;
 
     // All values start off with their dependencies being live.
     liveDependencies[value] = value.dependencies.dup();
@@ -76,6 +76,8 @@ class RegisterAllocator {
   }
 
   reg_t use(Value value, ir.Address address) {
+    if (value.isNull()) return 0;
+
     auto dependencyIndex = liveDependencies[value].countUntil!(dependency => (dependency == address));
     // We have to have found the dependency.
     assert(dependencyIndex > -1);
@@ -203,6 +205,12 @@ class BasicBlockCompiler {
           use(call.target),
           call.arguments.map!(value => use(value)).array(),
         ),
+      ),
+      (ir.Return ret) => wrap(
+        Return(use(ret.rval)),
+      ),
+      (ir.ReturnNull) => wrap(
+        ReturnNull(),
       ),
     );
   }

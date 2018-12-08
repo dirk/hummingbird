@@ -10,6 +10,8 @@ struct SetLocalLexical { string name; reg_t rval; }
 struct MakeInteger { reg_t lval; long value; }
 struct Branch { ubyte id; }
 struct Call { reg_t lval; reg_t target; reg_t[] arguments; }
+struct Return { reg_t rval; }
+struct ReturnNull {}
 
 alias Instruction = Algebraic!(
   GetLocal,
@@ -18,6 +20,8 @@ alias Instruction = Algebraic!(
   MakeInteger,
   Branch,
   Call,
+  Return,
+  ReturnNull,
 );
 
 // A single compiled file to be evaluated.

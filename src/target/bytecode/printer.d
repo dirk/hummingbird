@@ -48,6 +48,8 @@ class InstructionPrinter {
         call.target,
         call.arguments.map!(argument => format!"r%d"(argument)).join(" "),
       ),
+      (Return ret) => format!"Return r%d"(ret.rval),
+      (ReturnNull) => "ReturnNull",
     );
     writeln("    " ~ value);
   }

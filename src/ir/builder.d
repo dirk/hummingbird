@@ -134,7 +134,7 @@ class Value {
   private __gshared Value nullInstance;
   static Value NULL() {
     synchronized {
-      if (nullInstance !is null) {
+      if (nullInstance is null) {
         nullInstance = new Value(0);
       }
     }
@@ -160,8 +160,9 @@ class Value {
   // Call this to track an instruction that uses this value. This is critical
   // for fast register allocation.
   void usedBy(Address address) {
+    // The null register can be used freely without the need to track its use.
     if (isNull()) {
-      throw new Error("Null Value cannot be used");
+      return;
     }
     if (!dependencies.canFind(address)) {
       dependencies ~= address;
@@ -209,6 +210,9 @@ struct Call {
   }
 }
 
+struct Return { Value rval; }
+struct ReturnNull {}
+
 alias Instruction = Algebraic!(
   GetLocal,
   SetLocal,
@@ -216,6 +220,8 @@ alias Instruction = Algebraic!(
   MakeInteger,
   Branch,
   Call,
+  Return,
+  ReturnNull,
 );
 
 alias Address = uint;
@@ -273,6 +279,14 @@ class BasicBlockBuilder {
     trackUse(target);
     trackUse(arguments);
     return lval;
+  }
+
+  void buildReturn(Value rval) {
+    pushAndTrack!Return(rval);
+  }
+
+  void buildReturnNull() {
+    pushAndTrack!ReturnNull();
   }
 
   // Must be called immediately after the instruction using the Value has been

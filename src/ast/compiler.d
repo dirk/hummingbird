@@ -24,6 +24,8 @@ class UnitCompiler {
     foreach(node; program.nodes) {
       compileNode(node, unit.mainFunction);
     }
+    // Naively ensure the main function ends with a return.
+    unit.mainFunction.current.buildReturnNull();
     return unit;
   }
 
@@ -49,26 +51,34 @@ class UnitCompiler {
       "ast.Var",
     ));
     if (auto lhs = cast(ast.Block)node) {
-      compileAnonymousBlock(lhs, func);
-      return func.nullValue();
+      return compileAnonymousBlock(lhs, func);
     }
     throw new Error("Not implemented for: " ~ to!string(node.classinfo.name));
   }
 
   // Compile a block that doesn't appear as part of a function, clsas, etc.
   Value compileAnonymousBlock(ast.Block node, FunctionBuilder func) {
+    // Don't even bother branching for an anonymous block and just return null.
+    if (node.nodes.length == 0) {
+      return func.nullValue();
+    }
+
     BasicBlockBuilder enteringFrom = func.current;
     BasicBlockBuilder block = func.newBlock();
     // Make the block we just left branch into us.
     enteringFrom.buildBranch(block);
 
-    foreach(childNode; node.nodes) {
-      compileNode(childNode, func);
+    Value implicitReturn;
+    foreach (index, childNode; node.nodes) {
+      auto result = compileNode(childNode, func);
+      if ((index + 1) == node.nodes.length) {
+        implicitReturn = result;
+      }
     }
 
     BasicBlockBuilder leavingTo = func.newBlock();
     block.buildBranch(leavingTo);
-    return func.nullValue();
+    return implicitReturn;
   }
 
   Value compileAssignment(ast.Assignment node, FunctionBuilder func) {
