@@ -46,6 +46,8 @@ string defaultIndent = "  ";
 class Node {
   Location location = Location.missing;
 
+  abstract bool eq(Node) const;
+
   abstract string toPrettyString(string indent = "") const;
 
   string nameAndLocation() const {
@@ -69,6 +71,13 @@ class Assignment : Node {
     this.rhs = rhs;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Assignment)anyOther) {
+      return (lhs.eq(other.lhs) && rhs.eq(other.rhs));
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
     result ~= "\n" ~ indent ~ lhs.toPrettyString(indent ~ defaultIndent);
@@ -82,6 +91,22 @@ class Block : Node {
 
   this(Node[] nodes) {
     this.nodes = nodes;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Block)anyOther) {
+      if (nodes.length != other.nodes.length) {
+        return false;
+      }
+      foreach (index, ownNode; nodes) {
+        auto otherNode = other.nodes[index];
+        if (!ownNode.eq(otherNode)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
@@ -100,6 +125,13 @@ class Identifier : Node {
 
   this(string value) {
     this.value = value;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Identifier)anyOther) {
+      return (value == other.value);
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
@@ -123,6 +155,17 @@ class Infix : Node {
     this.rhs = rhs;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Infix)anyOther) {
+      return (
+        lhs.eq(other.lhs) &&
+        op == other.op &&
+        rhs.eq(other.rhs)
+      );
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(" ~ to!string(op);
     result ~= "\n" ~ indent ~ lhs.toPrettyString(indent ~ defaultIndent);
@@ -136,6 +179,13 @@ class Integer : Node {
 
   this(long value) {
     this.value = value;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Integer)anyOther) {
+      return (value == other.value);
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
@@ -154,6 +204,17 @@ class Let : Node {
     this.visibility = visibility;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Let)anyOther) {
+      return (
+        lhs == other.lhs &&
+        rhs.eq(other.rhs) &&
+        visibility == other.visibility
+      );
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(" ~ to!string(visibility) ~ " " ~ lhs;
     result ~= "\n" ~ indent ~ rhs.toPrettyString(indent ~ defaultIndent);
@@ -168,6 +229,25 @@ class PostfixCall : Node {
   this(Node target, Node[] arguments) {
     this.target = target;
     this.arguments = arguments;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(PostfixCall)anyOther) {
+      if (!target.eq(other.target)) {
+        return false;
+      }
+      if (arguments.length != other.arguments.length) {
+        return false;
+      }
+      foreach (index, ownArgument; arguments) {
+        auto otherArgument = other.arguments[index];
+        if (!ownArgument.eq(otherArgument)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
@@ -189,6 +269,16 @@ class PostfixIndex : Node {
     this.argument = argument;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(PostfixIndex)anyOther) {
+      return (
+        target.eq(other.target) &&
+        argument.eq(other.argument)
+      );
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
     result ~= "\n" ~ indent ~ argument.toPrettyString(indent ~ defaultIndent);
@@ -206,6 +296,16 @@ class PostfixProperty : Node {
     this.value = value;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(PostfixProperty)anyOther) {
+      return (
+        target.eq(other.target) &&
+        value == other.value
+      );
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
     result ~= "\n" ~ indent ~ value;
@@ -219,6 +319,22 @@ class Program : Node {
 
   this(Node[] nodes) {
     this.nodes = nodes;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Program)anyOther) {
+      if (nodes.length != other.nodes.length) {
+        return false;
+      }
+      foreach (index, ownNode; nodes) {
+        auto otherNode = other.nodes[index];
+        if (!ownNode.eq(otherNode)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
@@ -240,6 +356,16 @@ class Return : Node {
     this.rhs = rhs;
   }
 
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Return)anyOther) {
+      if (rhs is null) {
+        return (other.rhs is null);
+      }
+      return rhs.eq(other.rhs);
+    }
+    return false;
+  }
+
   override string toPrettyString(string indent = "") const {
     auto result = nameAndLocation() ~ "(";
     if (rhs !is null) {
@@ -258,6 +384,17 @@ class Var : Node {
     this.lhs = lhs;
     this.rhs = rhs;
     this.visibility = visibility;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Var)anyOther) {
+      return (
+        lhs == other.lhs &&
+        rhs.eq(other.rhs) &&
+        visibility == other.visibility
+      );
+    }
+    return false;
   }
 
   override string toPrettyString(string indent = "") const {
