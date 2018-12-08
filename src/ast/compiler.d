@@ -163,10 +163,10 @@ class UnitCompiler {
 }
 
 unittest {
-  auto compiler = new Compiler();
+  auto compiler = new UnitCompiler(new ast.Program([]));
   auto identifier = new ast.Identifier("foo");
 
-  auto let = new ast.Let("bar", identifier, ast.Visibility.Public);
+  auto let = new ast.Integer(1);
   assert(compiler.isConstant(let) == true);
 
   auto assignment = new ast.Assignment(identifier, new ast.Integer(1));
