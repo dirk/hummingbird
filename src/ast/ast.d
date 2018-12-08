@@ -155,6 +155,24 @@ class Infix : Node {
     this.rhs = rhs;
   }
 
+  this(Node lhs, string opString, Node rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+
+    InfixOp matchedOp;
+    switch (opString) {
+      case "+":
+        matchedOp = InfixOp.Add;
+        break;
+      case "*":
+        matchedOp = InfixOp.Multiply;
+        break;
+      default:
+        throw new Error("Unrecognized infix operator: " ~ opString);
+    }
+    this.op = matchedOp;
+  }
+
   override bool eq(Node anyOther) const {
     if (auto other = cast(Infix)anyOther) {
       return (
