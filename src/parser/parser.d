@@ -280,6 +280,9 @@ unittest {
   testParse("var a = 1",
     new Var("a", new Integer(1), Visibility.Public),
   );
+  testParse("let a = 1",
+    new Let("a", new Integer(1), Visibility.Public),
+  );
 
   testParse("a = 1",
     new Assignment(new Identifier("a"), new Integer(1)),
