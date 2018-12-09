@@ -431,42 +431,48 @@ unittest {
     return actual;
   }
 
-  testRead("foo", Token(TokenType.IDENTIFIER, "foo"));
-  
-  testRead("var", Token(TokenType.KEYWORD, "var"));
+  // Reduce the noise of constructors and types in tests.
+  Token t(Args...)(TokenType type, Args args) {
+    return Token(type, args, Position(-1, -1, -1));
+  }
+  alias T = TokenType;
+
+  testRead("foo", t(T.IDENTIFIER, "foo"));
+
+  testRead("var", t(T.KEYWORD, "var"));
   testReads("var foo = 1",
-    Token(TokenType.KEYWORD, "var"),
-    Token(TokenType.IDENTIFIER, "foo"),
-    Token(TokenType.EQUALS_OP),
-    Token(TokenType.INTEGER, 1),
-    Token(TokenType.EOF),
+    t(T.KEYWORD, "var"),
+    t(T.IDENTIFIER, "foo"),
+    t(T.EQUALS_OP),
+    t(T.INTEGER, 1),
+    t(T.EOF),
   );
 
-  testRead("1", Token(TokenType.INTEGER, 1));
-  testRead("-1", Token(TokenType.INTEGER, -1));
+  testRead("1", t(T.INTEGER, 1));
+  testRead("-1", t(T.INTEGER, -1));
   testReads("- 1",
-    Token(TokenType.BINARY_OP, "-"),
-    Token(TokenType.INTEGER, 1),
-    Token(TokenType.EOF),
+    t(T.BINARY_OP, "-"),
+    t(T.INTEGER, 1),
+    t(T.EOF),
   );
   testReads("1+2",
-    Token(TokenType.INTEGER, 1),
-    Token(TokenType.BINARY_OP, "+"),
-    Token(TokenType.INTEGER, 2),
-    Token(TokenType.EOF),
+    t(T.INTEGER, 1),
+    t(T.BINARY_OP, "+"),
+    t(T.INTEGER, 2),
+    t(T.EOF),
   );
 
   testReads("foo /* Comment */ bar",
-    Token(TokenType.IDENTIFIER, "foo"),
-    Token(TokenType.IDENTIFIER, "bar"),
-    Token(TokenType.EOF),
+    t(T.IDENTIFIER, "foo"),
+    t(T.IDENTIFIER, "bar"),
+    t(T.EOF),
   );
 
   testReads("foo // Comment \n bar",
-    Token(TokenType.IDENTIFIER, "foo"),
-    Token(TokenType.TERMINAL, "\n"),
-    Token(TokenType.IDENTIFIER, "bar"),
-    Token(TokenType.EOF),
+    t(T.IDENTIFIER, "foo"),
+    t(T.TERMINAL, "\n"),
+    t(T.IDENTIFIER, "bar"),
+    t(T.EOF),
   );
 
   testReads(
@@ -474,20 +480,20 @@ unittest {
       // Comment about the call
       // Another comment about the call
       bar()",
-    Token(TokenType.IDENTIFIER, "foo"),
-    Token(TokenType.TERMINAL, "\n"),
-    Token(TokenType.IDENTIFIER, "bar"),
-    Token(TokenType.PARENTHESES_LEFT),
-    Token(TokenType.PARENTHESES_RIGHT),
-    Token(TokenType.EOF),
+    t(T.IDENTIFIER, "foo"),
+    t(T.TERMINAL, "\n"),
+    t(T.IDENTIFIER, "bar"),
+    t(T.PARENTHESES_LEFT),
+    t(T.PARENTHESES_RIGHT),
+    t(T.EOF),
   );
 
   testReads(
     "{ 1; }",
-    Token(TokenType.BRACE_LEFT),
-    Token(TokenType.INTEGER, 1),
-    Token(TokenType.TERMINAL, ";"),
-    Token(TokenType.BRACE_RIGHT),
-    Token(TokenType.EOF),
+    t(T.BRACE_LEFT),
+    t(T.INTEGER, 1),
+    t(T.TERMINAL, ";"),
+    t(T.BRACE_RIGHT),
+    t(T.EOF),
   );
 }
