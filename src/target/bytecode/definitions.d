@@ -40,6 +40,7 @@ struct Unit {
 
 struct Function {
   string name;
+  ubyte registers;
   BasicBlock[] basicBlocks;
   ubyte locals;
   string[] localsNames;

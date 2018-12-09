@@ -140,6 +140,7 @@ class FunctionCompiler {
 
     return Function(
       builder.name,
+      cast(ubyte)registerAllocator.registers.length,
       basicBlocks,
       cast(ubyte)builder.locals.length,
       builder.locals,

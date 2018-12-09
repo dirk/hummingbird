@@ -3,7 +3,7 @@ module target.bytecode.printer;
 import std.algorithm.iteration : map;
 import std.array : join;
 import std.format : format;
-import std.stdio : writeln;
+import std.stdio : writeln, writefln;
 import std.variant : visit;
 
 import target.bytecode.definitions;
@@ -18,7 +18,7 @@ class UnitPrinter {
 
 class FunctionPrinter {
   static void print(immutable Function func) {
-    writeln(func.name ~ "() {");
+    writefln!"%s() registers(%d) {"(func.name, func.registers);
     foreach (basicBlock; func.basicBlocks) {
       BasicBlockPrinter.print(basicBlock);
     }
