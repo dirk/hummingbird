@@ -101,7 +101,6 @@ class Parser {
 
   Node parseReturn(TokenType terminator) {
     auto keyword = input.read(); // `return` keyword
-
     Node rhs = null;
     auto const next = input.peek();
     if (next.type != TokenType.TERMINAL && next.type != terminator) {
@@ -303,6 +302,21 @@ unittest {
   );
   testParse("let a = 1",
     new Let("a", new Integer(1), Visibility.Public),
+  );
+
+  testParse("return", new Return(null));
+  testParse("return\n", new Return(null));
+  testParse("return;", new Return(null));
+  testParse("return 1", new Return(new Integer(1)),);
+  testParse("{ return }",
+    new Block([
+      new Return(null),
+    ]),
+  );
+  testParse("{ return 1 }",
+    new Block([
+      new Return(new Integer(1)),
+    ]),
   );
 
   testParse("a = 1",
