@@ -103,7 +103,7 @@ class Parser {
     auto keyword = input.read(); // `return` keyword
 
     Node rhs = null;
-    auto next = input.peek();
+    auto const next = input.peek();
     if (next.type != TokenType.TERMINAL && next.type != terminator) {
       rhs = parseExpression();
     }
