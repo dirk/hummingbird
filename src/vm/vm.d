@@ -32,6 +32,9 @@ class VM {
     run();
   }
 
+  // Returned to the run loop from the `dispatch` method. The loop then does
+  // whatever the action tells it to do (advance to the next instruction,
+  // branch, return, etc.).
   struct Action {
     enum : ubyte {
       ADVANCE,
