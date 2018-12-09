@@ -115,9 +115,8 @@ class UnitCompiler {
       auto index = func.getLocal(local);
       return func.current.buildGetLocal(index);
     } else {
-      throw new Error("Cannot compile non-local identifier: " ~ local);
+      return func.current.buildGetLocalLexical(local);
     }
-    assert(0);
   }
 
   Value compileInteger(ast.Integer node, FunctionBuilder func) {

@@ -5,6 +5,7 @@ import std.variant : Algebraic;
 alias reg_t = ubyte;
 
 struct GetLocal { reg_t lval; ubyte index; }
+struct GetLocalLexical { reg_t lval; string name; }
 struct SetLocal { ubyte index; reg_t rval; }
 struct SetLocalLexical { string name; reg_t rval; }
 struct MakeInteger { reg_t lval; long value; }
@@ -15,6 +16,7 @@ struct ReturnNull {}
 
 alias Instruction = Algebraic!(
   GetLocal,
+  GetLocalLexical,
   SetLocal,
   SetLocalLexical,
   MakeInteger,

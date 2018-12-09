@@ -179,6 +179,15 @@ struct GetLocal {
   }
 }
 
+struct GetLocalLexical {
+  Value lval;
+  string name;
+
+  string toString() const {
+    return lval.toString() ~ " = GetLocalLexical(" ~ name ~ ")";
+  }
+}
+
 struct SetLocal { ubyte index; Value rval; }
 
 struct SetLocalLexical { string name; Value rval; }
@@ -215,6 +224,7 @@ struct ReturnNull {}
 
 alias Instruction = Algebraic!(
   GetLocal,
+  GetLocalLexical,
   SetLocal,
   SetLocalLexical,
   MakeInteger,
@@ -252,6 +262,12 @@ class BasicBlockBuilder {
   Value buildGetLocal(ubyte index) {
     auto lval = parent.newValue();
     push(GetLocal(lval, index));
+    return lval;
+  }
+
+  Value buildGetLocalLexical(string name) {
+    auto lval = parent.newValue();
+    push(GetLocalLexical(lval, name));
     return lval;
   }
 

@@ -187,6 +187,9 @@ class BasicBlockCompiler {
       (ir.GetLocal getLocal) => wrap(
         GetLocal(allocate(getLocal.lval), getLocal.index),
       ),
+      (ir.GetLocalLexical getLocalLexical) => wrap(
+        GetLocalLexical(allocate(getLocalLexical.lval), getLocalLexical.name),
+      ),
       (ir.SetLocal setLocal) => wrap(
         SetLocal(setLocal.index, use(setLocal.rval)),
       ),
