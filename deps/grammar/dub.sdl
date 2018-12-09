@@ -1,4 +1,0 @@
-name "hummingbird-grammar"
-targetType "executable"
-
-dependency "pegged" version="~>0.4.4"

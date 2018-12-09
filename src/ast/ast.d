@@ -4,8 +4,6 @@ import std.algorithm.searching : findSkip;
 import std.conv : to;
 import std.typecons : Tuple;
 
-import peg = pegged.peg;
-
 enum Visibility {
   Public,
   Private,
@@ -25,15 +23,10 @@ struct Location {
     this.end = end;
   }
 
-  this(peg.ParseTree tree) {
-    source = tree.input;
-    begin = tree.begin;
-    end = tree.end;
-  }
-
   auto position() const {
-    auto resolved = peg.position(source[0..begin]);
-    return Position(resolved.line, resolved.col);
+    // auto resolved = peg.position(source[0..begin]);
+    // return Position(resolved.line, resolved.col);
+    return Position(0, 0);
   }
 
   bool present() const {

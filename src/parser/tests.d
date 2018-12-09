@@ -1,10 +1,10 @@
 module parser.tests;
 
 import ast.ast;
-import parser.parser : parse;
+import parser.parser : Parser;
 
 Program testParse(string input, Program expected) {
-  auto program = parse(input);
+  auto program = new Parser(input).parseProgram();
   if (!program.eq(expected)) {
     assert(false,
       "Incorrect parse of:\n" ~
