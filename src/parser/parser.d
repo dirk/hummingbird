@@ -56,6 +56,9 @@ class Parser {
       if (next.stringValue == "let" || next.stringValue == "var") {
         node = parseLetAndVar();
         goto terminal;
+      } else if (next.stringValue == "return") {
+        node = parseReturn(terminator);
+        goto terminal;
       }
     }
     node = parseExpression();
@@ -92,6 +95,19 @@ class Parser {
     } else {
       throw new Error("Unrecognized keyword: " ~ keyword.stringValue);
     }
+    node.location = Location(keyword);
+    return node;
+  }
+
+  Node parseReturn(TokenType terminator) {
+    auto keyword = input.read(); // `return` keyword
+
+    Node rhs = null;
+    auto next = input.peek();
+    if (next.type != TokenType.TERMINAL && next.type != terminator) {
+      rhs = parseExpression();
+    }
+    auto node = new Return(rhs);
     node.location = Location(keyword);
     return node;
   }

@@ -86,6 +86,7 @@ class StringStream {
 string[] KEYWORDS = [
   "let",
   "var",
+  "return",
 ];
 
 enum TokenType {
