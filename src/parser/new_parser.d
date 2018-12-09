@@ -137,12 +137,24 @@ class Parser {
 
   Node parseBlock() {
     if (input.peek().type != TokenType.BRACE_LEFT) {
-      return parseAssignment();
+      return parseParentheses();
     }
     input.read(); // Opening brace
     auto nodes = parseStatements(TokenType.BRACE_RIGHT);
     input.read(); // Closing brace
     return new Block(nodes);
+  }
+
+  Node parseParentheses() {
+    if (input.peek().type != TokenType.PARENTHESES_LEFT) {
+      return parseAssignment();
+    }
+    input.read(); // Opening parentheses
+    auto node = parseExpression();
+    // Should be closing parentheses.
+    auto token = input.read();
+    if (token.type != TokenType.PARENTHESES_RIGHT) throwUnexpected(token);
+    return node;
   }
 
   Node parseAssignment() {
@@ -306,6 +318,19 @@ unittest {
         new Integer(3),
         InfixOp.Multiply,
         new Integer(4),
+      ),
+    ),
+  );
+
+  // Test grouping.
+  testParse("1 * (2 + 3)",
+    new Infix(
+      new Integer(1),
+      InfixOp.Multiply,
+      new Infix(
+        new Integer(2),
+        InfixOp.Add,
+        new Integer(3),
       ),
     ),
   );
