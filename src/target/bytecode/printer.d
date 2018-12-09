@@ -39,9 +39,15 @@ class InstructionPrinter {
   static void print(Instruction instruction) {
     string value = instruction.visit!(
       (GetLocal getLocal) => format!"r%d = GetLocal #%d"(getLocal.lval, getLocal.index),
-      (GetLocalLexical getLocalLexical) => format!"r%d = GetLocalLexical \"%s\""(getLocalLexical.lval, getLocalLexical.name),
+      (GetLocalLexical getLocalLexical) => format!"r%d = GetLocalLexical \"%s\""(
+        getLocalLexical.lval,
+        getLocalLexical.name,
+      ),
       (SetLocal setLocal) => format!"SetLocal #%d r%d"(setLocal.index, setLocal.rval),
-      (SetLocalLexical setLocalLexical) => format!"SetLocalLexical \"%s\" r%d"(setLocalLexical.name, setLocalLexical.rval),
+      (SetLocalLexical setLocalLexical) => format!"SetLocalLexical \"%s\" r%d"(
+        setLocalLexical.name,
+        setLocalLexical.rval,
+      ),
       (MakeInteger makeInteger) => format!"r%d = MakeInteger %d"(makeInteger.lval, makeInteger.value),
       (Branch branch) => format!"Branch @%d"(branch.id),
       (Call call) => format!"r%d = Call r%d [%s]"(

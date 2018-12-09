@@ -35,7 +35,6 @@ class UnitCompiler {
   }
 }
 
-
 class RegisterAllocator {
   struct Register {
     bool live;
