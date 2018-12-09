@@ -3,10 +3,20 @@ module parser.lexer;
 import std.algorithm : canFind;
 import std.conv : to;
 import std.format : format;
+import std.typecons : Tuple;
+
+struct Position {
+  int index;
+  int line;
+  int column;
+}
 
 class StringStream {
   string input;
   int index = 0;
+
+  int line = 1;
+  int column = 1;
 
   this(string input) {
     this.input = input;
@@ -15,11 +25,19 @@ class StringStream {
   this(StringStream copyable) {
     input = copyable.input;
     index = copyable.index;
+    line = copyable.line;
+    column = copyable.column;
   }
 
   char read() {
     auto character = safePeek(index);
     index += 1;
+    if (character == '\n') {
+      line += 1;
+      column = 1;
+    } else {
+      column += 1;
+    }
     return character;
   }
 
@@ -52,6 +70,10 @@ class StringStream {
     }
 
     return true;
+  }
+
+  Position getPosition() {
+    return Position(index, line, column);
   }
 
   // Bounds-checked peeking; will return '\0' if target is beyond the end of
@@ -100,13 +122,13 @@ static this() {
 
 struct Token {
   TokenType type;
-
   union {
     string stringValue;
     long integerValue;
   }
+  Position begin;
 
-  this(TokenType type) {
+  this(TokenType type, Position begin) {
     assert(
       type == TokenType.BRACE_LEFT ||
       type == TokenType.BRACE_RIGHT ||
@@ -118,18 +140,21 @@ struct Token {
       type == TokenType.PARENTHESES_RIGHT
     );
     this.type = type;
+    this.begin = begin;
   }
 
-  this(TokenType type, string value) {
+  this(TokenType type, string value, Position begin) {
     assert(stringValueType(type), "Not a string value type: " ~ to!string(type) ~ " (value = \"" ~ value ~ "\")");
     this.type = type;
     this.stringValue = value;
+    this.begin = begin;
   }
 
-  this(TokenType type, long value) {
+  this(TokenType type, long value, Position begin) {
     assert(integerValueType(type));
     this.type = type;
     this.integerValue = value;
+    this.begin = begin;
   }
 
   bool opEquals(const Token other) const {
@@ -222,39 +247,46 @@ class TokenStream {
     consumeSpaceAndComments();
 
     char character;
+    Position begin;
 
     while (true) {
       character = input.peek();
+      begin = getPosition();
 
       if (identifierHead(character))
-        return lexIdentifier();
+        return lexIdentifier(begin);
 
       if (numericHead(character))
-        return lexNumeric();
+        return lexNumeric(begin);
 
-      if (character == '+' || character == '*')
+      if (character == '+' || character == '*') {
         // Not checking for '-' because it's already handled by `lexNumeric`.
-        return Token(TokenType.BINARY_OP, to!string(input.read()));
+        return Token(TokenType.BINARY_OP, to!string(input.read()), begin);
+      }
 
       if (character == '\n') {
         input.read();
         consumeMoreNewlineTerminals();
-        return Token(TokenType.TERMINAL, "\n");
+        return Token(TokenType.TERMINAL, "\n", begin);
       }
 
       if (character == ';') {
         input.read();
-        return Token(TokenType.TERMINAL, ";");
+        return Token(TokenType.TERMINAL, ";", begin);
       }
 
       auto mapped = (character in characterMap);
       if (mapped !is null) {
         input.read();
-        return Token(*mapped);
+        return Token(*mapped, begin);
       }
 
       throw new Error("Unrecognized character: " ~ character);
     }
+  }
+
+  private Position getPosition() {
+    return input.getPosition();
   }
 
   private void consumeMoreNewlineTerminals() {
@@ -299,7 +331,7 @@ class TokenStream {
     }
   }
 
-  Token lexIdentifier() {
+  Token lexIdentifier(Position begin) {
     string identifier = "" ~ input.read();
     while (true) {
       char character = input.peek();
@@ -311,18 +343,18 @@ class TokenStream {
       }
     }
     if (KEYWORDS.canFind(identifier)) {
-      return Token(TokenType.KEYWORD, identifier);
+      return Token(TokenType.KEYWORD, identifier, begin);
     }
-    return Token(TokenType.IDENTIFIER, identifier);
+    return Token(TokenType.IDENTIFIER, identifier, begin);
   }
 
-  Token lexNumeric() {
+  Token lexNumeric(Position begin) {
     string number = "" ~ input.read();
 
     // If it's just a minus with no digit after it then return the minus as a
     // binary operator.
     if (number == "-" && !digit(input.peek())) {
-      return Token(TokenType.BINARY_OP, number);
+      return Token(TokenType.BINARY_OP, number, begin);
     }
 
     while (true) {
@@ -334,7 +366,7 @@ class TokenStream {
       }
     }
 
-    return Token(TokenType.INTEGER, to!long(number));
+    return Token(TokenType.INTEGER, to!long(number), begin);
   }
 
   // The first character of identifiers must be alphabetical.

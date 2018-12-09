@@ -2,36 +2,35 @@ module ast.ast;
 
 import std.algorithm.searching : findSkip;
 import std.conv : to;
-import std.typecons : Tuple;
+
+import parser.lexer : Position, Token;
+
+struct Location {
+  // TODO: Also track end location.
+  Position begin;
+
+  static const missing = Location(Position(-1, -1, -1));
+
+  this(Position begin) {
+    this.begin = begin;
+  }
+
+  this(Token token) {
+    this(token.begin);
+  }
+
+  auto position() const {
+    return begin;
+  }
+
+  bool present() const {
+    return begin.index > -1;
+  }
+}
 
 enum Visibility {
   Public,
   Private,
-}
-
-alias Position = Tuple!(size_t, "line", size_t, "column");
-
-struct Location {
-  string source;
-  size_t begin, end;
-
-  static const missing = Location("", -1, -1);
-
-  this(string source, size_t begin, size_t end) {
-    this.source = source;
-    this.begin = begin;
-    this.end = end;
-  }
-
-  auto position() const {
-    // auto resolved = peg.position(source[0..begin]);
-    // return Position(resolved.line, resolved.col);
-    return Position(0, 0);
-  }
-
-  bool present() const {
-    return source != "" && begin != -1 && end != -1;
-  }
 }
 
 string defaultIndent = "  ";

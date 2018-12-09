@@ -84,13 +84,16 @@ class Parser {
       rhs = parseExpression();
     }
 
+    Node node;
     if (keyword.stringValue == "let") {
-      return new Let(lhs.stringValue, rhs, Visibility.Public);
+      node = new Let(lhs.stringValue, rhs, Visibility.Public);
     } else if (keyword.stringValue == "var") {
-      return new Var(lhs.stringValue, rhs, Visibility.Public);
+      node = new Var(lhs.stringValue, rhs, Visibility.Public);
     } else {
       throw new Error("Unrecognized keyword: " ~ keyword.stringValue);
     }
+    node.location = Location(keyword);
+    return node;
   }
 
   Node parseExpression() {
@@ -239,14 +242,16 @@ class Parser {
 
   Node parseAtom() {
     auto token = input.read();
-
+    Node node;
     if (token.type == TokenType.IDENTIFIER) {
-      return new Identifier(token.stringValue);
+      node = new Identifier(token.stringValue);
     } else if (token.type == TokenType.INTEGER) {
-      return new Integer(token.integerValue);
+      node = new Integer(token.integerValue);
+    } else {
+      throwUnexpected(token);
     }
-    throwUnexpected(token);
-    return null;
+    node.location = Location(token);
+    return node;
   }
 
   void consumeTerminals() {
