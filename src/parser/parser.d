@@ -1,8 +1,10 @@
 module parser.parser;
 
+import std.algorithm.iteration : map;
 import std.algorithm.mutation : remove;
 import std.algorithm.searching : canFind;
-import std.array : replaceInPlace;
+import std.array : join, replaceInPlace;
+import std.conv : to;
 import std.format : format;
 import std.stdio : writeln;
 import std.variant : Algebraic;
@@ -93,7 +95,7 @@ class Parser {
       identifier.value,
       block,
     );
-    node.location = new Location(keyword);
+    node.location = Location(keyword);
     return node;
   }
 
@@ -289,7 +291,10 @@ class Parser {
     } else if (next.type == TokenType.INTEGER) {
       node = new Integer(input.read().integerValue);
     } else {
-      throwUnexpected(next);
+      throwUnexpected(next,
+        TokenType.IDENTIFIER,
+        TokenType.INTEGER,
+      );
     }
     node.location = Location(next);
     return node;
@@ -298,7 +303,7 @@ class Parser {
   Identifier parseIdentifier() {
     auto token = input.read();
     if (token.type != TokenType.IDENTIFIER) {
-      throwUnexpected(token);
+      throwUnexpected(token, TokenType.IDENTIFIER);
     }
     return new Identifier(token.stringValue);
   }
@@ -309,14 +314,26 @@ class Parser {
     }
   }
 
-  void throwUnexpected(Token token) {
-    throw new Error("Unexpected token: " ~ format!"%s"(token));
+  void throwUnexpected(Token token, TokenType[] expectedTypes ...) {
+    string expected = "";
+    if (expectedTypes.length > 0) {
+      expected = (
+        " (expected " ~
+        expectedTypes.map!(type => to!string(type)).join(" or ") ~
+        ")"
+      );
+    }
+    throw new Error(
+      "Unexpected token: " ~
+      format!"%s"(token) ~
+      expected
+    );
   }
 
-  private Token expectToRead(TokenType type) {
+  Token expectToRead(TokenType type) {
     auto token = input.read();
     if (token.type != type) {
-      throwUnexpected(token);
+      throwUnexpected(token, type);
     }
     return token;
   }
