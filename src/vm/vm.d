@@ -45,7 +45,7 @@ class VM {
   void run() {
     while (true) {
       auto instruction = top.current();
-      auto action = dispatch(*instruction);
+      auto const action = dispatch(*instruction);
       if (action == Action.ADVANCE) {
         top.advance();
       } else if (action == Action.EXIT) {
