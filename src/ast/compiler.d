@@ -177,7 +177,7 @@ class UnitCompiler {
     return false;
   }
 
-  BasicBlockBuilder currentBlock() @property {
+  @property BasicBlockBuilder currentBlock() {
     return currentFunction.current;
   }
 }
