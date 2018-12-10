@@ -88,14 +88,8 @@ class Block : Node {
 
   override bool eq(Node anyOther) const {
     if (auto other = cast(Block)anyOther) {
-      if (nodes.length != other.nodes.length) {
+      if (!(equal!"a.eq(b)"(nodes, other.nodes))) {
         return false;
-      }
-      foreach (index, ownNode; nodes) {
-        auto otherNode = other.nodes[index];
-        if (!ownNode.eq(otherNode)) {
-          return false;
-        }
       }
       return true;
     }
@@ -273,14 +267,8 @@ class PostfixCall : Node {
       if (!target.eq(other.target)) {
         return false;
       }
-      if (arguments.length != other.arguments.length) {
+      if (!(equal!"a.eq(b)"(arguments, other.arguments))) {
         return false;
-      }
-      foreach (index, ownArgument; arguments) {
-        auto otherArgument = other.arguments[index];
-        if (!ownArgument.eq(otherArgument)) {
-          return false;
-        }
       }
       return true;
     }
@@ -360,14 +348,8 @@ class Program : Node {
 
   override bool eq(Node anyOther) const {
     if (auto other = cast(Program)anyOther) {
-      if (nodes.length != other.nodes.length) {
+      if (!(equal!"a.eq(b)"(nodes, other.nodes))) {
         return false;
-      }
-      foreach (index, ownNode; nodes) {
-        auto otherNode = other.nodes[index];
-        if (!ownNode.eq(otherNode)) {
-          return false;
-        }
       }
       return true;
     }
