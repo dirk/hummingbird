@@ -85,6 +85,7 @@ class StringStream {
 
 string[] KEYWORDS = [
   "let",
+  "func",
   "var",
   "return",
 ];

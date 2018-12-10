@@ -53,7 +53,10 @@ class Parser {
 
     auto const next = input.peek();
     if (next.type == TokenType.KEYWORD) {
-      if (next.stringValue == "let" || next.stringValue == "var") {
+      if (next.stringValue == "func") {
+        node = parseFunction();
+        goto terminal;
+      } else if (next.stringValue == "let" || next.stringValue == "var") {
         node = parseLetAndVar();
         goto terminal;
       } else if (next.stringValue == "return") {
@@ -73,6 +76,23 @@ class Parser {
       throwUnexpected(token);
     }
     return node;
+  }
+
+  Node parseFunction() {
+    auto keyword = input.read(); // `func` keyword
+    auto identifier = parseIdentifier();
+    expectToRead(TokenType.PARENTHESES_LEFT);
+    expectToRead(TokenType.PARENTHESES_RIGHT);
+    // Check that the parentheses are followed by a block.
+    auto next = input.peek();
+    if (next.type != TokenType.BRACE_LEFT) {
+      throwUnexpected(next);
+    }
+    auto block = cast(Block)parseBlock();
+    return new Function(
+      identifier.value,
+      block,
+    );
   }
 
   Node parseLetAndVar() {
@@ -119,6 +139,10 @@ class Parser {
     alias Op = string;
     alias Subnode = Algebraic!(Node, Op);
 
+    Node parseSubnode() {
+      return parseBlock();
+    }
+
     void reduceNodes(ref Subnode[] nodes, string reduceOp) {
       for (int index = 0; index < nodes.length; index++) {
         auto const node = nodes[index];
@@ -135,10 +159,10 @@ class Parser {
       }
     }
 
-    Subnode[] nodes = [Subnode(parseBlock())];
+    Subnode[] nodes = [Subnode(parseSubnode())];
     while (input.peek().type == TokenType.BINARY_OP) {
       nodes ~= Subnode(input.read().stringValue);
-      nodes ~= Subnode(parseBlock());
+      nodes ~= Subnode(parseSubnode());
     }
     if (nodes.length == 1) {
       // Don't bother reducing if there weren't any operations.
@@ -256,17 +280,25 @@ class Parser {
   }
 
   Node parseAtom() {
-    auto token = input.read();
+    auto next = input.peek();
     Node node;
-    if (token.type == TokenType.IDENTIFIER) {
-      node = new Identifier(token.stringValue);
-    } else if (token.type == TokenType.INTEGER) {
-      node = new Integer(token.integerValue);
+    if (next.type == TokenType.IDENTIFIER) {
+      node = parseIdentifier();
+    } else if (next.type == TokenType.INTEGER) {
+      node = new Integer(input.read().integerValue);
     } else {
+      throwUnexpected(next);
+    }
+    node.location = Location(next);
+    return node;
+  }
+
+  Identifier parseIdentifier() {
+    auto token = input.read();
+    if (token.type != TokenType.IDENTIFIER) {
       throwUnexpected(token);
     }
-    node.location = Location(token);
-    return node;
+    return new Identifier(token.stringValue);
   }
 
   void consumeTerminals() {
@@ -277,6 +309,14 @@ class Parser {
 
   void throwUnexpected(Token token) {
     throw new Error("Unexpected token: " ~ format!"%s"(token));
+  }
+
+  private Token expectToRead(TokenType type) {
+    auto token = input.read();
+    if (token.type != type) {
+      throwUnexpected(token);
+    }
+    return token;
   }
 }
 

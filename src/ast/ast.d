@@ -1,5 +1,6 @@
 module ast.ast;
 
+import std.algorithm.comparison : equal;
 import std.algorithm.searching : findSkip;
 import std.conv : to;
 
@@ -108,6 +109,32 @@ class Block : Node {
         result ~= "\n" ~ indent ~ node.toPrettyString(indent ~ defaultIndent);
       }
     }
+    return result ~ ")";
+  }
+}
+
+class Function : Node {
+  string name;
+  Block block;
+
+  this(string name, Block block) {
+    this.name = name;
+    this.block = block;
+  }
+
+  override bool eq(Node anyOther) const {
+    if (auto other = cast(Function)anyOther) {
+      return (
+        name == other.name &&
+        block.eq(other.block)
+      );
+    }
+    return false;
+  }
+
+  override string toPrettyString(string indent = "") const {
+    auto result = nameAndLocation() ~ "(" ~ name;
+    result ~= "\n" ~ indent ~ block.toPrettyString(indent ~ defaultIndent);
     return result ~ ")";
   }
 }

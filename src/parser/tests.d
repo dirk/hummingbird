@@ -96,4 +96,15 @@ unittest {
       new Integer(2),
     ]),
   );
+
+  // Test functions.
+  testParse(
+    "func foo() { 123 }",
+    new Function(
+      "foo",
+      new Block([
+        new Integer(123),
+      ]),
+    ),
+  );
 }
