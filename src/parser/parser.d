@@ -89,10 +89,12 @@ class Parser {
       throwUnexpected(next);
     }
     auto block = cast(Block)parseBlock();
-    return new Function(
+    auto node = new Function(
       identifier.value,
       block,
     );
+    node.location = new Location(keyword);
+    return node;
   }
 
   Node parseLetAndVar() {
