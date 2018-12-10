@@ -18,13 +18,14 @@ class UnitBuilder {
   FunctionBuilder mainFunction;
 
   this() {
-    this.mainFunction = new FunctionBuilder("main");
+    this.mainFunction = new FunctionBuilder(0, "main", this);
     this.functions = [this.mainFunction];
   }
 
   FunctionBuilder newFunction(string name) {
-    this.functions ~= new FunctionBuilder(name);
-    return this.functions[$-1];
+    auto id = cast(ushort)(functions.length);
+    functions ~= new FunctionBuilder(id, name, this);
+    return functions[$-1];
   }
 
   string toPrettyString() {
@@ -40,6 +41,8 @@ class UnitBuilder {
 }
 
 class FunctionBuilder {
+  UnitBuilder parent;
+  ushort id;
   string name;
   BasicBlockBuilder entry;
   BasicBlockBuilder current;
@@ -49,8 +52,10 @@ class FunctionBuilder {
   Value[] values;
   uint instructionCounter = 1;
 
-  this(string name) {
+  this(ushort id, string name, UnitBuilder parent) {
+    this.id = id;
     this.name = name;
+    this.parent = parent;
     this.basicBlocks ~= new BasicBlockBuilder("entry", this);
     this.entry = this.basicBlocks[$-1];
     this.current = this.basicBlocks[$-1];
@@ -87,7 +92,12 @@ class FunctionBuilder {
 
   // TODO: Define printer in a separate module.
   string toPrettyString() {
-    auto result = name ~ "() {";
+    auto result = format!"%s() id(%d) {"(name, id);
+    result ~= "\n  locals {";
+    foreach (local; locals) {
+      result ~= "\n    " ~ local;
+    }
+    result ~= "\n  }";
     result ~= "\n  blocks {";
     foreach (basicBlock; basicBlocks) {
       result ~= "\n" ~ basicBlock.toPrettyString();
