@@ -3,16 +3,22 @@ module vm.frame;
 import target.bytecode.definitions :
   BasicBlock,
   Function,
-  Instruction;
+  Instruction,
+  reg_t,
+  Unit;
 import vm.value;
 
 class Frame {
-  const Function* func;
-
+  // All of these should not be changed after initialization:
+  Unit* unit;
+  Function* func;
   Frame stackParent;
   // The frame that should be used for lexical (ie. closure) variable setting
   // and getting.
   Frame lexicalParent;
+  reg_t returnRegister;
+
+  // These can be changed after initialization:
   Value[] registers;
   Value[] locals;
   string[] localsNames;
@@ -21,11 +27,14 @@ class Frame {
   ubyte instructionAddress = 0;
 
   this() {
+    unit = null;
     func = null;
   }
 
-  this(Frame stackParent, Function* func) {
+  this(Frame stackParent, reg_t returnRegister, Unit* unit, Function* func) {
     this.stackParent = stackParent;
+    this.returnRegister = returnRegister;
+    this.unit = unit;
     this.func = func;
     registers.length = func.registers;
     locals.length = func.locals;
@@ -74,9 +83,7 @@ class Frame {
   }
 
   void branch(ubyte blockIndex) {
-    // The function defining should remain constant, but the compiler isn't
-    // smart enough to figure out that this is a non-mutating access.
-    block = &(cast(Function*)func).basicBlocks[blockIndex];
+    block = &func.basicBlocks[blockIndex];
     instructionAddress = 0;
   }
 

@@ -116,14 +116,19 @@ class UnitCompiler {
 
   Value compileFunction(ast.Function funcNode) {
     auto outerFunction = currentFunction;
-    currentFunction = outerFunction.parent.newFunction(funcNode.name);
+    auto newFunction = outerFunction.parent.newFunction(funcNode.name);
+
+    currentFunction = newFunction;
     foreach(node; funcNode.block.nodes) {
       compileNode(node);
     }
     // Naively ensure the function at least returns null.
     currentBlock.buildReturnNull();
+
     currentFunction = outerFunction;
-    return currentFunction.nullValue();
+    auto lval = currentBlock.buildMakeFunction(newFunction);
+    currentBlock.buildSetLocal(currentFunction.getOrAddLocal(funcNode.name), lval);
+    return lval;
   }
 
   Value compileIdentifier(ast.Identifier identifier) {

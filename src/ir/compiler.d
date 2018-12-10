@@ -139,6 +139,7 @@ class FunctionCompiler {
     }
 
     return Function(
+      builder.id,
       builder.name,
       cast(ubyte)registerAllocator.registers.length,
       basicBlocks,
@@ -195,6 +196,9 @@ class BasicBlockCompiler {
       ),
       (ir.SetLocalLexical setLocalLexical) => wrap(
         SetLocalLexical(setLocalLexical.name, use(setLocalLexical.rval)),
+      ),
+      (ir.MakeFunction makeFunction) => wrap(
+        MakeFunction(allocate(makeFunction.lval), makeFunction.id),
       ),
       (ir.MakeInteger makeInteger) => wrap(
         MakeInteger(allocate(makeInteger.lval), makeInteger.value),

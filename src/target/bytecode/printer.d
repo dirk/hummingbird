@@ -18,7 +18,7 @@ class UnitPrinter {
 
 class FunctionPrinter {
   static void print(immutable Function func) {
-    writefln!"%s() registers(%d) {"(func.name, func.registers);
+    writefln!"%s() id(%d) registers(%d) {"(func.name, func.id, func.registers);
     foreach (basicBlock; func.basicBlocks) {
       BasicBlockPrinter.print(basicBlock);
     }
@@ -48,6 +48,7 @@ class InstructionPrinter {
         setLocalLexical.name,
         setLocalLexical.rval,
       ),
+      (MakeFunction makeFunction) => format!"r%d = MakeFunction id(%d)"(makeFunction.lval, makeFunction.id),
       (MakeInteger makeInteger) => format!"r%d = MakeInteger %d"(makeInteger.lval, makeInteger.value),
       (Branch branch) => format!"Branch @%d"(branch.id),
       (Call call) => format!"r%d = Call r%d [%s]"(

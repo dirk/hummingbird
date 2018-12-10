@@ -8,6 +8,7 @@ struct GetLocal { reg_t lval; ubyte index; }
 struct GetLocalLexical { reg_t lval; string name; }
 struct SetLocal { ubyte index; reg_t rval; }
 struct SetLocalLexical { string name; reg_t rval; }
+struct MakeFunction { reg_t lval; ushort id; }
 struct MakeInteger { reg_t lval; long value; }
 struct Branch { ubyte id; }
 struct Call { reg_t lval; reg_t target; reg_t[] arguments; }
@@ -19,6 +20,7 @@ alias Instruction = Algebraic!(
   GetLocalLexical,
   SetLocal,
   SetLocalLexical,
+  MakeFunction,
   MakeInteger,
   Branch,
   Call,
@@ -39,6 +41,7 @@ struct Unit {
 }
 
 struct Function {
+  ushort id;
   string name;
   ubyte registers;
   BasicBlock[] basicBlocks;

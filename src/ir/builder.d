@@ -202,6 +202,15 @@ struct SetLocal { ubyte index; Value rval; }
 
 struct SetLocalLexical { string name; Value rval; }
 
+struct MakeFunction {
+  Value lval;
+  ushort id;
+
+  string toString() const {
+    return lval.toString() ~ " = MakeFunction(id(" ~ to!string(id) ~ "))";
+  }
+}
+
 struct MakeInteger {
   Value lval;
   long value;
@@ -237,6 +246,7 @@ alias Instruction = Algebraic!(
   GetLocalLexical,
   SetLocal,
   SetLocalLexical,
+  MakeFunction,
   MakeInteger,
   Branch,
   Call,
@@ -287,6 +297,12 @@ class BasicBlockBuilder {
 
   void buildSetLocalLexical(string name, Value rval) {
     pushAndTrack!SetLocalLexical(name, rval);
+  }
+
+  Value buildMakeFunction(FunctionBuilder value) {
+    auto lval = parent.newValue();
+    push(MakeFunction(lval, value.id));
+    return lval;
   }
 
   Value buildMakeInteger(long value) {

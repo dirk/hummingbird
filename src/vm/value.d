@@ -1,12 +1,13 @@
 module vm.value;
 
-import target.bytecode.definitions : Function;
+import target.bytecode.definitions : Function, Unit;
 import vm.frame : Frame;
 
 struct DynamicFunction {
+  Unit* unit;
   Function* callTarget;
   // The lexical scope in which this function was declared.
-  Frame* lexicalFrame;
+  Frame lexicalFrame;
 }
 
 alias NativeCallTarget = Value function(Value[]);
@@ -34,9 +35,9 @@ class Value {
     integerValue = value;
   }
 
-  this(Function* callTarget, Frame* lexicalFrame) {
+  this(Unit* unit, Function* callTarget, Frame lexicalFrame) {
     type = Type.DYNAMIC_FUNCTION;
-    dynamicFunctionValue = DynamicFunction(callTarget, lexicalFrame);
+    dynamicFunctionValue = DynamicFunction(unit, callTarget, lexicalFrame);
   }
 
   this(NativeCallTarget callTarget) {
