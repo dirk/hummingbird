@@ -223,14 +223,14 @@ class Parser {
         continue;
       }
       if (input.peek().type == TokenType.PARENTHESES_LEFT) {
-        target = parsePostfixProperty(target);
+        target = parsePostfixCall(target);
       }
       break;
     }
     return target;
   }
 
-  Node parsePostfixProperty(Node target) {
+  Node parsePostfixCall(Node target) {
     input.read(); // Left parentheses
     Node[] arguments;
     if (input.peek().type == TokenType.PARENTHESES_RIGHT) {
