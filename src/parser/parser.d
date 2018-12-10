@@ -231,18 +231,15 @@ class Parser {
   }
 
   Node parsePostfixCall(Node target) {
-    input.read(); // Left parentheses
+    expectToRead(TokenType.PARENTHESES_LEFT);
     Node[] arguments;
-    if (input.peek().type == TokenType.PARENTHESES_RIGHT) {
-      input.read();
-      goto end;
-    }
+    if (input.peek().type == TokenType.PARENTHESES_RIGHT) goto end;
     while (true) {
       auto argument = parseExpression();
       arguments ~= argument;
       auto next = input.peek();
       if (next.type == TokenType.COMMA) {
-        input.read(); // Comma
+        expectToRead(TokenType.COMMA);
         // Allow a trailing comma before the closing parentheses.
         if (input.peek().type == TokenType.PARENTHESES_RIGHT) goto end;
         continue;
@@ -253,7 +250,7 @@ class Parser {
       }
     }
   end:
-    input.read(); // Right parentheses
+    expectToRead(TokenType.PARENTHESES_RIGHT);
     return new PostfixCall(target, arguments);
   }
 
