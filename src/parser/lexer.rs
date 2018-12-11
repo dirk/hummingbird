@@ -69,8 +69,13 @@ enum Token {
     Integer(i64),
     Let,
     Func,
-    Var,
+    ParenthesesLeft,
+    ParenthesesRight,
+    Plus,
     Return,
+    Star,
+    Terminal(char),
+    Var,
 }
 
 struct TokenStream {
@@ -113,8 +118,18 @@ impl TokenStream {
             } else if numeric_head(character) {
                 return self.lex_numeric();
             } else {
+                self.input.read();
                 match character {
                     '\0' => return Token::EOF,
+                    '(' => return Token::ParenthesesLeft,
+                    ')' => return Token::ParenthesesRight,
+                    '+' => return Token::Plus,
+                    '*' => return Token::Star,
+                    ';' => return Token::Terminal(character),
+                    '\n' => {
+                        self.consume_more_newline_terminals();
+                        return Token::Terminal(character);
+                    }
                     _ => panic!("Unexpected character: {}", character),
                 }
             }
@@ -155,6 +170,18 @@ impl TokenStream {
         }
         let number_string: String = number.into_iter().collect();
         return Token::Integer(number_string.parse().unwrap());
+    }
+
+    fn consume_more_newline_terminals(&mut self) {
+        loop {
+            self.consume_space_and_comments();
+            if self.input.peek() == '\n' {
+                self.input.read();
+                continue;
+            } else {
+                break;
+            }
+        }
     }
 
     fn consume_space_and_comments(&mut self) {
@@ -232,5 +259,44 @@ mod tests {
         assert_eq!(parse("let"), vec![Token::Let, Token::EOF,]);
         assert_eq!(parse("return"), vec![Token::Return, Token::EOF,]);
         assert_eq!(parse("var"), vec![Token::Var, Token::EOF,]);
+    }
+
+    #[test]
+    fn it_parse_comments_and_terminals() {
+        assert_eq!(
+            parse("foo /* Comment */ bar"),
+            vec![
+                Token::Identifier("foo".to_string()),
+                Token::Identifier("bar".to_string()),
+                Token::EOF,
+            ]
+        );
+
+        assert_eq!(
+            parse("foo // Comment \n bar"),
+            vec![
+                Token::Identifier("foo".to_string()),
+                Token::Terminal('\n'),
+                Token::Identifier("bar".to_string()),
+                Token::EOF,
+            ]
+        );
+
+        assert_eq!(
+            parse(
+                "foo
+            // Comment about the call
+            // Another comment about the call
+            bar()"
+            ),
+            vec![
+                Token::Identifier("foo".to_string()),
+                Token::Terminal('\n'),
+                Token::Identifier("bar".to_string()),
+                Token::ParenthesesLeft,
+                Token::ParenthesesRight,
+                Token::EOF,
+            ]
+        );
     }
 }
