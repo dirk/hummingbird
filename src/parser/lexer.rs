@@ -50,7 +50,7 @@ impl StringStream {
         if (self.index + target.len()) > self.input.len() {
             return false;
         }
-        let substr = &self.input[self.index..(target.len())];
+        let substr = &self.input[self.index..(self.index + target.len())];
         if substr != target {
             return false;
         }
