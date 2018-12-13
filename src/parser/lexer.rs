@@ -81,14 +81,18 @@ enum Token {
     Var,
 }
 
-struct TokenStream {
+pub struct TokenStream {
     input: StringStream,
     peeking: bool,
     next_token: Option<Token>,
 }
 
 impl TokenStream {
-    pub fn new(input: StringStream) -> Self {
+    pub fn from_string(input: String) -> Self {
+        Self::new(StringStream::new(input.as_str()))
+    }
+
+    fn new(input: StringStream) -> Self {
         TokenStream {
             input: input,
             peeking: false,
