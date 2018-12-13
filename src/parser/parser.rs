@@ -144,7 +144,7 @@ fn parse_block(input: &mut TokenStream) -> Node {
 fn parse_parentheses(input: &mut TokenStream) -> Node {
     if let Token::ParenthesesLeft = input.peek() {
         input.read(); // Opening parentheses
-        let node = parse_atom(input);
+        let node = parse_expression(input);
         expect_to_read(input, Token::ParenthesesRight); // Closing parentheses
         node
     } else {
