@@ -1,3 +1,4 @@
+#[derive(Clone)]
 struct StringStream {
     input: Vec<char>,
     index: usize,
@@ -63,10 +64,12 @@ impl StringStream {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Token {
+pub enum Token {
     BraceLeft,
     BraceRight,
+    Dot,
     EOF,
+    Equals,
     Identifier(String),
     Integer(i64),
     Let,
@@ -81,6 +84,16 @@ enum Token {
     Var,
 }
 
+impl Token {
+    pub fn newline(self) -> bool {
+        match self {
+            Token::Terminal(character) => character == '\n',
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct TokenStream {
     input: StringStream,
     peeking: bool,
@@ -98,6 +111,12 @@ impl TokenStream {
             peeking: false,
             next_token: None,
         }
+    }
+
+    pub fn backtrack(&mut self, other: &TokenStream) {
+        self.input = other.input.clone();
+        self.peeking = other.peeking;
+        self.next_token = other.next_token.clone();
     }
 
     pub fn peek(&mut self) -> Token {
@@ -132,6 +151,8 @@ impl TokenStream {
                     '}' => return Token::BraceRight,
                     '(' => return Token::ParenthesesLeft,
                     ')' => return Token::ParenthesesRight,
+                    '.' => return Token::Dot,
+                    '=' => return Token::Equals,
                     '+' => return Token::Plus,
                     '*' => return Token::Star,
                     ';' => return Token::Terminal(character),
