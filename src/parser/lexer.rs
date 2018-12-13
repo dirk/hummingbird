@@ -64,11 +64,14 @@ impl StringStream {
 
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
+    BraceLeft,
+    BraceRight,
     EOF,
     Identifier(String),
     Integer(i64),
     Let,
     Func,
+    Minus,
     ParenthesesLeft,
     ParenthesesRight,
     Plus,
@@ -116,11 +119,13 @@ impl TokenStream {
             if identifier_head(character) {
                 return self.lex_identifier();
             } else if numeric_head(character) {
-                return self.lex_numeric();
+                return self.lex_numeric_or_minus();
             } else {
                 self.input.read();
                 match character {
                     '\0' => return Token::EOF,
+                    '{' => return Token::BraceLeft,
+                    '}' => return Token::BraceRight,
                     '(' => return Token::ParenthesesLeft,
                     ')' => return Token::ParenthesesRight,
                     '+' => return Token::Plus,
@@ -157,8 +162,12 @@ impl TokenStream {
         }
     }
 
-    fn lex_numeric(&mut self) -> Token {
-        let mut number = vec![self.input.read()];
+    fn lex_numeric_or_minus(&mut self) -> Token {
+        let first_character = self.input.read();
+        if first_character == '-' && !digit(self.input.peek()) {
+            return Token::Minus;
+        }
+        let mut number = vec![first_character];
         loop {
             let character = self.input.peek();
             if digit(character) {
@@ -216,7 +225,7 @@ fn identifier_tail(character: char) -> bool {
 }
 
 fn numeric_head(character: char) -> bool {
-    digit(character)
+    digit(character) || (character == '-')
 }
 
 fn alphabetical(character: char) -> bool {
@@ -295,6 +304,48 @@ mod tests {
                 Token::Identifier("bar".to_string()),
                 Token::ParenthesesLeft,
                 Token::ParenthesesRight,
+                Token::EOF,
+            ]
+        );
+    }
+
+    #[test]
+    fn it_parses_integers() {
+        assert_eq!(parse("1"), vec![Token::Integer(1), Token::EOF]);
+        assert_eq!(parse("-1"), vec![Token::Integer(-1), Token::EOF]);
+        assert_eq!(
+            parse("- 1"),
+            vec![Token::Minus, Token::Integer(1), Token::EOF]
+        );
+        assert_eq!(
+            parse("1+2"),
+            vec![
+                Token::Integer(1),
+                Token::Plus,
+                Token::Integer(2),
+                Token::EOF,
+            ]
+        );
+        assert_eq!(
+            parse("1 + 2"),
+            vec![
+                Token::Integer(1),
+                Token::Plus,
+                Token::Integer(2),
+                Token::EOF,
+            ]
+        );
+    }
+
+    #[test]
+    fn it_parses_blocks() {
+        assert_eq!(
+            parse("{ 1; }"),
+            vec![
+                Token::BraceLeft,
+                Token::Integer(1),
+                Token::Terminal(';'),
+                Token::BraceRight,
                 Token::EOF,
             ]
         );
