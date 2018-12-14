@@ -67,6 +67,7 @@ impl StringStream {
 pub enum Token {
     BraceLeft,
     BraceRight,
+    Comma,
     Dot,
     EOF,
     Equals,
@@ -151,6 +152,7 @@ impl TokenStream {
                     '}' => return Token::BraceRight,
                     '(' => return Token::ParenthesesLeft,
                     ')' => return Token::ParenthesesRight,
+                    ',' => return Token::Comma,
                     '.' => return Token::Dot,
                     '=' => return Token::Equals,
                     '+' => return Token::Plus,

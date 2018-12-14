@@ -1,5 +1,5 @@
 use super::super::ast::nodes::{
-    Assignment, Block, Identifier, Infix, Integer, Node, PostfixProperty, Program,
+    Assignment, Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
 };
 
 use super::lexer::{Token, TokenStream};
@@ -170,6 +170,9 @@ fn parse_postfix(input: &mut TokenStream) -> Node {
             target = new_target;
             continue;
         }
+        if input.peek() == Token::ParenthesesLeft {
+            target = parse_postfix_call(input, target);
+        }
         break;
     }
     target
@@ -204,6 +207,32 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
         input.backtrack(&savepoint);
     }
     None
+}
+
+fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
+    expect_to_read(input, Token::ParenthesesLeft);
+    let mut arguments = vec![];
+    if input.peek() != Token::ParenthesesRight {
+        loop {
+            let argument = parse_expression(input);
+            arguments.push(argument);
+            let next = input.peek();
+            if next == Token::Comma {
+                expect_to_read(input, Token::Comma);
+                // Allow a trailing comma before the closing parentheses.
+                if input.peek() == Token::ParenthesesRight {
+                    break;
+                }
+                // Otherwise consume the next argument.
+                continue;
+            } else if next == Token::ParenthesesRight {
+                break;
+            } else {
+                panic_unexpected(next, Some(vec![Token::Comma, Token::ParenthesesRight]));
+            }
+        }
+    }
+    Node::PostfixCall(PostfixCall::new(target, arguments))
 }
 
 fn parse_atom(input: &mut TokenStream) -> Node {
@@ -242,7 +271,7 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Block, Identifier, Infix, Integer, Node, PostfixProperty, Program,
+        Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -351,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn it_parses_postfix() {
+    fn it_parses_postfix_property() {
         assert_eq!(
             parse_postfix(&mut input("foo.bar")),
             Node::PostfixProperty(PostfixProperty::new(
@@ -360,6 +389,61 @@ mod tests {
                 }),
                 "bar".to_string(),
             ))
-        )
+        );
+    }
+
+    #[test]
+    fn it_parses_postfix_call() {
+        assert_eq!(
+            parse_postfix(&mut input("foo()")),
+            Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier {
+                    value: "foo".to_string()
+                }),
+                vec![],
+            )),
+        );
+        assert_eq!(
+            parse_postfix(&mut input("foo(1)")),
+            Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier {
+                    value: "foo".to_string()
+                }),
+                vec![Node::Integer(Integer { value: 1 }),],
+            )),
+        );
+        assert_eq!(
+            parse_postfix(&mut input("foo(1,)")),
+            Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier {
+                    value: "foo".to_string()
+                }),
+                vec![Node::Integer(Integer { value: 1 }),],
+            )),
+        );
+        assert_eq!(
+            parse_postfix(&mut input("foo(1, 2)")),
+            Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier {
+                    value: "foo".to_string()
+                }),
+                vec![
+                    Node::Integer(Integer { value: 1 }),
+                    Node::Integer(Integer { value: 2 }),
+                ],
+            )),
+        );
+        assert_eq!(
+            parse_postfix(&mut input("foo(1, 2,)")),
+            Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier {
+                    value: "foo".to_string()
+                }),
+                vec![
+                    Node::Integer(Integer { value: 1 }),
+                    Node::Integer(Integer { value: 2 }),
+                ],
+            )),
+        );
     }
 }

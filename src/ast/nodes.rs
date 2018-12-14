@@ -9,6 +9,7 @@ pub enum Node {
     Identifier(Identifier),
     Infix(Infix),
     Integer(Integer),
+    PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Program(Program),
 }
@@ -69,6 +70,21 @@ impl Infix {
             lhs: Box::new(lhs),
             op,
             rhs: Box::new(rhs),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PostfixCall {
+    target: Box<Node>,
+    arguments: Vec<Node>,
+}
+
+impl PostfixCall {
+    pub fn new(target: Node, arguments: Vec<Node>) -> Self {
+        Self {
+            target: Box::new(target),
+            arguments,
         }
     }
 }
