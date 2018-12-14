@@ -12,6 +12,7 @@ pub enum Node {
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Program(Program),
+    Return(Return),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -107,4 +108,17 @@ impl PostfixProperty {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
     pub nodes: Vec<Node>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Return {
+    pub rhs: Option<Box<Node>>,
+}
+
+impl Return {
+    pub fn new(rhs: Option<Node>) -> Self {
+        Self {
+            rhs: rhs.map(|node| Box::new(node)),
+        }
+    }
 }

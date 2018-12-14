@@ -1,5 +1,6 @@
 use super::super::ast::nodes::{
     Assignment, Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
+    Return,
 };
 
 use super::lexer::{Token, TokenStream};
@@ -38,7 +39,7 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
     let node = match next {
         // Token::Func => parse_function(input),
         // Token::Let => parse_let_and_var(input),
-        // Token::Return => parse_return(input, terminator),
+        Token::Return => parse_return(input, terminator.clone()),
         // Token::Var => parse_let_and_var(input),
         _ => parse_expression(input),
     };
@@ -56,6 +57,21 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
         Some(vec![Token::Terminal('\n'), Token::Terminal(';')]),
     );
     unreachable!()
+}
+
+fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
+    expect_to_read(input, Token::Return);
+    let mut rhs = None;
+    let next = input.peek();
+    if let Token::Terminal(_) = next {
+        // Do nothing.
+    } else if next == terminator {
+        // Also do nothing.
+    } else {
+        // We got an expression!
+        rhs = Some(parse_expression(input));
+    }
+    Node::Return(Return::new(rhs))
 }
 
 fn parse_expression(input: &mut TokenStream) -> Node {
@@ -271,7 +287,7 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
+        Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -280,6 +296,15 @@ mod tests {
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
+    }
+
+    fn parse_complete(program: &str) -> Vec<Node> {
+        let mut token_stream = input(program);
+        let node = parse_program(&mut token_stream);
+        match node {
+            Node::Program(program) => program.nodes,
+            _ => panic!("Not a Program: {:?}", node),
+        }
     }
 
     #[test]
@@ -300,6 +325,44 @@ mod tests {
                     Node::Integer(Integer { value: 2 }),
                 ],
             }),
+        );
+    }
+
+    #[test]
+    fn it_parses_return() {
+        assert_eq!(
+            parse_complete("return"),
+            vec![Node::Return(Return::new(None))],
+        );
+        assert_eq!(
+            parse_complete("return\n"),
+            vec![Node::Return(Return::new(None))],
+        );
+        assert_eq!(
+            parse_complete("return;"),
+            vec![Node::Return(Return::new(None))],
+        );
+        assert_eq!(
+            parse_complete("return 1"),
+            vec![Node::Return(Return::new(Some(Node::Integer(Integer {
+                value: 1
+            })),))],
+        );
+        assert_eq!(
+            parse_complete("{ return 1 }"),
+            vec![Node::Block(Block {
+                nodes: vec![Node::Return(Return::new(Some(Node::Integer(Integer {
+                    value: 1
+                })),)),],
+            })],
+        );
+        assert_eq!(
+            parse_complete("{ return 1; }"),
+            vec![Node::Block(Block {
+                nodes: vec![Node::Return(Return::new(Some(Node::Integer(Integer {
+                    value: 1
+                })),)),],
+            })],
         );
     }
 
