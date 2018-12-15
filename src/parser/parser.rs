@@ -62,13 +62,7 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
 fn parse_function(input: &mut TokenStream) -> Node {
     expect_to_read(input, Token::Func);
     let token = input.read();
-    let name = match token {
-        Token::Identifier(name, _) => name,
-        _ => {
-            panic_unexpected(token, None);
-            unreachable!()
-        }
-    };
+    let name_identifier: Identifier = token.into();
 
     expect_to_read(input, Token::ParenthesesLeft);
     expect_to_read(input, Token::ParenthesesRight);
@@ -79,6 +73,7 @@ fn parse_function(input: &mut TokenStream) -> Node {
     }
     let block_node = parse_block(input);
 
+    let name = name_identifier.value;
     let block = match block_node {
         Node::Block(block) => block,
         _ => unreachable!(),
@@ -281,11 +276,7 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
 fn parse_atom(input: &mut TokenStream) -> Node {
     let next = input.read();
     match next {
-        Token::Identifier(value, location) => {
-            let mut identifier = Identifier::new(value);
-            identifier.location = Some(location);
-            Node::Identifier(identifier)
-        }
+        Token::Identifier(_, _) => Node::Identifier(next.into()),
         Token::Integer(value) => Node::Integer(Integer { value }),
         _ => {
             panic_unexpected(next, None);
@@ -314,6 +305,26 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
         None => "".to_string(),
     };
     panic!("Unexpected token: {:?}{}", token, expected)
+}
+
+fn panic_unexpected_names(token: Token, expected_names: &str) {
+    panic!("Unexpected token: {:?} (expected {})", token, expected_names)
+}
+
+impl From<Token> for Identifier {
+    fn from(token: Token) -> Identifier {
+        match token {
+            Token::Identifier(value, location) => {
+                let mut identifier = Identifier::new(value);
+                identifier.location = Some(location);
+                identifier
+            }
+            _ => {
+                panic_unexpected_names(token, "Identifier");
+                unreachable!()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
