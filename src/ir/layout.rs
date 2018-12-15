@@ -1,6 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+// We have to share a lot of things around, so use reference-counting to keep
+// track of them.
+pub type SharedBasicBlock = Rc<RefCell<BasicBlock>>;
 pub type SharedFunction = Rc<RefCell<Function>>;
 pub type SharedValue = Rc<RefCell<Value>>;
 
@@ -23,27 +26,27 @@ impl Unit {
     }
 }
 
-type Address = u32;
+pub type Address = u32;
 
 #[derive(Debug)]
 pub struct Value {
     pub id: u32,
     // List of all the instructions that read this value.
-    pub dependencies: Vec<Address>,
+    pub dependents: Vec<Address>,
 }
 
 impl Value {
     fn new(id: u32) -> Self {
         Value {
             id,
-            dependencies: vec![],
+            dependents: vec![],
         }
     }
 
     fn null() -> Self {
         Value {
             id: 0,
-            dependencies: vec![],
+            dependents: vec![],
         }
     }
 
@@ -57,8 +60,8 @@ impl Value {
         if self.is_null() {
             return;
         }
-        if !self.dependencies.contains(&address) {
-            self.dependencies.push(address)
+        if !self.dependents.contains(&address) {
+            self.dependents.push(address)
         }
     }
 }
@@ -74,26 +77,48 @@ pub struct Function {
     pub id: u16,
     pub name: String,
     pub locals: Vec<String>,
+
+    // Always keep track of where we entered.
+    entry: SharedBasicBlock,
+    // Keep track of where we are.
+    current: SharedBasicBlock,
+    // Used for compilation.
+    basic_blocks: Vec<SharedBasicBlock>,
+
+    // All the values allocated within the function.
     pub values: Vec<SharedValue>,
+    // Use to generate monotonically-increasing instruction addresses.
     pub instruction_counter: u32,
 }
 
 impl Function {
     fn new<V: Into<String>>(id: u16, name: V) -> Self {
+        let entry = Rc::new(RefCell::new(BasicBlock::new("entry")));
         Self {
             id,
             name: name.into(),
             locals: vec![],
+            entry: entry.clone(),
+            current: entry.clone(),
+            basic_blocks: vec![entry],
             values: vec![],
             instruction_counter: 0,
         }
     }
 
-    fn new_value(&mut self) -> SharedValue {
-        let id = (self.values.len() as u32) + 1;
-        let value = Rc::new(RefCell::new(Value::new(id)));
-        self.values.push(value.clone());
-        value
+    pub fn null_value(&self) -> SharedValue {
+        Rc::new(RefCell::new(Value::null()))
+    }
+
+    pub fn get_or_add_local(&mut self, local: String) -> u8 {
+        let position = self.locals.iter().position(|existing| existing == &local);
+        match position {
+            Some(index) => index as u8,
+            None => {
+                self.locals.push(local);
+                (self.locals.len() - 1) as u8
+            }
+        }
     }
 
     fn next_address(&mut self) -> Address {
@@ -103,18 +128,16 @@ impl Function {
     }
 }
 
-enum Instruction {
-    GetLocal(SharedValue, u8),
-    SetLocal(u8, SharedValue),
-}
+pub trait InstructionBuilder {
+    // Build a new `Value`.
+    fn new_value(&mut self) -> SharedValue;
 
-struct BasicBlock {
-    parent: RefCell<Function>,
-    name: String,
-    instructions: Vec<(Address, Instruction)>,
-}
+    // Push an instruction: returns the address of the new instruction.
+    fn push(&mut self, instruction: Instruction) -> Address;
 
-impl BasicBlock {
+    // Add an instruction address to the value's list of dependents.
+    fn track(&mut self, rval: SharedValue, address: Address);
+
     fn build_get_local(&mut self, index: u8) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::GetLocal(lval.clone(), index));
@@ -123,24 +146,56 @@ impl BasicBlock {
 
     fn build_set_local(&mut self, index: u8, rval: SharedValue) {
         let address = self.push(Instruction::SetLocal(index, rval.clone()));
-        BasicBlock::track(rval, address);
+        self.track(rval, address);
     }
 
+    fn build_make_integer(&mut self, value: i64) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::MakeInteger(lval.clone(), value));
+        lval
+    }
+}
+
+impl InstructionBuilder for Function {
     fn new_value(&mut self) -> SharedValue {
-        self.parent.borrow_mut().new_value()
-    }
-
-    fn next_address(&mut self) -> Address {
-        self.parent.borrow_mut().next_address()
+        let id = (self.values.len() as u32) + 1;
+        let value = Rc::new(RefCell::new(Value::new(id)));
+        self.values.push(value.clone());
+        value
     }
 
     fn push(&mut self, instruction: Instruction) -> Address {
         let address = self.next_address();
-        self.instructions.push((address, instruction));
+        self.current
+            .borrow_mut()
+            .instructions
+            .push((address, instruction));
         address
     }
 
-    fn track(rval: SharedValue, address: Address) {
+    fn track(&mut self, rval: SharedValue, address: Address) {
         rval.borrow_mut().used_by(address)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Instruction {
+    GetLocal(SharedValue, u8),
+    SetLocal(u8, SharedValue),
+    MakeInteger(SharedValue, i64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BasicBlock {
+    pub name: String,
+    pub instructions: Vec<(Address, Instruction)>,
+}
+
+impl BasicBlock {
+    fn new<V: Into<String>>(name: V) -> Self {
+        Self {
+            name: name.into(),
+            instructions: vec![],
+        }
     }
 }
