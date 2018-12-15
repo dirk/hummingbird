@@ -36,10 +36,27 @@ pub struct Block {
     pub nodes: Vec<Node>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Function {
     pub name: String,
     pub block: Block,
+    pub location: Option<Location>
+}
+
+impl Function {
+    pub fn new(name: String, block: Block) -> Self {
+        Self {
+            name,
+            block,
+            location: None,
+        }
+    }
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Function) -> bool {
+        self.name == other.name && self.block == other.block
+    }
 }
 
 #[derive(Clone, Debug)]

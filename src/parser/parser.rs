@@ -4,6 +4,7 @@ use super::super::ast::nodes::{
 };
 
 use super::lexer::{Token, TokenStream};
+use super::location::Location;
 
 fn parse_program(input: &mut TokenStream) -> Node {
     let mut nodes: Vec<Node> = Vec::new();
@@ -37,7 +38,7 @@ fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
 fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
     let next = input.peek();
     let node = match next {
-        Token::Func => parse_function(input),
+        Token::Func(_) => parse_function(input),
         // Token::Let => parse_let_and_var(input),
         Token::Return => parse_return(input, terminator.clone()),
         // Token::Var => parse_let_and_var(input),
@@ -60,7 +61,9 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
 }
 
 fn parse_function(input: &mut TokenStream) -> Node {
-    expect_to_read(input, Token::Func);
+    // Consume the `func` and get its location.
+    let location = input.read().location();
+
     let token = input.read();
     let name_identifier: Identifier = token.into();
 
@@ -78,7 +81,9 @@ fn parse_function(input: &mut TokenStream) -> Node {
         Node::Block(block) => block,
         _ => unreachable!(),
     };
-    Node::Function(Function { name, block })
+    let mut function = Function::new(name, block);
+    function.location = location;
+    Node::Function(function)
 }
 
 fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
@@ -308,7 +313,10 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
 }
 
 fn panic_unexpected_names(token: Token, expected_names: &str) {
-    panic!("Unexpected token: {:?} (expected {})", token, expected_names)
+    panic!(
+        "Unexpected token: {:?} (expected {})",
+        token, expected_names
+    )
 }
 
 impl From<Token> for Identifier {
@@ -415,12 +423,12 @@ mod tests {
     fn it_parses_func() {
         assert_eq!(
             parse_complete("func foo() { 123 }"),
-            vec![Node::Function(Function {
-                name: "foo".to_string(),
-                block: Block {
+            vec![Node::Function(Function::new(
+                "foo".to_string(),
+                Block {
                     nodes: vec![Node::Integer(Integer { value: 123 })],
                 },
-            })],
+            ))],
         );
     }
 
