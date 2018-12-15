@@ -83,7 +83,7 @@ pub enum Token {
     Equals,
     Identifier(String, Location),
     Integer(i64),
-    Let,
+    Let(Location),
     Func(Location),
     Minus,
     ParenthesesLeft,
@@ -92,13 +92,15 @@ pub enum Token {
     Return,
     Star,
     Terminal(char),
-    Var,
+    Var(Location),
 }
 
 impl Token {
     pub fn location(&self) -> Option<Location> {
         match self {
-            Token::Func(location) => Some(location.clone()),
+            Token::Func(location) | Token::Let(location) | Token::Var(location) => {
+                Some(location.clone())
+            }
             Token::Identifier(_, location) => Some(location.clone()),
             _ => None,
         }
@@ -202,9 +204,9 @@ impl TokenStream {
         }
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
-            "let" => Token::Let,
+            "let" => Token::Let(location),
             "func" => Token::Func(location),
-            "var" => Token::Var,
+            "var" => Token::Var(location),
             "return" => Token::Return,
             _ => Token::Identifier(identifier_string, location),
         }
@@ -315,10 +317,19 @@ mod tests {
 
     #[test]
     fn it_parses_keywords() {
-        assert_eq!(parse("func"), vec![Token::Func(Location::new(0, 1, 1)), Token::EOF,]);
-        assert_eq!(parse("let"), vec![Token::Let, Token::EOF,]);
+        assert_eq!(
+            parse("func"),
+            vec![Token::Func(Location::new(0, 1, 1)), Token::EOF,]
+        );
+        assert_eq!(
+            parse("let"),
+            vec![Token::Let(Location::new(0, 1, 1)), Token::EOF,]
+        );
         assert_eq!(parse("return"), vec![Token::Return, Token::EOF,]);
-        assert_eq!(parse("var"), vec![Token::Var, Token::EOF,]);
+        assert_eq!(
+            parse("var"),
+            vec![Token::Var(Location::new(0, 1, 1)), Token::EOF,]
+        );
     }
 
     #[test]

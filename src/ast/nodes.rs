@@ -10,10 +10,12 @@ pub enum Node {
     Identifier(Identifier),
     Infix(Infix),
     Integer(Integer),
+    Let(Let),
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Program(Program),
     Return(Return),
+    Var(Var),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -40,7 +42,7 @@ pub struct Block {
 pub struct Function {
     pub name: String,
     pub block: Block,
-    pub location: Option<Location>
+    pub location: Option<Location>,
 }
 
 impl Function {
@@ -83,6 +85,29 @@ impl PartialEq for Identifier {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Integer {
     pub value: i64,
+}
+
+#[derive(Clone, Debug)]
+pub struct Let {
+    pub lhs: Identifier,
+    pub rhs: Option<Box<Node>>,
+    pub location: Option<Location>,
+}
+
+impl Let {
+    pub fn new(lhs: Identifier, rhs: Option<Node>) -> Self {
+        Self {
+            lhs,
+            rhs: rhs.map(|node| Box::new(node)),
+            location: None,
+        }
+    }
+}
+
+impl PartialEq for Let {
+    fn eq(&self, other: &Let) -> bool {
+        self.lhs == other.lhs && self.rhs == other.rhs
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -153,6 +178,29 @@ pub struct Program {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Return {
     pub rhs: Option<Box<Node>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Var {
+    pub lhs: Identifier,
+    pub rhs: Option<Box<Node>>,
+    pub location: Option<Location>,
+}
+
+impl Var {
+    pub fn new(lhs: Identifier, rhs: Option<Node>) -> Self {
+        Self {
+            lhs,
+            rhs: rhs.map(|node| Box::new(node)),
+            location: None,
+        }
+    }
+}
+
+impl PartialEq for Var {
+    fn eq(&self, other: &Var) -> bool {
+        self.lhs == other.lhs && self.rhs == other.rhs
+    }
 }
 
 impl Return {

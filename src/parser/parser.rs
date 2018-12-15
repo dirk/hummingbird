@@ -1,6 +1,6 @@
 use super::super::ast::nodes::{
-    Assignment, Block, Function, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty,
-    Program, Return,
+    Assignment, Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall,
+    PostfixProperty, Program, Return, Var,
 };
 
 use super::lexer::{Token, TokenStream};
@@ -38,9 +38,9 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
     let next = input.peek();
     let node = match next {
         Token::Func(_) => parse_function(input),
-        // Token::Let => parse_let_and_var(input),
+        Token::Let(_) => parse_let_and_var(input),
         Token::Return => parse_return(input, terminator.clone()),
-        // Token::Var => parse_let_and_var(input),
+        Token::Var(_) => parse_let_and_var(input),
         _ => parse_expression(input),
     };
     // Treat the statement as terminated if we encounter the terminator (but
@@ -83,6 +83,36 @@ fn parse_function(input: &mut TokenStream) -> Node {
     let mut function = Function::new(name, block);
     function.location = location;
     Node::Function(function)
+}
+
+fn parse_let_and_var(input: &mut TokenStream) -> Node {
+    // Consume the `let` or `var`.
+    let keyword = input.read();
+
+    let lhs: Identifier = input.read().into();
+
+    let mut rhs = None;
+    if input.peek() == Token::Equals {
+        expect_to_read(input, Token::Equals);
+        rhs = Some(parse_expression(input));
+    }
+
+    match keyword {
+        Token::Let(location) => {
+            let mut let_ = Let::new(lhs, rhs);
+            let_.location = Some(location);
+            Node::Let(let_)
+        }
+        Token::Var(location) => {
+            let mut var = Var::new(lhs, rhs);
+            var.location = Some(location);
+            Node::Var(var)
+        }
+        _ => {
+            panic_unexpected_names(keyword, "Let or Var");
+            unreachable!()
+        }
+    }
 }
 
 fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
@@ -337,8 +367,8 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Block, Function, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
-        Return,
+        Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall, PostfixProperty,
+        Program, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -378,6 +408,25 @@ mod tests {
                 ],
             }),
         );
+    }
+
+    #[test]
+    fn it_parses_let() {
+        let mut nodes = parse_complete("let a = 1");
+        assert_eq!(
+            nodes,
+            vec![Node::Let(Let::new(
+                Identifier::new("a"),
+                Some(Node::Integer(Integer { value: 1 })),
+            ))],
+        );
+        let node = nodes.remove(0);
+        match node {
+            Node::Let(let_) => {
+                assert_eq!(let_.location, Some(Location::new(0, 1, 1)));
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[test]
