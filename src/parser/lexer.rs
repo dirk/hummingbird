@@ -65,11 +65,7 @@ impl StringStream {
     }
 
     fn location(&self) -> Location {
-        Location {
-            index: self.index as u32,
-            line: self.line,
-            column: self.column,
-        }
+        Location::new(self.index as u32, self.line, self.column)
     }
 }
 
