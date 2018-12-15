@@ -5,7 +5,7 @@ use super::super::ast::nodes::{
 
 use super::lexer::{Token, TokenStream};
 
-fn parse_program(input: &mut TokenStream) -> Node {
+pub fn parse_program(input: &mut TokenStream) -> Node {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
         nodes.append(&mut parse_statements(input, Token::EOF))
@@ -304,6 +304,7 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
             }
         }
     }
+    expect_to_read(input, Token::ParenthesesRight);
     Node::PostfixCall(PostfixCall::new(target, arguments))
 }
 
@@ -622,6 +623,16 @@ mod tests {
                     Node::Integer(Integer { value: 2 }),
                 ],
             )),
+        );
+        assert_eq!(
+            parse_complete("foo(bar())"),
+            vec![Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier::new("foo")),
+                vec![Node::PostfixCall(PostfixCall::new(
+                    Node::Identifier(Identifier::new("bar")),
+                    vec![],
+                )),],
+            )),]
         );
     }
 }
