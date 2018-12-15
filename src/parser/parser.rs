@@ -4,7 +4,6 @@ use super::super::ast::nodes::{
 };
 
 use super::lexer::{Token, TokenStream};
-use super::location::Location;
 
 fn parse_program(input: &mut TokenStream) -> Node {
     let mut nodes: Vec<Node> = Vec::new();
@@ -345,7 +344,7 @@ mod tests {
     use super::super::lexer::{Token, TokenStream};
     use super::super::location::Location;
 
-    use super::{parse_atom, parse_block, parse_infix, parse_postfix, parse_program};
+    use super::{parse_block, parse_infix, parse_postfix, parse_program};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
