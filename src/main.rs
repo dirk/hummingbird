@@ -2,6 +2,7 @@ use std::process::exit;
 use std::{env, fs};
 
 mod ast;
+mod ir;
 mod parser;
 mod target;
 
@@ -18,5 +19,10 @@ fn main() {
     println!("Program:\n{:?}", program);
 
     let mut printer = ast::printer::Printer::new(std::io::stdout());
-    printer.print_program(program).expect("Unable to print AST");
+    printer
+        .print_program(program.clone())
+        .expect("Unable to print AST");
+
+    let ir_unit = ast::compiler::compile(&program);
+    println!("IR:\n{:?}", ir_unit);
 }
