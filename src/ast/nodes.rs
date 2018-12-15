@@ -6,6 +6,7 @@ use super::super::parser::Token;
 pub enum Node {
     Assignment(Assignment),
     Block(Block),
+    Function(Function),
     Identifier(Identifier),
     Infix(Infix),
     Integer(Integer),
@@ -33,6 +34,12 @@ impl Assignment {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     pub nodes: Vec<Node>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Function {
+    pub name: String,
+    pub block: Block,
 }
 
 #[derive(Clone, Debug, PartialEq)]

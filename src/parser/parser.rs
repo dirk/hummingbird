@@ -1,6 +1,6 @@
 use super::super::ast::nodes::{
-    Assignment, Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
-    Return,
+    Assignment, Block, Function, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty,
+    Program, Return,
 };
 
 use super::lexer::{Token, TokenStream};
@@ -37,7 +37,7 @@ fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
 fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
     let next = input.peek();
     let node = match next {
-        // Token::Func => parse_function(input),
+        Token::Func => parse_function(input),
         // Token::Let => parse_let_and_var(input),
         Token::Return => parse_return(input, terminator.clone()),
         // Token::Var => parse_let_and_var(input),
@@ -57,6 +57,33 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
         Some(vec![Token::Terminal('\n'), Token::Terminal(';')]),
     );
     unreachable!()
+}
+
+fn parse_function(input: &mut TokenStream) -> Node {
+    expect_to_read(input, Token::Func);
+    let token = input.read();
+    let name = match token {
+        Token::Identifier(name) => name,
+        _ => {
+            panic_unexpected(token, None);
+            unreachable!()
+        }
+    };
+
+    expect_to_read(input, Token::ParenthesesLeft);
+    expect_to_read(input, Token::ParenthesesRight);
+
+    let token = input.peek();
+    if token != Token::BraceLeft {
+        panic_unexpected(token, Some(vec![Token::BraceLeft]));
+    }
+    let block_node = parse_block(input);
+
+    let block = match block_node {
+        Node::Block(block) => block,
+        _ => unreachable!(),
+    };
+    Node::Function(Function { name, block })
 }
 
 fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
@@ -269,11 +296,12 @@ fn consume_terminals(input: &mut TokenStream) {
     }
 }
 
-fn expect_to_read(input: &mut TokenStream, token: Token) {
+fn expect_to_read(input: &mut TokenStream, token: Token) -> Token {
     let next = input.read();
     if next != token {
-        panic_unexpected(next, Some(vec![token]));
+        panic_unexpected(next.clone(), Some(vec![token]));
     }
+    next
 }
 
 fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
@@ -287,7 +315,8 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Block, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program, Return,
+        Block, Function, Identifier, Infix, Integer, Node, PostfixCall, PostfixProperty, Program,
+        Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -362,6 +391,19 @@ mod tests {
                 nodes: vec![Node::Return(Return::new(Some(Node::Integer(Integer {
                     value: 1
                 })),)),],
+            })],
+        );
+    }
+
+    #[test]
+    fn it_parses_func() {
+        assert_eq!(
+            parse_complete("func foo() { 123 }"),
+            vec![Node::Function(Function {
+                name: "foo".to_string(),
+                block: Block {
+                    nodes: vec![Node::Integer(Integer { value: 123 })],
+                },
             })],
         );
     }
