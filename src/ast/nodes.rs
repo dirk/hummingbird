@@ -13,7 +13,6 @@ pub enum Node {
     Let(Let),
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
-    Program(Program),
     Return(Return),
     Var(Var),
 }

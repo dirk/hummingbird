@@ -5,12 +5,12 @@ use super::super::ast::nodes::{
 
 use super::lexer::{Token, TokenStream};
 
-pub fn parse_program(input: &mut TokenStream) -> Node {
+pub fn parse_program(input: &mut TokenStream) -> Program {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
         nodes.append(&mut parse_statements(input, Token::EOF))
     }
-    Node::Program(Program { nodes })
+    Program { nodes }
 }
 
 fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
@@ -383,11 +383,8 @@ mod tests {
 
     fn parse_complete(program: &str) -> Vec<Node> {
         let mut token_stream = input(program);
-        let node = parse_program(&mut token_stream);
-        match node {
-            Node::Program(program) => program.nodes,
-            _ => panic!("Not a Program: {:?}", node),
-        }
+        let program = parse_program(&mut token_stream);
+        program.nodes
     }
 
     #[test]
@@ -402,12 +399,12 @@ mod tests {
 
             "
             )),
-            Node::Program(Program {
+            Program {
                 nodes: vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            }),
+            },
         );
     }
 
