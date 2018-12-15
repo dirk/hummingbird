@@ -63,7 +63,7 @@ fn parse_function(input: &mut TokenStream) -> Node {
     expect_to_read(input, Token::Func);
     let token = input.read();
     let name = match token {
-        Token::Identifier(name) => name,
+        Token::Identifier(name, _) => name,
         _ => {
             panic_unexpected(token, None);
             unreachable!()
@@ -237,7 +237,7 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
         input.read(); // Dot
         needs_backtrack = true;
 
-        if let Token::Identifier(value) = input.peek() {
+        if let Token::Identifier(value, _) = input.peek() {
             input.read(); // Identifier
             return Some(Node::PostfixProperty(PostfixProperty::new(
                 target.to_owned(),
@@ -281,7 +281,11 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
 fn parse_atom(input: &mut TokenStream) -> Node {
     let next = input.read();
     match next {
-        Token::Identifier(value) => Node::Identifier(Identifier { value }),
+        Token::Identifier(value, location) => {
+            let mut identifier = Identifier::new(value);
+            identifier.location = Some(location);
+            Node::Identifier(identifier)
+        }
         Token::Integer(value) => Node::Integer(Integer { value }),
         _ => {
             panic_unexpected(next, None);
@@ -320,8 +324,9 @@ mod tests {
     };
 
     use super::super::lexer::{Token, TokenStream};
+    use super::super::location::Location;
 
-    use super::{parse_block, parse_infix, parse_postfix, parse_program};
+    use super::{parse_atom, parse_block, parse_infix, parse_postfix, parse_program};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
@@ -409,6 +414,19 @@ mod tests {
     }
 
     #[test]
+    fn it_parses_atom() {
+        let mut nodes = parse_complete("/* */\n  foo");
+        assert_eq!(nodes, vec![Node::Identifier(Identifier::new("foo"))]);
+        let node = nodes.remove(0);
+        match node {
+            Node::Identifier(identifier) => {
+                assert_eq!(identifier.location, Some(Location::new(8, 2, 3)));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
     fn it_parses_block() {
         assert_eq!(
             parse_block(&mut input("{}")),
@@ -489,9 +507,7 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo.bar")),
             Node::PostfixProperty(PostfixProperty::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 "bar".to_string(),
             ))
         );
@@ -502,36 +518,28 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo()")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 vec![],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 vec![Node::Integer(Integer { value: 1 }),],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1,)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 vec![Node::Integer(Integer { value: 1 }),],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1, 2)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
@@ -541,9 +549,7 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo(1, 2,)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier {
-                    value: "foo".to_string()
-                }),
+                Node::Identifier(Identifier::new("foo")),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),

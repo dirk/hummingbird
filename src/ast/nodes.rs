@@ -1,6 +1,6 @@
 use std::boxed::Box;
 
-use super::super::parser::Token;
+use super::super::parser::{Location, Token};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
@@ -42,9 +42,25 @@ pub struct Function {
     pub block: Block,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Identifier {
     pub value: String,
+    pub location: Option<Location>,
+}
+
+impl Identifier {
+    pub fn new<V: Into<String>>(value: V) -> Self {
+        Self {
+            value: value.into(),
+            location: None,
+        }
+    }
+}
+
+impl PartialEq for Identifier {
+    fn eq(&self, other: &Identifier) -> bool {
+        self.value == other.value
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

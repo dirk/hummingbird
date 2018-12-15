@@ -1,3 +1,5 @@
+use super::location::Location;
+
 #[derive(Clone)]
 struct StringStream {
     input: Vec<char>,
@@ -61,6 +63,14 @@ impl StringStream {
         }
         true
     }
+
+    fn location(&self) -> Location {
+        Location {
+            index: self.index as u32,
+            line: self.line,
+            column: self.column,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -71,7 +81,7 @@ pub enum Token {
     Dot,
     EOF,
     Equals,
-    Identifier(String),
+    Identifier(String, Location),
     Integer(i64),
     Let,
     Func,
@@ -138,10 +148,11 @@ impl TokenStream {
         self.consume_space_and_comments();
 
         loop {
+            let location = self.input.location();
             let character = self.input.peek();
 
             if identifier_head(character) {
-                return self.lex_identifier();
+                return self.lex_identifier(location);
             } else if numeric_head(character) {
                 return self.lex_numeric_or_minus();
             } else {
@@ -168,7 +179,7 @@ impl TokenStream {
         }
     }
 
-    fn lex_identifier(&mut self) -> Token {
+    fn lex_identifier(&mut self, location: Location) -> Token {
         let mut identifier = vec![self.input.read()];
         loop {
             let character = self.input.peek();
@@ -185,7 +196,7 @@ impl TokenStream {
             "func" => Token::Func,
             "var" => Token::Var,
             "return" => Token::Return,
-            _ => Token::Identifier(identifier_string),
+            _ => Token::Identifier(identifier_string, location),
         }
     }
 
@@ -265,7 +276,7 @@ fn digit(character: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{StringStream, Token, TokenStream};
+    use super::{Location, StringStream, Token, TokenStream};
 
     fn parse(input: &str) -> Vec<Token> {
         let string_stream = StringStream::new(input);
@@ -285,7 +296,10 @@ mod tests {
     fn it_parses_identifier() {
         assert_eq!(
             parse("foo"),
-            vec![Token::Identifier("foo".to_string()), Token::EOF,]
+            vec![
+                Token::Identifier("foo".to_string(), Location::new(0, 1, 1)),
+                Token::EOF,
+            ]
         );
     }
 
@@ -302,8 +316,8 @@ mod tests {
         assert_eq!(
             parse("foo /* Comment */ bar"),
             vec![
-                Token::Identifier("foo".to_string()),
-                Token::Identifier("bar".to_string()),
+                Token::Identifier("foo".to_string(), Location::new(0, 1, 1)),
+                Token::Identifier("bar".to_string(), Location::new(18, 1, 19)),
                 Token::EOF,
             ]
         );
@@ -311,9 +325,9 @@ mod tests {
         assert_eq!(
             parse("foo // Comment \n bar"),
             vec![
-                Token::Identifier("foo".to_string()),
+                Token::Identifier("foo".to_string(), Location::new(0, 1, 1)),
                 Token::Terminal('\n'),
-                Token::Identifier("bar".to_string()),
+                Token::Identifier("bar".to_string(), Location::new(17, 2, 2)),
                 Token::EOF,
             ]
         );
@@ -326,9 +340,9 @@ mod tests {
             bar()"
             ),
             vec![
-                Token::Identifier("foo".to_string()),
+                Token::Identifier("foo".to_string(), Location::new(0, 1, 1)),
                 Token::Terminal('\n'),
-                Token::Identifier("bar".to_string()),
+                Token::Identifier("bar".to_string(), Location::new(100, 4, 13)),
                 Token::ParenthesesLeft,
                 Token::ParenthesesRight,
                 Token::EOF,
