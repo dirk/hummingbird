@@ -68,9 +68,7 @@ impl<O: Write> Printer<O> {
 
     fn print_function(&mut self, function: Function) -> Result<()> {
         writeln!(self, "Function({}", function.name)?;
-        self.indented(|printer| {
-            printer.print_block(function.block)
-        })?;
+        self.indented(|printer| printer.print_block(function.block))?;
         writeln!(self, ")")
     }
 
@@ -87,7 +85,7 @@ impl<O: Write> Printer<O> {
         self.indented(|printer| {
             printer.print_node(*postfix_call.clone().target)?;
             if postfix_call.arguments.is_empty() {
-                return writeln!(printer, "[]")
+                return writeln!(printer, "[]");
             }
             writeln!(printer, "[")?;
             printer.indented(|arguments_printer| {
@@ -104,9 +102,7 @@ impl<O: Write> Printer<O> {
     fn print_return(&mut self, ret: Return) -> Result<()> {
         if let Some(rhs) = ret.rhs {
             writeln!(self, "Return(")?;
-            self.indented(|printer| {
-                printer.print_node(*rhs)
-            })?;
+            self.indented(|printer| printer.print_node(*rhs))?;
             writeln!(self, ")")
         } else {
             writeln!(self, "Return()")
@@ -116,9 +112,7 @@ impl<O: Write> Printer<O> {
     fn print_var(&mut self, var: Var) -> Result<()> {
         if let Some(rhs) = var.rhs {
             writeln!(self, "Var({}", var.lhs.value)?;
-            self.indented(|printer| {
-                printer.print_node(*rhs)
-            })?;
+            self.indented(|printer| printer.print_node(*rhs))?;
             writeln!(self, ")")
         } else {
             writeln!(self, "Var({})", var.lhs.value)
