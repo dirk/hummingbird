@@ -15,4 +15,7 @@ fn main() {
 
     let program = parser::parse(source);
     println!("Program:\n{:?}", program);
+
+    let mut printer = ast::printer::Printer::new(std::io::stdout());
+    printer.print_program(program).expect("Unable to print AST");
 }

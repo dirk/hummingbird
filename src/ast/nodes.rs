@@ -141,8 +141,8 @@ impl Infix {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PostfixCall {
-    target: Box<Node>,
-    arguments: Vec<Node>,
+    pub target: Box<Node>,
+    pub arguments: Vec<Node>,
 }
 
 impl PostfixCall {
