@@ -30,11 +30,46 @@ impl Compiler {
 
     fn compile_node(&mut self, node: &Node) -> SharedValue {
         match node {
+            &Node::Assignment(ref assignment) => self.compile_assignment(assignment),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier),
             &Node::Integer(ref integer) => self.compile_integer(integer),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call),
             &Node::Var(ref var) => self.compile_var(var),
             _ => panic!("Cannot compile node: {:?}", node),
+        }
+    }
+
+    fn compile_assignment(&mut self, assignment: &Assignment) -> SharedValue {
+        let lhs = assignment.lhs.deref();
+
+        enum Assigner {
+            Local(u8),
+            LexicalLocal(String),
+        }
+
+        let assigner = match lhs {
+            &Node::Identifier(ref identifier) => {
+                let local = &identifier.value;
+                if self.current.borrow().have_local(&local) {
+                    let index = self.current.borrow().get_local(&local);
+                    Assigner::Local(index)
+                } else {
+                    Assigner::LexicalLocal(local.to_string())
+                }
+            }
+            _ => panic!("Cannot assign to: {:?}", lhs),
+        };
+
+        let rval = self.compile_node(assignment.rhs.deref());
+        match assigner {
+            Assigner::Local(index) => {
+                self.build_set_local(index, rval.clone());
+                rval
+            }
+            Assigner::LexicalLocal(local) => {
+                self.build_set_local_lexical(local, rval.clone());
+                rval
+            }
         }
     }
 

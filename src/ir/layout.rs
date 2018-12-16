@@ -166,6 +166,11 @@ pub trait InstructionBuilder {
         self.track(rval, address);
     }
 
+    fn build_set_local_lexical(&mut self, name: String, rval: SharedValue) {
+        let address = self.push(Instruction::SetLocalLexical(name, rval.clone()));
+        self.track(rval, address);
+    }
+
     fn build_make_integer(&mut self, value: i64) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::MakeInteger(lval.clone(), value));
@@ -214,6 +219,7 @@ pub enum Instruction {
     GetLocal(SharedValue, u8),
     GetLocalLexical(SharedValue, String),
     SetLocal(u8, SharedValue),
+    SetLocalLexical(String, SharedValue),
     MakeInteger(SharedValue, i64),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
 }
