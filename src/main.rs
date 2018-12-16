@@ -24,5 +24,6 @@ fn main() {
         .expect("Unable to print AST");
 
     let ir_unit = ast::compiler::compile(&program);
-    println!("IR:\n{:?}", ir_unit);
+    let mut printer = ir::printer::Printer::new(std::io::stdout());
+    printer.print_unit(&ir_unit).expect("Unable to print IR");
 }

@@ -83,7 +83,7 @@ pub struct Function {
     // Keep track of where we are.
     current: SharedBasicBlock,
     // Used for compilation.
-    basic_blocks: Vec<SharedBasicBlock>,
+    pub basic_blocks: Vec<SharedBasicBlock>,
 
     // All the values allocated within the function.
     pub values: Vec<SharedValue>,
