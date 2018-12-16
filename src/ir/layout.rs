@@ -110,6 +110,17 @@ impl Function {
         Rc::new(RefCell::new(Value::null()))
     }
 
+    pub fn have_local(&self, local: &String) -> bool {
+        self.locals.contains(local)
+    }
+
+    pub fn get_local(&self, local: &String) -> u8 {
+        self.locals
+            .iter()
+            .position(|existing| existing == local)
+            .expect("Local not found") as u8
+    }
+
     pub fn get_or_add_local(&mut self, local: String) -> u8 {
         let position = self.locals.iter().position(|existing| existing == &local);
         match position {
@@ -144,6 +155,12 @@ pub trait InstructionBuilder {
         lval
     }
 
+    fn build_get_local_lexical(&mut self, name: String) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::GetLocalLexical(lval.clone(), name));
+        lval
+    }
+
     fn build_set_local(&mut self, index: u8, rval: SharedValue) {
         let address = self.push(Instruction::SetLocal(index, rval.clone()));
         self.track(rval, address);
@@ -152,6 +169,20 @@ pub trait InstructionBuilder {
     fn build_make_integer(&mut self, value: i64) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::MakeInteger(lval.clone(), value));
+        lval
+    }
+
+    fn build_call(&mut self, target: SharedValue, arguments: Vec<SharedValue>) -> SharedValue {
+        let lval = self.new_value();
+        let address = self.push(Instruction::Call(
+            lval.clone(),
+            target.clone(),
+            arguments.clone(),
+        ));
+        self.track(target, address);
+        for argument in arguments {
+            self.track(argument, address);
+        }
         lval
     }
 }
@@ -181,8 +212,10 @@ impl InstructionBuilder for Function {
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
     GetLocal(SharedValue, u8),
+    GetLocalLexical(SharedValue, String),
     SetLocal(u8, SharedValue),
     MakeInteger(SharedValue, i64),
+    Call(SharedValue, SharedValue, Vec<SharedValue>),
 }
 
 #[derive(Debug, PartialEq)]

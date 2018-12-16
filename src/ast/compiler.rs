@@ -30,14 +30,35 @@ impl Compiler {
 
     fn compile_node(&mut self, node: &Node) -> SharedValue {
         match node {
+            &Node::Identifier(ref identifier) => self.compile_identifier(identifier),
             &Node::Integer(ref integer) => self.compile_integer(integer),
+            &Node::PostfixCall(ref call) => self.compile_postfix_call(call),
             &Node::Var(ref var) => self.compile_var(var),
-            _ => self.null_value(),
+            _ => panic!("Cannot compile node: {:?}", node),
+        }
+    }
+
+    fn compile_identifier(&mut self, identifier: &Identifier) -> SharedValue {
+        let local = &identifier.value;
+        if self.current.borrow().have_local(local) {
+            let index = self.current.borrow().get_local(local);
+            self.build_get_local(index)
+        } else {
+            self.build_get_local_lexical(local.clone())
         }
     }
 
     fn compile_integer(&mut self, integer: &Integer) -> SharedValue {
         self.build_make_integer(integer.value)
+    }
+
+    fn compile_postfix_call(&mut self, call: &PostfixCall) -> SharedValue {
+        let target = self.compile_node(call.target.deref());
+        let mut arguments = vec![];
+        for argument in call.arguments.iter() {
+            arguments.push(self.compile_node(argument));
+        }
+        self.build_call(target, arguments)
     }
 
     fn compile_var(&mut self, var: &Var) -> SharedValue {
