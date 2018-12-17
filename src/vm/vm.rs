@@ -110,8 +110,6 @@ enum Action {
     CallDynamic(Reg, Value, Vec<Value>),
     CallNative(Reg, NativeFunction, Vec<Value>),
     Return(Value),
-    // Exit the VM.
-    Exit,
 }
 
 fn prelude_println(arguments: Vec<Value>) -> Value {
@@ -162,12 +160,11 @@ impl Vm {
 
     fn run(&mut self) {
         loop {
-            let top = self.stack.last().expect("Empty stack").deref();
+            let top = self.stack.last().expect("Empty stack");
             let instruction = top.borrow().current();
             let action = Vm::dispatch(&instruction, &mut top.borrow_mut());
             match action {
                 Action::Advance => top.borrow_mut().advance(),
-                Action::Exit => exit(0),
                 // Due to borrow-checker rules we cannot have the side effects
                 // of a call happen within `dispatch`.
                 Action::CallDynamic(return_register, target, arguments) => {
@@ -188,10 +185,10 @@ impl Vm {
                 }
                 Action::Return(value) => {
                     let popped = self.stack.pop().expect("Empty stack");
-                    let return_register = popped.deref().borrow().return_register;
+                    let return_register = popped.borrow().return_register;
                     match self.stack.last() {
                         Some(top) => {
-                            let mut top = top.deref().borrow_mut();
+                            let mut top = top.borrow_mut();
                             top.write_register(return_register, value);
                             top.advance();
                         }
@@ -204,6 +201,8 @@ impl Vm {
         }
     }
 
+    // Decodes the instruction, applies any frame-level side effects, and
+    // returns an `Action` describing stack/VM-level side effects.
     #[inline]
     fn dispatch(instruction: &Instruction, top: &mut Frame) -> Action {
         match instruction {

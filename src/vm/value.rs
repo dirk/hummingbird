@@ -29,7 +29,7 @@ impl Finalize for DynamicObject {}
 
 unsafe impl Trace for DynamicObject {
     custom_trace!(this, {
-        for (key, value) in this.properties.iter() {
+        for (_key, value) in this.properties.iter() {
             mark(value);
         }
     });
