@@ -1,6 +1,4 @@
-use std::cell::{RefCell, RefMut};
-use std::ops::Deref;
-use std::process::exit;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Function, Instruction, Reg, Unit};
@@ -79,7 +77,6 @@ impl Frame {
     fn get_local_lexical(&self, name: &String) -> Value {
         let index = self
             .function
-            .deref()
             .locals_names
             .iter()
             .position(|local| local == name);
@@ -87,7 +84,7 @@ impl Frame {
             self.locals[index].clone()
         } else {
             if let Some(ref lexical_parent) = self.lexical_parent {
-                lexical_parent.deref().borrow().get_local_lexical(name)
+                lexical_parent.borrow().get_local_lexical(name)
             } else {
                 panic!("Out of parents")
             }
