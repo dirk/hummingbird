@@ -2,6 +2,7 @@
 extern crate gc;
 
 use std::process::exit;
+use std::rc::Rc;
 use std::{env, fs};
 
 mod ast;
@@ -33,6 +34,10 @@ fn main() {
 
     let bytecode_unit = ir::compiler::compile(&ir_unit);
     let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
-    bytecode_printer.print_unit(&bytecode_unit).expect("Unable to print bytecode");
+    bytecode_printer
+        .print_unit(&bytecode_unit)
+        .expect("Unable to print bytecode");
+
+    vm::Vm::run_main(Rc::new(bytecode_unit));
     // println!("Bytecode:\n{:?}", bytecode_unit);
 }

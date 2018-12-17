@@ -1,6 +1,6 @@
 pub type Reg = u8;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Instruction {
     GetLocal(Reg, u8),
     GetLocalLexical(Reg, String),
@@ -14,12 +14,12 @@ pub enum Instruction {
     ReturnNull,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Unit {
     pub functions: Vec<Function>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Function {
     pub id: u16,
     pub name: String,
@@ -29,7 +29,7 @@ pub struct Function {
     pub locals_names: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BasicBlock {
     pub id: u8,
     pub name: String,
