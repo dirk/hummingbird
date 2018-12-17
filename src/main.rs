@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate gc;
+
 use std::process::exit;
 use std::{env, fs};
 
@@ -5,6 +8,7 @@ mod ast;
 mod ir;
 mod parser;
 mod target;
+mod vm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
