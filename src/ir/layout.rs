@@ -95,7 +95,9 @@ pub struct Function {
 
 impl Function {
     fn new<V: Into<String>>(id: u16, name: V) -> Self {
-        let entry = Rc::new(RefCell::new(BasicBlock::new("entry")));
+        // NOTE: Normally we'd want to call `self.next_basic_block_id()`, but
+        //   we don't exist yet to we have to hard-code the 0.
+        let entry = Rc::new(RefCell::new(BasicBlock::new(0, "entry")));
         Self {
             id,
             name: name.into(),
@@ -228,13 +230,15 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq)]
 pub struct BasicBlock {
+    pub id: u16,
     pub name: String,
     pub instructions: Vec<(Address, Instruction)>,
 }
 
 impl BasicBlock {
-    fn new<V: Into<String>>(name: V) -> Self {
+    fn new<V: Into<String>>(id: u16, name: V) -> Self {
         Self {
+            id,
             name: name.into(),
             instructions: vec![],
         }
