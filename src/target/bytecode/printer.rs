@@ -1,6 +1,4 @@
-use std::cell::Ref;
 use std::io::{Result, Write};
-use std::ops::Deref;
 
 use super::layout::*;
 

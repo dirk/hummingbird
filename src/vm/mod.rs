@@ -1,4 +1,5 @@
 mod frame;
+mod loader;
 mod value;
 mod vm;
 

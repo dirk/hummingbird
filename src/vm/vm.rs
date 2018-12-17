@@ -2,13 +2,16 @@ use std::cell::RefCell;
 use std::process::exit;
 use std::rc::Rc;
 
-use super::super::target::bytecode::layout::{Function, Instruction, Unit};
+use super::super::ir::layout as ir;
+use super::super::target::bytecode::layout::Instruction;
 
 use super::frame::{Frame, SharedFrame};
-use super::value::{NativeFunction, Value};
+use super::loader::Loader;
+use super::value::Value;
 
 pub struct Vm {
     stack: Vec<SharedFrame>,
+    loader: Loader,
 }
 
 enum Action {
@@ -28,40 +31,41 @@ fn prelude_println(arguments: Vec<Value>) -> Value {
 }
 
 impl Vm {
-    pub fn run_main(unit: Rc<Unit>) {
-        let prelude = Vm::build_prelude();
-        let main_function = Rc::new(unit.functions[0].clone());
-        let frame = Frame::new(unit, main_function, Some(prelude), 0);
+    pub fn run_main(ir_unit: ir::Unit) {
         let mut vm = Self {
-            stack: vec![Rc::new(RefCell::new(frame))],
+            stack: vec![],
+            loader: Loader::new(),
         };
+        let loaded_unit = vm.loader.load(ir_unit);
+        let frame = Frame::new(loaded_unit.main(), None, 0);
+        vm.stack.push(Rc::new(RefCell::new(frame)));
         vm.run();
     }
 
-    fn build_prelude() -> SharedFrame {
-        let prelude_unit = Unit {
-            functions: vec![Function {
-                id: 0,
-                name: "prelude".to_string(),
-                registers: 0,
-                basic_blocks: vec![],
-                locals: 1,
-                locals_names: vec!["println".to_string()],
-            }],
-        };
-        let prelude_main_function = prelude_unit.functions[0].clone();
-        let mut prelude = Frame::new(
-            Rc::new(prelude_unit),
-            Rc::new(prelude_main_function),
-            None,
-            0,
-        );
-        prelude.set_local(
-            0,
-            Value::NativeFunction(NativeFunction::new(Rc::new(prelude_println))),
-        );
-        Rc::new(RefCell::new(prelude))
-    }
+    // fn build_prelude() -> SharedFrame {
+    //     let prelude_unit = Unit {
+    //         functions: vec![Function {
+    //             id: 0,
+    //             name: "prelude".to_string(),
+    //             registers: 0,
+    //             basic_blocks: vec![],
+    //             locals: 1,
+    //             locals_names: vec!["println".to_string()],
+    //         }],
+    //     };
+    //     let prelude_main_function = prelude_unit.functions[0].clone();
+    //     let mut prelude = Frame::new(
+    //         Rc::new(prelude_unit),
+    //         Rc::new(prelude_main_function),
+    //         None,
+    //         0,
+    //     );
+    //     prelude.set_local(
+    //         0,
+    //         Value::NativeFunction(NativeFunction::new(Rc::new(prelude_println))),
+    //     );
+    //     Rc::new(RefCell::new(prelude))
+    // }
 
     fn run(&mut self) {
         loop {
@@ -98,13 +102,8 @@ impl Vm {
                     None
                 }
                 Instruction::MakeFunction(lval, id) => {
-                    let unit = top.unit.clone();
-                    let function = unit
-                        .functions
-                        .iter()
-                        .find(|&function| function.id == *id)
-                        .expect("Function not found");
-                    let value = Value::DynamicFunction(unit.clone(), Rc::new(function.clone()));
+                    let function = top.unit().function(*id);
+                    let value = Value::DynamicFunction(function);
                     top.write_register(*lval, value);
                     top.advance();
                     None
@@ -122,9 +121,8 @@ impl Vm {
                         .map(|argument| top.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::DynamicFunction(unit, function) => {
+                        Value::DynamicFunction(function) => {
                             let frame = Rc::new(RefCell::new(Frame::new(
-                                unit,
                                 function,
                                 Option::None,
                                 return_register,

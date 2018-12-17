@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use gc::{Finalize, Gc, GcCell, Trace};
 
-use super::super::target::bytecode::layout::{Function, Unit};
+use super::loader::LoadedFunctionHandle;
 
 #[derive(Clone)]
 pub struct NativeFunction {
@@ -38,7 +38,7 @@ unsafe impl Trace for DynamicObject {
 #[derive(Clone)]
 pub enum Value {
     DynamicObject(Gc<GcCell<DynamicObject>>),
-    DynamicFunction(Rc<Unit>, Rc<Function>),
+    DynamicFunction(LoadedFunctionHandle),
     Integer(i64),
     NativeFunction(NativeFunction),
     Null,

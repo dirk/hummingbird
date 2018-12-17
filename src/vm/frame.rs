@@ -1,8 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::super::target::bytecode::layout::{Function, Instruction, Reg, Unit};
+use super::super::target::bytecode::layout::{Instruction, Reg};
 
+use super::loader::{LoadedFunctionHandle, SharedLoadedUnit};
 use super::value::Value;
 
 // Frames can live outside of the stack (eg. closures) and can be mutated from
@@ -10,44 +11,45 @@ use super::value::Value;
 // counting (`Rc`) and interior mutability (`RefCell`).
 pub type SharedFrame = Rc<RefCell<Frame>>;
 
-// The first three fields should *not* be changed after the frame
+// The first two fields should *not* be changed after the frame
 // is initialized.
 pub struct Frame {
-    pub unit: Rc<Unit>,
-    function: Rc<Function>,
+    function: LoadedFunctionHandle,
     lexical_parent: Option<SharedFrame>,
     pub return_register: Reg,
     registers: Vec<Value>,
     locals: Vec<Value>,
-    current_block: usize,
+    current_basic_block: usize,
     current_address: usize,
 }
 
 impl Frame {
     pub fn new(
-        unit: Rc<Unit>,
-        function: Rc<Function>,
+        function: LoadedFunctionHandle,
         lexical_parent: Option<SharedFrame>,
         return_register: Reg,
     ) -> Self {
-        let registers = function.registers;
-        let locals = function.locals;
+        let registers = function.registers();
+        let locals = function.locals();
         Self {
-            unit,
             function,
             lexical_parent,
             return_register,
             registers: vec![Value::Null; registers as usize],
             locals: vec![Value::Null; locals as usize],
-            current_block: 0,
+            current_basic_block: 0,
             current_address: 0,
         }
     }
 
+    pub fn unit(&self) -> SharedLoadedUnit {
+        self.function.unit()
+    }
+
     #[inline]
     pub fn current(&self) -> Instruction {
-        let block = &self.function.basic_blocks[self.current_block];
-        block.instructions[self.current_address].clone()
+        self.function
+            .instruction(self.current_basic_block, self.current_address)
     }
 
     #[inline]
@@ -78,7 +80,7 @@ impl Frame {
     pub fn get_local_lexical(&self, name: &String) -> Value {
         let index = self
             .function
-            .locals_names
+            .locals_names()
             .iter()
             .position(|local| local == name);
         if let Some(index) = index {

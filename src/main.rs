@@ -2,7 +2,6 @@
 extern crate gc;
 
 use std::process::exit;
-use std::rc::Rc;
 use std::{env, fs};
 
 mod ast;
@@ -38,6 +37,6 @@ fn main() {
         .print_unit(&bytecode_unit)
         .expect("Unable to print bytecode");
 
-    vm::Vm::run_main(Rc::new(bytecode_unit));
+    vm::Vm::run_main(ir_unit);
     // println!("Bytecode:\n{:?}", bytecode_unit);
 }
