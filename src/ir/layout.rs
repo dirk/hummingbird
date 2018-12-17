@@ -194,6 +194,15 @@ pub trait InstructionBuilder {
         }
         lval
     }
+
+    fn build_return(&mut self, rval: SharedValue) {
+        let address = self.push(Instruction::Return(rval.clone()));
+        self.track(rval, address);
+    }
+
+    fn build_return_null(&mut self) {
+        self.push(Instruction::ReturnNull);
+    }
 }
 
 impl InstructionBuilder for Function {
@@ -226,6 +235,8 @@ pub enum Instruction {
     SetLocalLexical(String, SharedValue),
     MakeInteger(SharedValue, i64),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
+    Return(SharedValue),
+    ReturnNull,
 }
 
 #[derive(Debug, PartialEq)]

@@ -34,6 +34,7 @@ impl Compiler {
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier),
             &Node::Integer(ref integer) => self.compile_integer(integer),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call),
+            &Node::Return(ref ret) => self.compile_return(ret),
             &Node::Var(ref var) => self.compile_var(var),
             _ => panic!("Cannot compile node: {:?}", node),
         }
@@ -94,6 +95,16 @@ impl Compiler {
             arguments.push(self.compile_node(argument));
         }
         self.build_call(target, arguments)
+    }
+
+    fn compile_return(&mut self, ret: &Return) -> SharedValue {
+        if let Some(ref rhs) = ret.rhs {
+            let rval = self.compile_node(&rhs);
+            self.build_return(rval);
+        } else {
+            self.build_return_null();
+        }
+        self.null_value()
     }
 
     fn compile_var(&mut self, var: &Var) -> SharedValue {

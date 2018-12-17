@@ -202,6 +202,8 @@ impl Compiler {
                         .collect::<Vec<bytecode::Reg>>();
                     bytecode::Instruction::Call(lval, target, arguments)
                 }
+                ir::Instruction::Return(rval) => bytecode::Instruction::Return(read(rval, address)),
+                ir::Instruction::ReturnNull => bytecode::Instruction::ReturnNull,
                 _ => panic!("Cannot compile instruction: {:?}", instruction),
             };
             instructions.push(bytecode_instruction)
