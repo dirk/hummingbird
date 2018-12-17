@@ -6,7 +6,7 @@ use super::super::target::bytecode::layout::{Function, Instruction, Reg, Unit};
 use super::value::{NativeFunction, Value};
 
 // Frames can live outside of the stack (eg. closures) and can be mutated from
-// places outside the stack (again, closures), therefore we need referencing
+// places outside the stack (again, closures), therefore we need reference
 // counting (`Rc`) and interior mutability (`RefCell`).
 type SharedFrame = Rc<RefCell<Frame>>;
 
@@ -160,6 +160,9 @@ impl Vm {
             let top = self.stack.last().expect("Empty stack");
             let instruction = top.borrow().current();
             let action = Vm::dispatch(&instruction, &mut top.borrow_mut());
+            // Apply side effects which will impact the whole VM. We isolated
+            // frame-level side effects inside of `Vm::dispatch` to make the
+            // borrow-checker happy.
             match action {
                 Action::Advance => top.borrow_mut().advance(),
                 // Due to borrow-checker rules we cannot have the side effects
