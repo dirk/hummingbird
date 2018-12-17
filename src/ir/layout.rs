@@ -28,15 +28,17 @@ impl Unit {
 
 pub type Address = u32;
 
+pub type ValueId = u32;
+
 #[derive(Debug)]
 pub struct Value {
-    pub id: u32,
+    pub id: ValueId,
     // List of all the instructions that read this value.
     pub dependents: Vec<Address>,
 }
 
 impl Value {
-    fn new(id: u32) -> Self {
+    fn new(id: ValueId) -> Self {
         Value {
             id,
             dependents: vec![],
@@ -50,7 +52,7 @@ impl Value {
         }
     }
 
-    fn is_null(&self) -> bool {
+    pub fn is_null(&self) -> bool {
         self.id == 0
     }
 
