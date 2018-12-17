@@ -200,8 +200,7 @@ impl Vm {
                         .map(|argument| top.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::DynamicFunction(_, _) => {
-                            let (unit, function) = target.dynamic_function().unwrap();
+                        Value::DynamicFunction(unit, function) => {
                             let frame = Rc::new(RefCell::new(Frame::new(
                                 unit,
                                 function,
@@ -219,9 +218,7 @@ impl Vm {
                         _ => panic!("Cannot call"),
                     }
                 }
-                Instruction::Return(rval) => {
-                    Pop(top.read_register(*rval))
-                }
+                Instruction::Return(rval) => Pop(top.read_register(*rval)),
                 Instruction::ReturnNull => Pop(Value::Null),
                 _ => panic!("Cannot dispatch: {:?}", instruction),
             }

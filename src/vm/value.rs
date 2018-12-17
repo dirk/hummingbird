@@ -44,14 +44,7 @@ pub enum Value {
     Null,
 }
 
-impl Value {
-    pub fn dynamic_function(self) -> Option<(Rc<Unit>, Rc<Function>)> {
-        match self {
-            Value::DynamicFunction(unit, function) => Some((unit, function)),
-            _ => None,
-        }
-    }
-}
+impl Value {}
 
 impl Finalize for Value {}
 
