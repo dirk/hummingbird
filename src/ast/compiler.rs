@@ -31,6 +31,7 @@ impl Compiler {
     fn compile_node(&mut self, node: &Node) -> SharedValue {
         match node {
             &Node::Assignment(ref assignment) => self.compile_assignment(assignment),
+            &Node::Function(ref function) => self.compile_function(function),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier),
             &Node::Integer(ref integer) => self.compile_integer(integer),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call),
@@ -72,6 +73,24 @@ impl Compiler {
                 rval
             }
         }
+    }
+
+    fn compile_function(&mut self, function: &Function) -> SharedValue {
+        let name = function.name.to_owned();
+        let outer_function = self.current.clone();
+        let new_function = self.unit.new_function(name.clone());
+        self.current = new_function.clone();
+
+        for node in function.block.nodes.iter() {
+            self.compile_node(node);
+        }
+        self.build_return_null();
+
+        self.current = outer_function;
+        let lval = self.build_make_function(new_function);
+        let index = self.get_or_add_local(name);
+        self.build_set_local(index, lval);
+        self.null_value()
     }
 
     fn compile_identifier(&mut self, identifier: &Identifier) -> SharedValue {

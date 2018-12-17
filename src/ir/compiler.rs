@@ -190,6 +190,10 @@ impl Compiler {
                 ir::Instruction::SetLocal(index, rval) => {
                     bytecode::Instruction::SetLocal(*index, read(rval, address))
                 }
+                ir::Instruction::MakeFunction(lval, function) => {
+                    let id = function.borrow().id;
+                    bytecode::Instruction::MakeFunction(allocate(lval), id)
+                }
                 ir::Instruction::MakeInteger(lval, value) => {
                     bytecode::Instruction::MakeInteger(allocate(lval), *value)
                 }

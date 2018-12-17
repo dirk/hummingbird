@@ -187,6 +187,18 @@ impl Vm {
                     top.advance();
                     None
                 }
+                Instruction::MakeFunction(lval, id) => {
+                    let unit = top.unit.clone();
+                    let function = unit
+                        .functions
+                        .iter()
+                        .find(|&function| function.id == *id)
+                        .expect("Function not found");
+                    let value = Value::DynamicFunction(unit.clone(), Rc::new(function.clone()));
+                    top.write_register(*lval, value);
+                    top.advance();
+                    None
+                }
                 Instruction::MakeInteger(lval, value) => {
                     top.write_register(*lval, Value::Integer(*value));
                     top.advance();

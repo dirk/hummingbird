@@ -24,6 +24,13 @@ impl Unit {
     pub fn main_function(&self) -> SharedFunction {
         self.functions[0].clone()
     }
+
+    pub fn new_function(&mut self, name: String) -> SharedFunction {
+        let id = self.functions.len();
+        let function = Rc::new(RefCell::new(Function::new(id as u16, name)));
+        self.functions.push(function.clone());
+        function
+    }
 }
 
 pub type Address = u32;
@@ -181,6 +188,12 @@ pub trait InstructionBuilder {
         lval
     }
 
+    fn build_make_function(&mut self, function: SharedFunction) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::MakeFunction(lval.clone(), function));
+        lval
+    }
+
     fn build_call(&mut self, target: SharedValue, arguments: Vec<SharedValue>) -> SharedValue {
         let lval = self.new_value();
         let address = self.push(Instruction::Call(
@@ -234,6 +247,7 @@ pub enum Instruction {
     SetLocal(u8, SharedValue),
     SetLocalLexical(String, SharedValue),
     MakeInteger(SharedValue, i64),
+    MakeFunction(SharedValue, SharedFunction),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,
