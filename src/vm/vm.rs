@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::process::exit;
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Function, Instruction, Reg, Unit};
@@ -101,12 +102,9 @@ pub struct Vm {
 }
 
 enum Action {
-    // Advance to the next instruction.
-    Advance,
-    // Execute a dynamic function call (ie. push onto the stack).
-    CallDynamic(Reg, Value, Vec<Value>),
-    CallNative(Reg, NativeFunction, Vec<Value>),
-    Return(Value),
+    None,
+    Push(SharedFrame),
+    Pop(Value),
 }
 
 fn prelude_println(arguments: Vec<Value>) -> Value {
@@ -157,87 +155,93 @@ impl Vm {
 
     fn run(&mut self) {
         loop {
-            let top = self.stack.last().expect("Empty stack");
-            let instruction = top.borrow().current();
-            let action = Vm::dispatch(&instruction, &mut top.borrow_mut());
-            // Apply side effects which will impact the whole VM. We isolated
-            // frame-level side effects inside of `Vm::dispatch` to make the
-            // borrow-checker happy.
-            match action {
-                Action::Advance => top.borrow_mut().advance(),
-                // Due to borrow-checker rules we cannot have the side effects
-                // of a call happen within `dispatch`.
-                Action::CallDynamic(return_register, target, arguments) => {
-                    let (unit, function) = target.dynamic_function().unwrap();
-                    let frame = Rc::new(RefCell::new(Frame::new(
-                        unit,
-                        function,
-                        None,
-                        return_register,
-                    )));
-                    self.stack.push(frame)
-                }
-                Action::CallNative(return_register, target, arguments) => {
-                    let result = target.call(arguments);
-                    let mut top = top.borrow_mut();
-                    top.write_register(return_register, result);
-                    top.advance();
-                }
-                Action::Return(value) => {
-                    let popped = self.stack.pop().expect("Empty stack");
-                    let return_register = popped.borrow().return_register;
-                    match self.stack.last() {
-                        Some(top) => {
-                            let mut top = top.borrow_mut();
-                            top.write_register(return_register, value);
-                            top.advance();
-                        }
-                        // Returning from the top frame.
-                        None => return,
-                    }
-                }
-                _ => unreachable!(),
+            match self.dispatch() {
+                Some(code) => exit(code),
+                None => (),
             }
         }
     }
 
-    // Decodes the instruction, applies any frame-level side effects, and
-    // returns an `Action` describing stack/VM-level side effects.
-    #[inline]
-    fn dispatch(instruction: &Instruction, top: &mut Frame) -> Action {
-        match instruction {
-            Instruction::GetLocal(lval, index) => {
-                top.write_register(*lval, top.get_local(*index));
-                Action::Advance
-            }
-            Instruction::GetLocalLexical(lval, name) => {
-                top.write_register(*lval, top.get_local_lexical(name));
-                Action::Advance
-            }
-            Instruction::SetLocal(index, rval) => {
-                top.set_local(*index, top.read_register(*rval));
-                Action::Advance
-            }
-            Instruction::MakeInteger(lval, value) => {
-                top.write_register(*lval, Value::Integer(*value));
-                Action::Advance
-            }
-            Instruction::Call(lval, target, arguments) => {
-                let target = top.read_register(*target);
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| top.read_register(*argument))
-                    .collect::<Vec<Value>>();
-                match target {
-                    Value::DynamicFunction(_, _) => Action::CallDynamic(*lval, target, arguments),
-                    Value::NativeFunction(native_function) => {
-                        Action::CallNative(*lval, native_function, arguments)
+    fn dispatch(&mut self) -> Option<i32> {
+        use self::Action::*;
+
+        let top = self.stack.last().expect("Empty stack");
+        let instruction = top.borrow().current();
+
+        let action = {
+            let top: &mut Frame = &mut top.borrow_mut();
+            match &instruction {
+                Instruction::GetLocal(lval, index) => {
+                    top.write_register(*lval, top.get_local(*index));
+                    top.advance();
+                    None
+                }
+                Instruction::GetLocalLexical(lval, name) => {
+                    top.write_register(*lval, top.get_local_lexical(name));
+                    top.advance();
+                    None
+                }
+                Instruction::SetLocal(index, rval) => {
+                    top.set_local(*index, top.read_register(*rval));
+                    top.advance();
+                    None
+                }
+                Instruction::MakeInteger(lval, value) => {
+                    top.write_register(*lval, Value::Integer(*value));
+                    top.advance();
+                    None
+                }
+                Instruction::Call(lval, target, arguments) => {
+                    let return_register = *lval;
+                    let target = top.read_register(*target);
+                    let arguments = arguments
+                        .iter()
+                        .map(|argument| top.read_register(*argument))
+                        .collect::<Vec<Value>>();
+                    match target {
+                        Value::DynamicFunction(_, _) => {
+                            let (unit, function) = target.dynamic_function().unwrap();
+                            let frame = Rc::new(RefCell::new(Frame::new(
+                                unit,
+                                function,
+                                Option::None,
+                                return_register,
+                            )));
+                            Push(frame)
+                        }
+                        Value::NativeFunction(native_function) => {
+                            let result = native_function.call(arguments);
+                            top.write_register(return_register, result);
+                            top.advance();
+                            None
+                        }
+                        _ => panic!("Cannot call"),
                     }
-                    _ => panic!("Cannot call"),
+                }
+                Instruction::Return(rval) => {
+                    Pop(top.read_register(*rval))
+                }
+                Instruction::ReturnNull => Pop(Value::Null),
+                _ => panic!("Cannot dispatch: {:?}", instruction),
+            }
+        };
+        match action {
+            Push(frame) => self.stack.push(frame),
+            Pop(return_value) => {
+                let popped = self.stack.pop().expect("Empty stack");
+                let return_register = popped.borrow().return_register;
+                match self.stack.last() {
+                    Option::Some(top) => {
+                        let mut top = top.borrow_mut();
+                        top.write_register(return_register, return_value);
+                        top.advance();
+                    }
+                    // Returning from the top frame.
+                    Option::None => return Some(0),
                 }
             }
-            Instruction::ReturnNull => Action::Return(Value::Null),
-            _ => panic!("Cannot dispatch: {:?}", instruction),
-        }
+            None => (),
+        };
+        Option::None
     }
 }
