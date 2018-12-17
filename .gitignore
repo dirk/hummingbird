@@ -27,4 +27,4 @@ a.out
 *.swp
 
 _site/*
-target
+/target
