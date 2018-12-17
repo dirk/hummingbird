@@ -1,3 +1,4 @@
+mod frame;
 mod value;
 mod vm;
 
