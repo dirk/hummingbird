@@ -169,6 +169,7 @@ impl Vm {
         let instruction = top.borrow().current();
 
         let action = {
+            // Need the `&mut Frame` to force this to be a mutable borrow.
             let top: &mut Frame = &mut top.borrow_mut();
             match &instruction {
                 Instruction::GetLocal(lval, index) => {
