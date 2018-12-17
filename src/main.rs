@@ -16,7 +16,7 @@ fn main() {
     let source = fs::read_to_string(filename).expect("Unable to read source file");
 
     let program = parser::parse(source);
-    println!("Program:\n{:?}", program);
+    // println!("Program:\n{:?}", program);
 
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
@@ -24,9 +24,11 @@ fn main() {
         .expect("Unable to print AST");
 
     let ir_unit = ast::compiler::compile(&program);
-    let mut printer = ir::printer::Printer::new(std::io::stdout());
-    printer.print_unit(&ir_unit).expect("Unable to print IR");
+    let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
+    ir_printer.print_unit(&ir_unit).expect("Unable to print IR");
 
     let bytecode_unit = ir::compiler::compile(&ir_unit);
-    println!("Bytecode:\n{:?}", bytecode_unit);
+    let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
+    bytecode_printer.print_unit(&bytecode_unit).expect("Unable to print bytecode");
+    // println!("Bytecode:\n{:?}", bytecode_unit);
 }
