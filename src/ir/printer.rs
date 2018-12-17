@@ -92,7 +92,11 @@ impl<O: Write> Printer<O> {
             ),
             _ => "Unknown".to_string(),
         };
-        writeln!(self.output, "      {:04} {}", address, formatted_instruction)
+        writeln!(
+            self.output,
+            "      {:04} {}",
+            address, formatted_instruction
+        )
     }
 }
 

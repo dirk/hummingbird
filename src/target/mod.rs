@@ -1,1 +1,1 @@
-mod bytecode;
+pub mod bytecode;
