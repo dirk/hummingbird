@@ -103,7 +103,7 @@ impl Vm {
                 }
                 Instruction::MakeFunction(lval, id) => {
                     let function = top.unit().function(*id);
-                    let value = Value::DynamicFunction(function);
+                    let value = Value::from_dynamic_function(function);
                     top.write_register(*lval, value);
                     top.advance();
                     None
@@ -121,7 +121,9 @@ impl Vm {
                         .map(|argument| top.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::DynamicFunction(function) => {
+                        Value::DynamicFunction(dynamic_function) => {
+                            // TODO: Make `CallTarget` able to do specialization.
+                            let function = dynamic_function.call_target.function;
                             let frame = Rc::new(RefCell::new(Frame::new(
                                 function,
                                 Option::None,

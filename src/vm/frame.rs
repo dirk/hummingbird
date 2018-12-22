@@ -14,6 +14,8 @@ pub type SharedFrame = Rc<RefCell<Frame>>;
 // The first two fields should *not* be changed after the frame
 // is initialized.
 pub struct Frame {
+    // TODO: Replace `LoadedFunction` with an abstraction that can support
+    //   specialized instruction sequences.
     function: LoadedFunction,
     lexical_parent: Option<SharedFrame>,
     pub return_register: Reg,

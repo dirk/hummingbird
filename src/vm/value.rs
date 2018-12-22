@@ -4,7 +4,13 @@ use std::rc::Rc;
 
 use gc::{Finalize, Gc, GcCell, Trace};
 
+use super::call_target::CallTarget;
 use super::loader::LoadedFunction;
+
+#[derive(Clone)]
+pub struct DynamicFunction {
+    pub call_target: CallTarget,
+}
 
 #[derive(Clone)]
 pub struct NativeFunction {
@@ -37,14 +43,23 @@ unsafe impl Trace for DynamicObject {
 
 #[derive(Clone)]
 pub enum Value {
+    DynamicFunction(DynamicFunction),
     DynamicObject(Gc<GcCell<DynamicObject>>),
-    DynamicFunction(LoadedFunction),
     Integer(i64),
     NativeFunction(NativeFunction),
     Null,
 }
 
-impl Value {}
+impl Value {
+    pub fn from_dynamic_function(loaded_function: LoadedFunction) -> Self {
+        let dynamic_function = DynamicFunction {
+            call_target: CallTarget {
+                function: loaded_function,
+            },
+        };
+        Value::DynamicFunction(dynamic_function)
+    }
+}
 
 impl Finalize for Value {}
 
