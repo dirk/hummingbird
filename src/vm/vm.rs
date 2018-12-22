@@ -7,7 +7,7 @@ use super::super::target::bytecode::layout::Instruction;
 
 use super::frame::{Frame, SharedFrame};
 use super::loader::Loader;
-use super::value::Value;
+use super::value::{NativeFunction, Value};
 
 pub struct Vm {
     stack: Vec<SharedFrame>,
@@ -36,36 +36,20 @@ impl Vm {
             stack: vec![],
             loader: Loader::new(),
         };
+
+        // Declare "println" in the local scope of the main function.
+        let ir_main = ir_unit.main_function();
+        let index = ir_main.borrow_mut().get_or_add_local("println".to_string());
+
         let loaded_unit = vm.loader.load(ir_unit);
-        let frame = Frame::new(loaded_unit.main(), None, 0);
+
+        // Then inject the println at the index we previously declared.
+        let mut frame = Frame::new(loaded_unit.main(), None, 0);
+        frame.set_local(index, Value::NativeFunction(NativeFunction::new(Rc::new(prelude_println))));
+
         vm.stack.push(Rc::new(RefCell::new(frame)));
         vm.run();
     }
-
-    // fn build_prelude() -> SharedFrame {
-    //     let prelude_unit = Unit {
-    //         functions: vec![Function {
-    //             id: 0,
-    //             name: "prelude".to_string(),
-    //             registers: 0,
-    //             basic_blocks: vec![],
-    //             locals: 1,
-    //             locals_names: vec!["println".to_string()],
-    //         }],
-    //     };
-    //     let prelude_main_function = prelude_unit.functions[0].clone();
-    //     let mut prelude = Frame::new(
-    //         Rc::new(prelude_unit),
-    //         Rc::new(prelude_main_function),
-    //         None,
-    //         0,
-    //     );
-    //     prelude.set_local(
-    //         0,
-    //         Value::NativeFunction(NativeFunction::new(Rc::new(prelude_println))),
-    //     );
-    //     Rc::new(RefCell::new(prelude))
-    // }
 
     fn run(&mut self) {
         loop {
