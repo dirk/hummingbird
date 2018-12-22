@@ -54,8 +54,8 @@ impl LoadedUnit {
     }
 
     pub fn function(&self, id: u16) -> LoadedFunction {
-        let this = &self.0;
-        this.borrow()
+        self.0
+            .borrow()
             .functions
             .iter()
             .find(|&function| function.id() == id)
