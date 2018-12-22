@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use super::super::ir;
@@ -9,7 +10,7 @@ use super::super::target::bytecode;
 // NOTE: Eventually this should probably handle loading source files. Really
 //   the whole continuum between source and specialized native code.
 pub struct Loader {
-    units: Vec<SharedLoadedUnit>,
+    units: Vec<LoadedUnit>,
 }
 
 impl Loader {
@@ -17,14 +18,20 @@ impl Loader {
         Self { units: vec![] }
     }
 
-    pub fn load(&mut self, ir_unit: ir::layout::Unit) -> SharedLoadedUnit {
-        let bytecode_functions = ir::compiler::compile(&ir_unit)
+    pub fn load(&mut self, ir_unit: ir::layout::Unit) -> LoadedUnit {
+        let loaded_unit = LoadedUnit::empty();
+        let functions = ir::compiler::compile(&ir_unit)
             .functions
             .into_iter()
-            .map(|function| Rc::new(function))
-            .collect::<Vec<Rc<bytecode::layout::Function>>>();
+            .map(|function| {
+                LoadedFunction(Rc::new(InnerLoadedFunction {
+                    unit: Rc::downgrade(&loaded_unit.0),
+                    function,
+                }))
+            })
+            .collect::<Vec<LoadedFunction>>();
+        loaded_unit.0.borrow_mut().functions = functions;
 
-        let loaded_unit: SharedLoadedUnit = LoadedUnit { bytecode_functions }.into();
         self.units.push(loaded_unit.clone());
         loaded_unit
     }
@@ -32,52 +39,53 @@ impl Loader {
 
 // Opaque wrapper around a reference-counted loaded unit.
 #[derive(Clone)]
-pub struct SharedLoadedUnit(Rc<RefCell<LoadedUnit>>);
+pub struct LoadedUnit(Rc<RefCell<InnerLoadedUnit>>);
 
-impl SharedLoadedUnit {
-    pub fn main(&self) -> LoadedFunctionHandle {
-        let function = self.0.borrow().bytecode_functions[0].clone();
-        LoadedFunctionHandle {
-            unit: Rc::downgrade(&self.0),
-            function,
-        }
+type WeakLoadedUnit = Weak<RefCell<InnerLoadedUnit>>;
+
+impl LoadedUnit {
+    fn empty() -> Self {
+        InnerLoadedUnit { functions: vec![] }.into()
     }
 
-    pub fn function(&self, id: u16) -> LoadedFunctionHandle {
+    pub fn main(&self) -> LoadedFunction {
+        self.0.borrow().functions[0].clone()
+    }
+
+    pub fn function(&self, id: u16) -> LoadedFunction {
         let this = &self.0;
-        let function = this
-            .borrow()
-            .bytecode_functions
+        this.borrow()
+            .functions
             .iter()
-            .find(|&function| function.id == id)
+            .find(|&function| function.id() == id)
             .expect("Function not found")
-            .clone();
-        LoadedFunctionHandle {
-            unit: Rc::downgrade(this),
-            function,
-        }
+            .clone()
     }
 }
 
-impl From<LoadedUnit> for SharedLoadedUnit {
-    fn from(loaded_unit: LoadedUnit) -> SharedLoadedUnit {
-        SharedLoadedUnit(Rc::new(RefCell::new(loaded_unit)))
+impl From<InnerLoadedUnit> for LoadedUnit {
+    fn from(loaded_unit: InnerLoadedUnit) -> LoadedUnit {
+        LoadedUnit(Rc::new(RefCell::new(loaded_unit)))
     }
 }
 
-pub struct LoadedUnit {
-    bytecode_functions: Vec<Rc<bytecode::layout::Function>>,
+pub struct InnerLoadedUnit {
+    functions: Vec<LoadedFunction>,
 }
 
-// TODO: Distinguish between a call target (shared, cloned in a `Value`) and
-//   a handle (in a `Frame` on and off stack).
+// Handle to a loaded bytecode function and its unit. Used by `Frame`.
 #[derive(Clone)]
-pub struct LoadedFunctionHandle {
-    unit: Weak<RefCell<LoadedUnit>>,
-    function: Rc<bytecode::layout::Function>,
+pub struct InnerLoadedFunction {
+    unit: WeakLoadedUnit,
+    function: bytecode::layout::Function,
 }
 
-impl LoadedFunctionHandle {
+impl InnerLoadedFunction {
+    #[inline]
+    pub fn id(&self) -> u16 {
+        self.function.id
+    }
+
     #[inline]
     pub fn registers(&self) -> u8 {
         self.function.registers
@@ -102,8 +110,19 @@ impl LoadedFunctionHandle {
         self.function.locals_names.clone()
     }
 
-    pub fn unit(&self) -> SharedLoadedUnit {
+    pub fn unit(&self) -> LoadedUnit {
         let upgraded = self.unit.upgrade().expect("Unit has been dropped");
-        SharedLoadedUnit(upgraded)
+        LoadedUnit(upgraded)
+    }
+}
+
+#[derive(Clone)]
+pub struct LoadedFunction(Rc<InnerLoadedFunction>);
+
+impl Deref for LoadedFunction {
+    type Target = InnerLoadedFunction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

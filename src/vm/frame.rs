@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
-use super::loader::{LoadedFunctionHandle, SharedLoadedUnit};
+use super::loader::{LoadedFunction, LoadedUnit};
 use super::value::Value;
 
 // Frames can live outside of the stack (eg. closures) and can be mutated from
@@ -14,7 +14,7 @@ pub type SharedFrame = Rc<RefCell<Frame>>;
 // The first two fields should *not* be changed after the frame
 // is initialized.
 pub struct Frame {
-    function: LoadedFunctionHandle,
+    function: LoadedFunction,
     lexical_parent: Option<SharedFrame>,
     pub return_register: Reg,
     registers: Vec<Value>,
@@ -25,7 +25,7 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(
-        function: LoadedFunctionHandle,
+        function: LoadedFunction,
         lexical_parent: Option<SharedFrame>,
         return_register: Reg,
     ) -> Self {
@@ -42,7 +42,7 @@ impl Frame {
         }
     }
 
-    pub fn unit(&self) -> SharedLoadedUnit {
+    pub fn unit(&self) -> LoadedUnit {
         self.function.unit()
     }
 
