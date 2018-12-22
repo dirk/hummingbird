@@ -24,10 +24,11 @@ impl Loader {
             .functions
             .into_iter()
             .map(|function| {
-                LoadedFunction(Rc::new(InnerLoadedFunction {
+                InnerLoadedFunction {
                     unit: Rc::downgrade(&loaded_unit.0),
                     function,
-                }))
+                }
+                .into()
             })
             .collect::<Vec<LoadedFunction>>();
         loaded_unit.0.borrow_mut().functions = functions;
@@ -118,6 +119,12 @@ impl InnerLoadedFunction {
 
 #[derive(Clone)]
 pub struct LoadedFunction(Rc<InnerLoadedFunction>);
+
+impl From<InnerLoadedFunction> for LoadedFunction {
+    fn from(loaded_function: InnerLoadedFunction) -> LoadedFunction {
+        LoadedFunction(Rc::new(loaded_function))
+    }
+}
 
 impl Deref for LoadedFunction {
     type Target = InnerLoadedFunction;
