@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
 
 use super::super::ir::layout as ir;
@@ -24,24 +25,14 @@ fn prelude_println(arguments: Vec<Value>) -> Value {
 }
 
 impl Vm {
-    pub fn run_main(ir_unit: ir::Unit) {
+    pub fn run_file<P: AsRef<Path>>(path: P) {
         let mut vm = Self {
             stack: vec![],
             loader: Loader::new(),
         };
 
-        // Declare "println" in the local scope of the main function.
-        let ir_main = ir_unit.main_function();
-        let index = ir_main.borrow_mut().get_or_add_local("println".to_string());
-
-        let loaded_unit = vm.loader.load(ir_unit);
-
-        // Then inject the println at the index we previously declared.
-        let mut frame = BytecodeFrame::new(loaded_unit.main(), None, 0);
-        frame.set_local(
-            index,
-            Value::NativeFunction(NativeFunction::new(Rc::new(prelude_println))),
-        );
+        let module = vm.loader.load_file(path).expect("Unable to read file");
+        let frame = BytecodeFrame::new(module.main(), None, 0);
 
         vm.stack.push(Rc::new(RefCell::new(frame)));
         vm.run();

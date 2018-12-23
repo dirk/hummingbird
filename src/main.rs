@@ -37,6 +37,6 @@ fn main() {
         .print_unit(&bytecode_unit)
         .expect("Unable to print bytecode");
 
-    vm::Vm::run_main(ir_unit);
+    vm::Vm::run_file(filename);
     // println!("Bytecode:\n{:?}", bytecode_unit);
 }

@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
-use super::loader::{LoadedFunction, LoadedUnit};
+use super::loader::{LoadedFunction, LoadedModule};
 use super::value::Value;
 
 // Frames can live outside of the stack (eg. closures) and can be mutated from
@@ -62,7 +62,7 @@ impl BytecodeFrame {
         }
     }
 
-    pub fn unit(&self) -> LoadedUnit {
+    pub fn unit(&self) -> LoadedModule {
         self.function.unit()
     }
 
