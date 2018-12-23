@@ -11,9 +11,27 @@ use super::value::Value;
 // counting (`Rc`) and interior mutability (`RefCell`).
 pub type SharedFrame = Rc<RefCell<Frame>>;
 
+// An action for the VM to do.
+pub enum Action {
+    Call(SharedFrame),
+    Return(Reg, Value),
+}
+
+pub trait Frame {
+    // Run the frame's fetch-execute loop. Will be different depending on if
+    // it's a bytecode or native frame.
+    fn run(&mut self) -> Action;
+
+    fn write_register(&mut self, index: Reg, value: Value);
+
+    fn get_local_lexical(&self, name: &String) -> Value;
+}
+
+// Frame evaluating a bytecode function.
+//
 // The first two fields should *not* be changed after the frame
 // is initialized.
-pub struct Frame {
+pub struct BytecodeFrame {
     // TODO: Replace `LoadedFunction` with an abstraction that can support
     //   specialized instruction sequences.
     function: LoadedFunction,
@@ -25,7 +43,7 @@ pub struct Frame {
     current_address: usize,
 }
 
-impl Frame {
+impl BytecodeFrame {
     pub fn new(
         function: LoadedFunction,
         lexical_parent: Option<SharedFrame>,
@@ -65,21 +83,87 @@ impl Frame {
     }
 
     pub fn read_register(&self, index: Reg) -> Value {
-        self.registers[Frame::offset_register(index)].clone()
-    }
-
-    pub fn write_register(&mut self, index: Reg, value: Value) {
-        if index == 0 {
-            return;
-        }
-        self.registers[Frame::offset_register(index)] = value;
+        self.registers[BytecodeFrame::offset_register(index)].clone()
     }
 
     pub fn get_local(&self, index: u8) -> Value {
         self.locals[index as usize].clone()
     }
 
-    pub fn get_local_lexical(&self, name: &String) -> Value {
+    pub fn set_local(&mut self, index: u8, value: Value) {
+        self.locals[index as usize] = value;
+    }
+}
+
+impl Frame for BytecodeFrame {
+    fn run(&mut self) -> Action {
+        loop {
+            let instruction = self.current();
+
+            match &instruction {
+                Instruction::GetLocal(lval, index) => {
+                    self.write_register(*lval, self.get_local(*index));
+                    self.advance();
+                }
+                Instruction::GetLocalLexical(lval, name) => {
+                    self.write_register(*lval, self.get_local_lexical(name));
+                    self.advance();
+                }
+                Instruction::SetLocal(index, rval) => {
+                    self.set_local(*index, self.read_register(*rval));
+                    self.advance();
+                }
+                Instruction::MakeFunction(lval, id) => {
+                    let function = self.unit().function(*id);
+                    let value = Value::from_dynamic_function(function);
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
+                Instruction::MakeInteger(lval, value) => {
+                    self.write_register(*lval, Value::Integer(*value));
+                    self.advance();
+                }
+                Instruction::Call(lval, target, arguments) => {
+                    let return_register = *lval;
+                    let target = self.read_register(*target);
+                    let arguments = arguments
+                        .iter()
+                        .map(|argument| self.read_register(*argument))
+                        .collect::<Vec<Value>>();
+                    match target {
+                        Value::DynamicFunction(dynamic_function) => {
+                            // TODO: Make `CallTarget` able to do specialization.
+                            let function = dynamic_function.call_target.function;
+                            let frame = Rc::new(RefCell::new(BytecodeFrame::new(
+                                function,
+                                Option::None,
+                                return_register,
+                            )));
+                            // Be at the next instruction when control flow returns to us.
+                            self.advance();
+                            return Action::Call(frame);
+                        }
+                        Value::NativeFunction(native_function) => {
+                            let result = native_function.call(arguments);
+                            self.write_register(return_register, result);
+                            self.advance();
+                        }
+                        _ => panic!("Cannot call"),
+                    }
+                }
+                Instruction::Return(rval) => {
+                    let value = self.read_register(*rval);
+                    return Action::Return(self.return_register, value);
+                }
+                Instruction::ReturnNull => {
+                    return Action::Return(self.return_register, Value::Null);
+                }
+                _ => panic!("Cannot dispatch: {:?}", instruction),
+            }
+        }
+    }
+
+    fn get_local_lexical(&self, name: &String) -> Value {
         let index = self
             .function
             .locals_names()
@@ -96,7 +180,10 @@ impl Frame {
         }
     }
 
-    pub fn set_local(&mut self, index: u8, value: Value) {
-        self.locals[index as usize] = value;
+    fn write_register(&mut self, index: Reg, value: Value) {
+        if index == 0 {
+            return;
+        }
+        self.registers[BytecodeFrame::offset_register(index)] = value;
     }
 }
