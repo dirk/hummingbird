@@ -1,6 +1,0 @@
-name "hummingbird"
-description "A minimal D application."
-authors "Dirk Gadsden"
-copyright "Copyright © 2018, Dirk Gadsden"
-license "proprietary"
-targetPath "bin"
