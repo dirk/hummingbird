@@ -19,7 +19,7 @@ impl<O: Write> Printer<O> {
     }
 
     fn print_function(&mut self, function: &Function) -> Result<()> {
-        writeln!(self.output, "{}() {{", function.name)?;
+        writeln!(self.output, "{}() id({}) {{", function.name, function.id)?;
         writeln!(self.output, "  locals {{")?;
         for local in function.locals_names.iter() {
             writeln!(self.output, "    {}", local)?;
@@ -48,6 +48,7 @@ impl<O: Write> Printer<O> {
                 format!("{} = GetLocalLexical({})", reg(lval), name)
             }
             Instruction::SetLocal(index, rval) => format!("SetLocal({}, {})", index, reg(rval)),
+            Instruction::MakeFunction(lval, id) => format!("MakeFunction({}, {})", reg(lval), id),
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", reg(lval), value)
             }
@@ -61,6 +62,8 @@ impl<O: Write> Printer<O> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Instruction::Return(rval) => format!("Return({})", reg(rval)),
+            Instruction::ReturnNull => "ReturnNull".to_string(),
             _ => "Unknown".to_string(),
         };
         writeln!(self.output, "      {}", formatted_instruction)

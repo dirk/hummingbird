@@ -77,6 +77,9 @@ impl<O: Write> Printer<O> {
                 format!("{} = GetLocalLexical({})", id(lval), name)
             }
             Instruction::SetLocal(index, rval) => format!("SetLocal({}, {})", index, id(rval)),
+            Instruction::MakeFunction(lval, function) => {
+                format!("MakeFunction({}, {})", id(lval), function.borrow().name)
+            }
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", id(lval), value)
             }
@@ -90,6 +93,8 @@ impl<O: Write> Printer<O> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Instruction::Return(rval) => format!("Return({})", id(rval),),
+            Instruction::ReturnNull => "ReturnNull".to_string(),
             _ => "Unknown".to_string(),
         };
         writeln!(
