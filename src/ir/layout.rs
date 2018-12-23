@@ -90,7 +90,7 @@ pub struct Function {
     // Always keep track of where we entered.
     entry: SharedBasicBlock,
     // Keep track of where we are.
-    current: SharedBasicBlock,
+    pub current: SharedBasicBlock,
     // Used for compilation.
     pub basic_blocks: Vec<SharedBasicBlock>,
 
@@ -148,6 +148,22 @@ impl Function {
         self.instruction_counter += 1;
         address
     }
+
+    pub fn push_basic_block(&mut self, build_branch: bool) -> SharedBasicBlock {
+        let id = self.basic_blocks.len();
+        let basic_block = Rc::new(RefCell::new(BasicBlock::new(
+            id as u16,
+            format!("anonymous.{}", id),
+        )));
+        self.basic_blocks.push(basic_block.clone());
+        // If requested to, automatically build the branch from the current
+        // block to the new block.
+        if build_branch {
+            self.build_branch(basic_block.clone());
+        }
+        self.current = basic_block.clone();
+        basic_block
+    }
 }
 
 pub trait InstructionBuilder {
@@ -192,6 +208,10 @@ pub trait InstructionBuilder {
         let lval = self.new_value();
         self.push(Instruction::MakeFunction(lval.clone(), function));
         lval
+    }
+
+    fn build_branch(&mut self, destination: SharedBasicBlock) {
+        self.push(Instruction::Branch(destination));
     }
 
     fn build_call(&mut self, target: SharedValue, arguments: Vec<SharedValue>) -> SharedValue {
@@ -248,6 +268,7 @@ pub enum Instruction {
     SetLocalLexical(String, SharedValue),
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
+    Branch(SharedBasicBlock),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,

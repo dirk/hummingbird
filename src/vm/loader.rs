@@ -121,13 +121,8 @@ impl InnerLoadedFunction {
     }
 
     #[inline]
-    pub fn instruction(
-        &self,
-        basic_block_address: usize,
-        instruction_address: usize,
-    ) -> bytecode::layout::Instruction {
-        let block = &self.function.basic_blocks[basic_block_address];
-        block.instructions[instruction_address].clone()
+    pub fn instruction(&self, instruction_address: usize) -> bytecode::layout::Instruction {
+        self.function.instructions[instruction_address].clone()
     }
 
     pub fn locals_names(&self) -> Vec<String> {

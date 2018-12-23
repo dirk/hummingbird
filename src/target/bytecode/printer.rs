@@ -25,23 +25,15 @@ impl<O: Write> Printer<O> {
             writeln!(self.output, "    {}", local)?;
         }
         writeln!(self.output, "  }}")?;
-        writeln!(self.output, "  blocks {{")?;
-        for basic_block in function.basic_blocks.iter() {
-            self.print_basic_block(basic_block)?;
+        writeln!(self.output, "  instructions {{")?;
+        for (address, instruction) in function.instructions.iter().enumerate() {
+            self.print_instruction(instruction, address)?;
         }
         writeln!(self.output, "  }}")?;
         writeln!(self.output, "}}")
     }
 
-    fn print_basic_block(&mut self, basic_block: &BasicBlock) -> Result<()> {
-        writeln!(self.output, "    {}:", basic_block.name)?;
-        for instruction in basic_block.instructions.iter() {
-            self.print_instruction(&instruction)?;
-        }
-        Ok(())
-    }
-
-    fn print_instruction(&mut self, instruction: &Instruction) -> Result<()> {
+    fn print_instruction(&mut self, instruction: &Instruction, address: usize) -> Result<()> {
         let formatted_instruction = match instruction {
             Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", reg(lval), index),
             Instruction::GetLocalLexical(lval, name) => {
@@ -52,6 +44,7 @@ impl<O: Write> Printer<O> {
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", reg(lval), value)
             }
+            Instruction::Branch(destination) => format!("Branch({:04})", destination),
             Instruction::Call(lval, target, arguments) => format!(
                 "{} = Call({}, [{}])",
                 reg(lval),
@@ -66,7 +59,11 @@ impl<O: Write> Printer<O> {
             Instruction::ReturnNull => "ReturnNull".to_string(),
             _ => "Unknown".to_string(),
         };
-        writeln!(self.output, "      {}", formatted_instruction)
+        writeln!(
+            self.output,
+            "      {:04} {}",
+            address, formatted_instruction
+        )
     }
 }
 

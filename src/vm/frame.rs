@@ -39,7 +39,6 @@ pub struct BytecodeFrame {
     pub return_register: Reg,
     registers: Vec<Value>,
     locals: Vec<Value>,
-    current_basic_block: usize,
     current_address: usize,
 }
 
@@ -57,7 +56,6 @@ impl BytecodeFrame {
             return_register,
             registers: vec![Value::Null; registers as usize],
             locals: vec![Value::Null; locals as usize],
-            current_basic_block: 0,
             current_address: 0,
         }
     }
@@ -68,8 +66,7 @@ impl BytecodeFrame {
 
     #[inline]
     pub fn current(&self) -> Instruction {
-        self.function
-            .instruction(self.current_basic_block, self.current_address)
+        self.function.instruction(self.current_address)
     }
 
     #[inline]
@@ -122,6 +119,9 @@ impl Frame for BytecodeFrame {
                 Instruction::MakeInteger(lval, value) => {
                     self.write_register(*lval, Value::Integer(*value));
                     self.advance();
+                }
+                Instruction::Branch(destination) => {
+                    self.current_address = *destination as usize;
                 }
                 Instruction::Call(lval, target, arguments) => {
                     let return_register = *lval;

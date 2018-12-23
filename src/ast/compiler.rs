@@ -31,6 +31,7 @@ impl Compiler {
     fn compile_node(&mut self, node: &Node) -> SharedValue {
         match node {
             &Node::Assignment(ref assignment) => self.compile_assignment(assignment),
+            &Node::Block(ref block) => self.compile_anonymous_block(block),
             &Node::Function(ref function) => self.compile_function(function),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier),
             &Node::Integer(ref integer) => self.compile_integer(integer),
@@ -73,6 +74,21 @@ impl Compiler {
                 rval
             }
         }
+    }
+
+    fn compile_anonymous_block(&mut self, block: &Block) -> SharedValue {
+        // Push a new basic block and branch to it.
+        self.current.borrow_mut().push_basic_block(true);
+
+        let mut implicit_return = self.null_value();
+        for node in block.nodes.iter() {
+            implicit_return = self.compile_node(node);
+        }
+
+        // Exit from the current block to the new block.
+        self.current.borrow_mut().push_basic_block(true);
+
+        implicit_return
     }
 
     fn compile_function(&mut self, function: &Function) -> SharedValue {

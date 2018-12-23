@@ -83,6 +83,7 @@ impl<O: Write> Printer<O> {
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", id(lval), value)
             }
+            Instruction::Branch(block) => format!("Branch({})", block.borrow().name),
             Instruction::Call(lval, target, arguments) => format!(
                 "{} = Call({}, [{}])",
                 id(lval),

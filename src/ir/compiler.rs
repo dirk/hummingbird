@@ -1,26 +1,31 @@
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
-use std::ops::Deref;
 
 use super::super::target::bytecode::layout as bytecode;
 use super::layout as ir;
 
-struct BasicBlockFinder {
-    indices: HashMap<u16, usize>,
+struct BasicBlockTracker {
+    // Map basic block IDs to the addresses where they start.
+    starts: HashMap<u16, usize>,
+    // Track branch instructions that need to be filled in after we know all
+    // the addresses.
+    branches: Vec<(usize, u16)>,
 }
 
-impl BasicBlockFinder {
-    fn new(basic_blocks: &Vec<ir::SharedBasicBlock>) -> Self {
-        let mut indices = HashMap::new();
-        for (index, basic_block) in basic_blocks.iter().enumerate() {
-            let basic_block = basic_block.deref().borrow();
-            indices.insert(basic_block.id, index);
+impl BasicBlockTracker {
+    fn new() -> Self {
+        Self {
+            starts: HashMap::new(),
+            branches: vec![],
         }
-        Self { indices }
     }
 
-    fn find(&self, basic_block: &ir::BasicBlock) -> usize {
-        *self.indices.get(&basic_block.id).unwrap()
+    fn track_start(&mut self, basic_block: &ir::BasicBlock, address: usize) {
+        self.starts.insert(basic_block.id, address);
+    }
+
+    fn track_branch(&mut self, address: usize, basic_block: &ir::BasicBlock) {
+        self.branches.push((address, basic_block.id));
     }
 }
 
@@ -122,7 +127,7 @@ impl Compiler {
         let functions = unit
             .functions
             .iter()
-            .map(|function| Compiler::compile_function(function.deref().borrow()))
+            .map(|function| Compiler::compile_function(function.borrow()))
             .collect::<Vec<bytecode::Function>>();
 
         bytecode::Unit {
@@ -131,27 +136,42 @@ impl Compiler {
     }
 
     fn compile_function(function: Ref<ir::Function>) -> bytecode::Function {
-        let basic_block_finder = BasicBlockFinder::new(&function.basic_blocks);
-        let mut register_allocator = RegisterAllocator::new();
+        let mut basic_block_tracker = BasicBlockTracker::new();
 
-        let basic_blocks = function
-            .basic_blocks
-            .iter()
-            .map(|basic_block| {
-                let basic_block = basic_block.deref().borrow();
-                Compiler::compile_basic_block(
-                    &basic_block,
-                    &basic_block_finder,
-                    &mut register_allocator,
-                )
-            })
-            .collect::<Vec<bytecode::BasicBlock>>();
+        // Build a shared mutable cell so that we can mutate the register
+        // allocator from our `allocate` and `read` convenience closures.
+        let register_allocator = RefCell::new(RegisterAllocator::new());
+
+        let mut instructions: Vec<bytecode::Instruction> = vec![];
+
+        for basic_block in function.basic_blocks.iter() {
+            Compiler::compile_basic_block(
+                &basic_block.borrow(),
+                &mut instructions,
+                &mut basic_block_tracker,
+                &register_allocator,
+            );
+        }
+
+        // Set all the branch destinations now that we know where the blocks lie.
+        for (address, id) in basic_block_tracker.branches {
+            let block_address = *basic_block_tracker.starts.get(&id).unwrap();
+            let instruction = instructions.get_mut(address).unwrap();
+            match instruction {
+                bytecode::Instruction::Branch(ref mut destination) => {
+                    *destination = block_address as u8;
+                }
+                _ => panic!("Unexpected instruction: {:?}", instruction),
+            }
+        }
+
+        let registers = register_allocator.borrow().registers_required() as u8;
 
         bytecode::Function {
             id: function.id,
             name: function.name.clone(),
-            registers: register_allocator.registers_required() as u8,
-            basic_blocks: basic_blocks,
+            registers,
+            instructions,
             locals: function.locals.len() as u8,
             locals_names: function.locals.clone(),
         }
@@ -159,26 +179,20 @@ impl Compiler {
 
     fn compile_basic_block(
         basic_block: &ir::BasicBlock,
-        basic_block_finder: &BasicBlockFinder,
-        register_allocator: &mut RegisterAllocator,
-    ) -> bytecode::BasicBlock {
-        let id = basic_block_finder.find(&basic_block);
+        instructions: &mut Vec<bytecode::Instruction>,
+        basic_block_tracker: &mut BasicBlockTracker,
+        register_allocator: &RefCell<RegisterAllocator>,
+    ) {
+        basic_block_tracker.track_start(basic_block, instructions.len());
 
-        // Build a shared mutable cell so that we can mutate the register
-        // allocator from our `allocate` and `read` convenience closures.
-        let register_allocator = RefCell::new(register_allocator);
-        let allocate = |lval: &ir::SharedValue| {
-            register_allocator
-                .borrow_mut()
-                .allocate(&lval.deref().borrow())
-        };
+        let allocate =
+            |lval: &ir::SharedValue| register_allocator.borrow_mut().allocate(&lval.borrow());
         let read = |rval: &ir::SharedValue, address| {
             register_allocator
                 .borrow_mut()
-                .read(&rval.deref().borrow(), address)
+                .read(&rval.borrow(), address)
         };
 
-        let mut instructions = vec![];
         for (address, instruction) in basic_block.instructions.iter() {
             let bytecode_instruction = match instruction {
                 ir::Instruction::GetLocal(lval, index) => {
@@ -197,6 +211,11 @@ impl Compiler {
                 ir::Instruction::MakeInteger(lval, value) => {
                     bytecode::Instruction::MakeInteger(allocate(lval), *value)
                 }
+                ir::Instruction::Branch(branch) => {
+                    let bytecode_address = instructions.len();
+                    basic_block_tracker.track_branch(bytecode_address, &branch.borrow());
+                    bytecode::Instruction::Branch(0)
+                }
                 ir::Instruction::Call(lval, target, arguments) => {
                     let lval = allocate(lval);
                     let target = read(target, address);
@@ -211,12 +230,6 @@ impl Compiler {
                 _ => panic!("Cannot compile instruction: {:?}", instruction),
             };
             instructions.push(bytecode_instruction)
-        }
-
-        bytecode::BasicBlock {
-            id: id as u8,
-            name: basic_block.name.clone(),
-            instructions,
         }
     }
 }

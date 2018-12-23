@@ -24,14 +24,7 @@ pub struct Function {
     pub id: u16,
     pub name: String,
     pub registers: u8,
-    pub basic_blocks: Vec<BasicBlock>,
+    pub instructions: Vec<Instruction>,
     pub locals: u8,
     pub locals_names: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct BasicBlock {
-    pub id: u8,
-    pub name: String,
-    pub instructions: Vec<Instruction>,
 }
