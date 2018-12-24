@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::ops::Deref;
@@ -9,18 +10,19 @@ use super::super::ast;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
+use super::value::Value;
 
 // Manages loading IR units and compiling them into callable functions.
 //
 // NOTE: Eventually this should probably handle loading source files. Really
 //   the whole continuum between source and specialized native code.
 pub struct Loader {
-    units: Vec<LoadedModule>,
+    modules: Vec<LoadedModule>,
 }
 
 impl Loader {
     pub fn new() -> Self {
-        Self { units: vec![] }
+        Self { modules: vec![] }
     }
 
     pub fn load_file<P: AsRef<Path>>(&mut self, path: P) -> Result<LoadedModule, Box<dyn Error>> {
@@ -55,7 +57,7 @@ impl Loader {
             .collect::<Vec<LoadedFunction>>();
         loaded_module.0.borrow_mut().functions = functions;
 
-        self.units.push(loaded_module.clone());
+        self.modules.push(loaded_module.clone());
         Ok(loaded_module)
     }
 }
@@ -67,8 +69,8 @@ pub struct LoadedModule(Rc<RefCell<InnerLoadedModule>>);
 type WeakLoadedModule = Weak<RefCell<InnerLoadedModule>>;
 
 impl LoadedModule {
-    fn empty() -> Self {
-        InnerLoadedModule { functions: vec![] }.into()
+    pub fn empty() -> Self {
+        InnerLoadedModule::empty().into()
     }
 
     pub fn main(&self) -> LoadedFunction {
@@ -92,9 +94,68 @@ impl From<InnerLoadedModule> for LoadedModule {
     }
 }
 
+impl Deref for LoadedModule {
+    type Target = RefCell<InnerLoadedModule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // TODO: Hold on to all stages of compilation.
 pub struct InnerLoadedModule {
     functions: Vec<LoadedFunction>,
+    // A module loaded into memory is uninitialized. Only after it has been
+    // evaluated (and imports and exports resolved) is it initialized.
+    initialized: bool,
+    imports: ModuleImports,
+    exports: ModuleExports,
+}
+
+impl InnerLoadedModule {
+    fn empty() -> Self {
+        Self {
+            functions: vec![],
+            initialized: false,
+            imports: ModuleImports::new(),
+            exports: ModuleExports::new(),
+        }
+    }
+
+    // Used by bootstrapping: see `prelude.rs`.
+    pub fn add_named_export<N: Into<String>>(&mut self, name: N, value: Value) {
+        self.exports.named_exports.insert(name.into(), Some(value));
+    }
+}
+
+struct ModuleImports {
+    // Imports are resolved from `None`s into values at the beginning of
+    // module initialization.
+    imports: HashMap<String, Option<Value>>,
+}
+
+impl ModuleImports {
+    fn new() -> Self {
+        Self {
+            imports: HashMap::new(),
+        }
+    }
+}
+
+struct ModuleExports {
+    // Exports will start out as `None`s and are then filled in once the module
+    // is initialized.
+    named_exports: HashMap<String, Option<Value>>,
+    default_export: Option<Value>,
+}
+
+impl ModuleExports {
+    fn new() -> Self {
+        Self {
+            named_exports: HashMap::new(),
+            default_export: None,
+        }
+    }
 }
 
 // Handle to a loaded bytecode function and its unit. Used by `Frame`.

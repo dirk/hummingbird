@@ -59,6 +59,13 @@ impl Value {
         };
         Value::DynamicFunction(dynamic_function)
     }
+
+    pub fn make_native_function<V: Fn(Vec<Value>) -> Value + 'static>(call_target: V) -> Self {
+        let native_function = NativeFunction {
+            call_target: Rc::new(call_target),
+        };
+        Value::NativeFunction(native_function)
+    }
 }
 
 impl Finalize for Value {}

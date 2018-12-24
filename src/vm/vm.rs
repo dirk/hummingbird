@@ -14,16 +14,6 @@ pub struct Vm {
     loader: Loader,
 }
 
-fn prelude_println(arguments: Vec<Value>) -> Value {
-    if let Some(argument) = arguments.first() {
-        match argument {
-            Value::Integer(value) => println!("{}", value),
-            _ => unreachable!(),
-        }
-    };
-    Value::Null
-}
-
 impl Vm {
     pub fn run_file<P: AsRef<Path>>(path: P) {
         let mut vm = Self {

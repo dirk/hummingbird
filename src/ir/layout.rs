@@ -8,12 +8,12 @@ pub type SharedFunction = Rc<RefCell<Function>>;
 pub type SharedValue = Rc<RefCell<Value>>;
 
 #[derive(Debug)]
-pub struct Unit {
+pub struct Module {
     pub locals: Vec<String>,
     pub functions: Vec<SharedFunction>,
 }
 
-impl Unit {
+impl Module {
     pub fn new() -> Self {
         Self {
             locals: vec![],
@@ -86,6 +86,8 @@ pub struct Function {
     pub id: u16,
     pub name: String,
     pub locals: Vec<String>,
+    // TODO: Make this precise instead of just grabbing everything.
+    pub lexical_captures: bool,
 
     // Always keep track of where we entered.
     entry: SharedBasicBlock,
@@ -109,6 +111,7 @@ impl Function {
             id,
             name: name.into(),
             locals: vec![],
+            lexical_captures: false,
             entry: entry.clone(),
             current: entry.clone(),
             basic_blocks: vec![entry],

@@ -123,7 +123,7 @@ impl RegisterAllocator {
 struct Compiler {}
 
 impl Compiler {
-    fn compile_unit(unit: &ir::Unit) -> bytecode::Unit {
+    fn compile_unit(unit: &ir::Module) -> bytecode::Unit {
         let functions = unit
             .functions
             .iter()
@@ -234,6 +234,6 @@ impl Compiler {
     }
 }
 
-pub fn compile(unit: &ir::Unit) -> bytecode::Unit {
+pub fn compile(unit: &ir::Module) -> bytecode::Unit {
     Compiler::compile_unit(unit)
 }
