@@ -61,7 +61,7 @@ impl BytecodeFrame {
     }
 
     pub fn unit(&self) -> LoadedModule {
-        self.function.unit()
+        self.function.module()
     }
 
     #[inline]
@@ -83,6 +83,12 @@ impl BytecodeFrame {
         self.registers[BytecodeFrame::offset_register(index)].clone()
     }
 
+    pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
+        let module = self.function.module();
+        let mut borrowed_module = module.borrow_mut();
+        borrowed_module.get_constant(name.as_ref())
+    }
+
     pub fn get_local(&self, index: u8) -> Value {
         self.locals[index as usize].clone()
     }
@@ -98,6 +104,10 @@ impl Frame for BytecodeFrame {
             let instruction = self.current();
 
             match &instruction {
+                Instruction::GetConstant(lval, name) => {
+                    self.write_register(*lval, self.get_constant(name));
+                    self.advance();
+                }
                 Instruction::GetLocal(lval, index) => {
                     self.write_register(*lval, self.get_local(*index));
                     self.advance();

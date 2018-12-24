@@ -35,6 +35,9 @@ impl<O: Write> Printer<O> {
 
     fn print_instruction(&mut self, instruction: &Instruction, address: usize) -> Result<()> {
         let formatted_instruction = match instruction {
+            Instruction::GetConstant(lval, name) => {
+                format!("{} = GetConstant({})", reg(lval), name)
+            }
             Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", reg(lval), index),
             Instruction::GetLocalLexical(lval, name) => {
                 format!("{} = GetLocalLexical({})", reg(lval), name)

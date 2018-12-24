@@ -108,8 +108,8 @@ pub struct InnerLoadedModule {
     // A module loaded into memory is uninitialized. Only after it has been
     // evaluated (and imports and exports resolved) is it initialized.
     initialized: bool,
-    imports: ModuleImports,
-    exports: ModuleExports,
+    pub imports: ModuleImports,
+    pub exports: ModuleExports,
 }
 
 impl InnerLoadedModule {
@@ -126,9 +126,13 @@ impl InnerLoadedModule {
     pub fn add_named_export<N: Into<String>>(&mut self, name: N, value: Value) {
         self.exports.named_exports.insert(name.into(), Some(value));
     }
+
+    pub fn get_constant<N: AsRef<str>>(&mut self, name: N) -> Value {
+        self.imports.get_import(name.as_ref())
+    }
 }
 
-struct ModuleImports {
+pub struct ModuleImports {
     // Imports are resolved from `None`s into values at the beginning of
     // module initialization.
     imports: HashMap<String, Option<Value>>,
@@ -140,12 +144,29 @@ impl ModuleImports {
             imports: HashMap::new(),
         }
     }
+
+    fn get_import(&self, name: &str) -> Value {
+        // First look for the entry in the map.
+        let import = self
+            .imports
+            .get(name)
+            .expect(&format!("Import not found: {}", name));
+
+        // Then check whether or not it's initialized.
+        import
+            .clone()
+            .expect(&format!("Uninitialized import: {}", name))
+    }
+
+    pub fn set_import<N: Into<String>>(&mut self, name: N, value: Value) {
+        self.imports.insert(name.into(), Some(value));
+    }
 }
 
-struct ModuleExports {
+pub struct ModuleExports {
     // Exports will start out as `None`s and are then filled in once the module
     // is initialized.
-    named_exports: HashMap<String, Option<Value>>,
+    pub named_exports: HashMap<String, Option<Value>>,
     default_export: Option<Value>,
 }
 
@@ -190,7 +211,7 @@ impl InnerLoadedFunction {
         self.function.locals_names.clone()
     }
 
-    pub fn unit(&self) -> LoadedModule {
+    pub fn module(&self) -> LoadedModule {
         let upgraded = self.unit.upgrade().expect("Unit has been dropped");
         LoadedModule(upgraded)
     }

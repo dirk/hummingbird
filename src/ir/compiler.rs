@@ -195,6 +195,9 @@ impl Compiler {
 
         for (address, instruction) in basic_block.instructions.iter() {
             let bytecode_instruction = match instruction {
+                ir::Instruction::GetConstant(lval, name) => {
+                    bytecode::Instruction::GetConstant(allocate(lval), name.clone())
+                }
                 ir::Instruction::GetLocal(lval, index) => {
                     bytecode::Instruction::GetLocal(allocate(lval), *index)
                 }

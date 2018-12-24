@@ -7,6 +7,7 @@ use super::super::target::bytecode::layout::Instruction;
 
 use super::frame::{Action, BytecodeFrame, SharedFrame};
 use super::loader::Loader;
+use super::prelude::build_prelude;
 use super::value::{NativeFunction, Value};
 
 pub struct Vm {
@@ -21,7 +22,20 @@ impl Vm {
             loader: Loader::new(),
         };
 
+        let prelude = build_prelude();
         let module = vm.loader.load_file(path).expect("Unable to read file");
+
+        // FIXME: Actually do imports on request instead of just copying the
+        //   whole prelude.
+        for (name, export) in prelude.borrow().exports.named_exports.iter() {
+            if let Some(export) = export {
+                module
+                    .borrow_mut()
+                    .imports
+                    .set_import(name.to_owned(), export.clone());
+            }
+        }
+
         let frame = BytecodeFrame::new(module.main(), None, 0);
 
         vm.stack.push(Rc::new(RefCell::new(frame)));

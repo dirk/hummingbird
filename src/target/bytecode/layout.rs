@@ -2,6 +2,7 @@ pub type Reg = u8;
 
 #[derive(Clone, Debug)]
 pub enum Instruction {
+    GetConstant(Reg, String),
     GetLocal(Reg, u8),
     GetLocalLexical(Reg, String),
     SetLocal(u8, Reg),
