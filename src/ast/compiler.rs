@@ -40,11 +40,11 @@ impl<'a> Scope for FunctionScope<'a> {
     }
 }
 
-struct RootScope {
+struct ModuleScope {
     module: Rc<RefCell<Module>>,
 }
 
-impl Scope for RootScope {
+impl Scope for ModuleScope {
     fn resolve(&mut self, name: &String) -> ScopeResolution {
         ScopeResolution::NotFound(name.to_owned())
     }
@@ -63,14 +63,14 @@ impl Compiler {
     }
 
     fn compile_program(&mut self, program: &Program) {
-        let mut root_scope = RootScope {
+        let mut module_scope = ModuleScope {
             module: self.unit.clone(),
         };
 
         // We should start in the main function.
         assert_eq!(self.current, self.unit.borrow().main_function());
 
-        let mut scope = FunctionScope::new(&mut root_scope, self.current.clone());
+        let mut scope = FunctionScope::new(&mut module_scope, self.current.clone());
 
         for node in program.nodes.iter() {
             self.compile_node(node, &mut scope);
