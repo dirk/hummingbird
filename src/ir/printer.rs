@@ -13,7 +13,12 @@ impl<O: Write> Printer<O> {
         Self { output }
     }
 
-    pub fn print_unit(&mut self, unit: &Module) -> Result<()> {
+    pub fn print_module(&mut self, unit: &Module) -> Result<()> {
+        writeln!(self.output, "imports {{")?;
+        for (name, import) in unit.imports.iter() {
+            writeln!(self.output, "  {} <- {:?}", name, import)?;
+        }
+        writeln!(self.output, "}}")?;
         for function in unit.functions.iter() {
             self.print_function(function.deref().borrow())?;
         }
@@ -72,6 +77,7 @@ impl<O: Write> Printer<O> {
         let address = instruction.0;
         let instruction = &instruction.1;
         let formatted_instruction = match instruction {
+            Instruction::GetConstant(lval, name) => format!("{} = GetConstant({})", id(lval), name),
             Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", id(lval), index),
             Instruction::GetLocalLexical(lval, name) => {
                 format!("{} = GetLocalLexical({})", id(lval), name)

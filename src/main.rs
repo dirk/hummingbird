@@ -29,7 +29,9 @@ fn main() {
 
     let ir_unit = ast::compiler::compile(&program);
     let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
-    ir_printer.print_unit(&ir_unit).expect("Unable to print IR");
+    ir_printer
+        .print_module(&ir_unit)
+        .expect("Unable to print IR");
 
     let bytecode_unit = ir::compiler::compile(&ir_unit);
     let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());

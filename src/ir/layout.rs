@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // We have to share a lot of things around, so use reference-counting to keep
@@ -8,9 +9,18 @@ pub type SharedFunction = Rc<RefCell<Function>>;
 pub type SharedValue = Rc<RefCell<Value>>;
 
 #[derive(Debug)]
+pub enum Import {
+    // Just the source.
+    Default(String),
+    // Source and the name.
+    Named(String, String),
+}
+
+#[derive(Debug)]
 pub struct Module {
     pub locals: Vec<String>,
     pub functions: Vec<SharedFunction>,
+    pub imports: HashMap<String, Import>,
 }
 
 impl Module {
@@ -18,6 +28,7 @@ impl Module {
         Self {
             locals: vec![],
             functions: vec![Rc::new(RefCell::new(Function::new(0, "main")))],
+            imports: HashMap::new(),
         }
     }
 
@@ -179,6 +190,12 @@ pub trait InstructionBuilder {
     // Add an instruction address to the value's list of dependents.
     fn track(&mut self, rval: SharedValue, address: Address);
 
+    fn build_get_constant(&mut self, name: String) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::GetConstant(lval.clone(), name));
+        lval
+    }
+
     fn build_get_local(&mut self, index: u8) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::GetLocal(lval.clone(), index));
@@ -265,6 +282,7 @@ impl InstructionBuilder for Function {
 
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
+    GetConstant(SharedValue, String),
     GetLocal(SharedValue, u8),
     GetLocalLexical(SharedValue, String),
     SetLocal(u8, SharedValue),

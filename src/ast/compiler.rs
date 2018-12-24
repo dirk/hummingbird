@@ -4,10 +4,10 @@ use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use super::super::ir::layout::{
-    Address, Instruction, InstructionBuilder, Module, SharedFunction, SharedValue,
+    Address, Import, Instruction, InstructionBuilder, Module, SharedFunction, SharedValue,
 };
-use super::nodes::*;
 use super::super::vm::prelude::is_in_prelude;
+use super::nodes::*;
 
 #[derive(Debug)]
 enum ScopeResolution {
@@ -45,13 +45,16 @@ impl<'a> Scope for FunctionScope<'a> {
 struct ModuleScope {
     module: Rc<RefCell<Module>>,
     // Map an import name to its source.
-    imports: HashMap<String, String>,
+    imports: HashMap<String, Import>,
 }
 
 impl Scope for ModuleScope {
     fn resolve(&mut self, name: &String) -> ScopeResolution {
         if is_in_prelude(name) {
-            self.imports.insert(name.to_owned(), "prelude".to_owned());
+            self.imports.insert(
+                name.to_owned(),
+                Import::Named("prelude".to_owned(), name.to_owned()),
+            );
             ScopeResolution::Constant(name.to_owned())
         } else {
             ScopeResolution::NotFound(name.to_owned())
@@ -87,6 +90,10 @@ impl Compiler {
             // We should always end up back in the main function.
             assert_eq!(self.current, self.unit.borrow().main_function());
         }
+
+        // Now that we've visited the whole program we can write out the
+        // imports we've found.
+        self.unit.borrow_mut().imports = module_scope.imports;
     }
 
     fn compile_node(&mut self, node: &Node, scope: &mut Scope) -> SharedValue {
@@ -177,6 +184,7 @@ impl Compiler {
         match resolution {
             ScopeResolution::Local(index) => self.build_get_local(index),
             ScopeResolution::Lexical(name) => self.build_get_local_lexical(name),
+            ScopeResolution::Constant(name) => self.build_get_constant(name),
             _ => panic!("Cannot handle resolution: {:?}", resolution),
         }
     }
