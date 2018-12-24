@@ -10,6 +10,13 @@ pub fn build_prelude() -> LoadedModule {
     module
 }
 
+pub fn is_in_prelude<N: AsRef<str>>(name: N) -> bool {
+    match name.as_ref() {
+        "println" => true,
+        _ => false,
+    }
+}
+
 fn prelude_println(arguments: Vec<Value>) -> Value {
     if let Some(argument) = arguments.first() {
         match argument {

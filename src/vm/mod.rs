@@ -1,7 +1,7 @@
 mod call_target;
 mod frame;
 mod loader;
-mod prelude;
+pub mod prelude;
 mod value;
 mod vm;
 

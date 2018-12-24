@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
@@ -6,6 +7,7 @@ use super::super::ir::layout::{
     Address, Instruction, InstructionBuilder, Module, SharedFunction, SharedValue,
 };
 use super::nodes::*;
+use super::super::vm::prelude::is_in_prelude;
 
 #[derive(Debug)]
 enum ScopeResolution {
@@ -42,11 +44,18 @@ impl<'a> Scope for FunctionScope<'a> {
 
 struct ModuleScope {
     module: Rc<RefCell<Module>>,
+    // Map an import name to its source.
+    imports: HashMap<String, String>,
 }
 
 impl Scope for ModuleScope {
     fn resolve(&mut self, name: &String) -> ScopeResolution {
-        ScopeResolution::NotFound(name.to_owned())
+        if is_in_prelude(name) {
+            self.imports.insert(name.to_owned(), "prelude".to_owned());
+            ScopeResolution::Constant(name.to_owned())
+        } else {
+            ScopeResolution::NotFound(name.to_owned())
+        }
     }
 }
 
@@ -65,6 +74,7 @@ impl Compiler {
     fn compile_program(&mut self, program: &Program) {
         let mut module_scope = ModuleScope {
             module: self.unit.clone(),
+            imports: HashMap::new(),
         };
 
         // We should start in the main function.
