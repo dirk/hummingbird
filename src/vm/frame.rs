@@ -84,9 +84,7 @@ impl BytecodeFrame {
     }
 
     pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
-        let module = self.function.module();
-        let mut borrowed_module = module.borrow_mut();
-        borrowed_module.get_constant(name.as_ref())
+        self.function.module().constant(name.as_ref())
     }
 
     pub fn get_local(&self, index: u8) -> Value {

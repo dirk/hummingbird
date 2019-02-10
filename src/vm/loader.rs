@@ -86,6 +86,12 @@ impl LoadedModule {
             .expect("Function not found")
             .clone()
     }
+
+    pub fn constant<N: AsRef<str>>(&self, name: N) -> Value {
+        self.0
+            .borrow_mut()
+            .get_constant(name)
+    }
 }
 
 impl From<InnerLoadedModule> for LoadedModule {
