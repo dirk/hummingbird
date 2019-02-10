@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
-use super::loader::{LoadedFunction, LoadedModule};
+use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::value::Value;
 
 // Frames can live outside of the stack (eg. closures) and can be mutated from
@@ -29,12 +29,13 @@ pub trait Frame {
 
 // Frame evaluating a bytecode function.
 //
-// The first two fields should *not* be changed after the frame
+// The first three fields should *not* be changed after the frame
 // is initialized.
 pub struct BytecodeFrame {
     // TODO: Replace `LoadedFunction` with an abstraction that can support
     //   specialized instruction sequences.
     function: LoadedFunction,
+    bytecode: BytecodeFunction,
     lexical_parent: Option<SharedFrame>,
     pub return_register: Reg,
     registers: Vec<Value>,
@@ -48,10 +49,12 @@ impl BytecodeFrame {
         lexical_parent: Option<SharedFrame>,
         return_register: Reg,
     ) -> Self {
-        let registers = function.registers();
-        let locals = function.locals();
+        let bytecode = function.bytecode();
+        let registers = bytecode.registers();
+        let locals = bytecode.locals();
         Self {
             function,
+            bytecode,
             lexical_parent,
             return_register,
             registers: vec![Value::Null; registers as usize],
@@ -66,7 +69,7 @@ impl BytecodeFrame {
 
     #[inline]
     pub fn current(&self) -> Instruction {
-        self.function.instruction(self.current_address)
+        self.bytecode.instruction(self.current_address)
     }
 
     #[inline]
@@ -173,7 +176,7 @@ impl Frame for BytecodeFrame {
 
     fn get_local_lexical(&self, name: &String) -> Value {
         let index = self
-            .function
+            .bytecode
             .locals_names()
             .iter()
             .position(|local| local == name);

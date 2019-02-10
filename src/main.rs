@@ -20,20 +20,22 @@ fn main() {
     let source = fs::read_to_string(filename).expect("Unable to read source file");
 
     let program = parser::parse(source);
-    // println!("Program:\n{:?}", program);
 
+    println!("AST:");
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
         .print_program(program.clone())
         .expect("Unable to print AST");
 
     let ir_unit = ast::compiler::compile(&program);
+    println!("\nIR:");
     let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
     ir_printer
         .print_module(&ir_unit)
         .expect("Unable to print IR");
 
     let bytecode_unit = ir::compiler::compile(&ir_unit);
+    println!("\nBytecode:");
     let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
     bytecode_printer
         .print_unit(&bytecode_unit)

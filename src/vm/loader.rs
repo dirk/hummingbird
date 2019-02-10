@@ -50,7 +50,8 @@ impl Loader {
             .map(|function| {
                 InnerLoadedFunction {
                     unit: Rc::downgrade(&loaded_module.0),
-                    function,
+                    id: function.id,
+                    bytecode: InnerBytecodeFunction { function }.into(),
                 }
                 .into()
             })
@@ -88,9 +89,7 @@ impl LoadedModule {
     }
 
     pub fn constant<N: AsRef<str>>(&self, name: N) -> Value {
-        self.0
-            .borrow_mut()
-            .get_constant(name)
+        self.0.borrow_mut().get_constant(name)
     }
 }
 
@@ -189,15 +188,47 @@ impl ModuleExports {
 #[derive(Clone)]
 pub struct InnerLoadedFunction {
     unit: WeakLoadedModule,
-    function: bytecode::layout::Function,
+    id: u16,
+    bytecode: BytecodeFunction,
 }
 
 impl InnerLoadedFunction {
-    #[inline]
     pub fn id(&self) -> u16 {
-        self.function.id
+        self.id
     }
 
+    pub fn bytecode(&self) -> BytecodeFunction {
+        self.bytecode.clone()
+    }
+
+    pub fn module(&self) -> LoadedModule {
+        let unit = self.unit.upgrade().expect("Unit has been dropped");
+        LoadedModule(unit)
+    }
+}
+
+#[derive(Clone)]
+pub struct LoadedFunction(Rc<InnerLoadedFunction>);
+
+impl From<InnerLoadedFunction> for LoadedFunction {
+    fn from(loaded_function: InnerLoadedFunction) -> LoadedFunction {
+        LoadedFunction(Rc::new(loaded_function))
+    }
+}
+
+impl Deref for LoadedFunction {
+    type Target = InnerLoadedFunction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct InnerBytecodeFunction {
+    function: bytecode::layout::Function,
+}
+
+impl InnerBytecodeFunction {
     #[inline]
     pub fn registers(&self) -> u8 {
         self.function.registers
@@ -216,24 +247,19 @@ impl InnerLoadedFunction {
     pub fn locals_names(&self) -> Vec<String> {
         self.function.locals_names.clone()
     }
-
-    pub fn module(&self) -> LoadedModule {
-        let upgraded = self.unit.upgrade().expect("Unit has been dropped");
-        LoadedModule(upgraded)
-    }
 }
 
 #[derive(Clone)]
-pub struct LoadedFunction(Rc<InnerLoadedFunction>);
+pub struct BytecodeFunction(Rc<InnerBytecodeFunction>);
 
-impl From<InnerLoadedFunction> for LoadedFunction {
-    fn from(loaded_function: InnerLoadedFunction) -> LoadedFunction {
-        LoadedFunction(Rc::new(loaded_function))
+impl From<InnerBytecodeFunction> for BytecodeFunction {
+    fn from(bytecode: InnerBytecodeFunction) -> BytecodeFunction {
+        BytecodeFunction(Rc::new(bytecode))
     }
 }
 
-impl Deref for LoadedFunction {
-    type Target = InnerLoadedFunction;
+impl Deref for BytecodeFunction {
+    type Target = InnerBytecodeFunction;
 
     fn deref(&self) -> &Self::Target {
         &self.0
