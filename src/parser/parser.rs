@@ -198,12 +198,10 @@ fn parse_infix(input: &mut TokenStream) -> Node {
         subnodes.push(Subnode::Op(input.read()));
         subnodes.push(Subnode::Node(parse_block(input)));
     }
-    if subnodes.len() > 1 {
-        // Implement associativity by reducing around operators. The earlier
-        // reductions have higher associativity than later ones.
-        reduce_subnodes(&mut subnodes, Token::Star);
-        reduce_subnodes(&mut subnodes, Token::Plus);
-    }
+    // Implement associativity by reducing around operators. The earlier
+    // reductions have higher associativity than later ones.
+    reduce_subnodes(&mut subnodes, Token::Star);
+    reduce_subnodes(&mut subnodes, Token::Plus);
     // It better have fully reduced!
     assert_eq!(subnodes.len(), 1);
     subnodes.remove(0).into()
