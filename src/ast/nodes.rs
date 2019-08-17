@@ -39,16 +39,24 @@ pub struct Block {
 
 #[derive(Clone, Debug)]
 pub struct Function {
-    pub name: String,
-    pub block: Block,
+    pub name: Option<String>,
+    pub body: Box<Node>,
     pub location: Option<Location>,
 }
 
 impl Function {
-    pub fn new(name: String, block: Block) -> Self {
+    pub fn new_anonymous(body: Box<Node>) -> Self {
         Self {
-            name,
-            block,
+            name: None,
+            body,
+            location: None,
+        }
+    }
+
+    pub fn new_named(name: String, body: Box<Node>) -> Self {
+        Self {
+            name: Some(name),
+            body,
             location: None,
         }
     }
@@ -56,7 +64,7 @@ impl Function {
 
 impl PartialEq for Function {
     fn eq(&self, other: &Function) -> bool {
-        self.name == other.name && self.block == other.block
+        self.name == other.name && self.body == other.body
     }
 }
 

@@ -37,7 +37,6 @@ fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
 fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
     let next = input.peek();
     let node = match next {
-        Token::Func(_) => parse_function(input),
         Token::Let(_) => parse_let_and_var(input),
         Token::Return => parse_return(input, terminator.clone()),
         Token::Var(_) => parse_let_and_var(input),
@@ -57,32 +56,6 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
         Some(vec![Token::Terminal('\n'), Token::Terminal(';')]),
     );
     unreachable!()
-}
-
-fn parse_function(input: &mut TokenStream) -> Node {
-    // Consume the `func` and get its location.
-    let location = input.read().location();
-
-    let token = input.read();
-    let name_identifier: Identifier = token.into();
-
-    expect_to_read(input, Token::ParenthesesLeft);
-    expect_to_read(input, Token::ParenthesesRight);
-
-    let token = input.peek();
-    if token != Token::BraceLeft {
-        panic_unexpected(token, Some(vec![Token::BraceLeft]));
-    }
-    let block_node = parse_block(input);
-
-    let name = name_identifier.value;
-    let block = match block_node {
-        Node::Block(block) => block,
-        _ => unreachable!(),
-    };
-    let mut function = Function::new(name, block);
-    function.location = location;
-    Node::Function(function)
 }
 
 fn parse_let_and_var(input: &mut TokenStream) -> Node {
@@ -209,7 +182,42 @@ fn parse_block(input: &mut TokenStream) -> Node {
         expect_to_read(input, Token::BraceRight); // Closing brace
         Node::Block(Block { nodes })
     } else {
-        parse_parentheses(input)
+        parse_anonymous_function(input)
+    }
+}
+
+fn parse_anonymous_function(input: &mut TokenStream) -> Node {
+    if let Some((_, body)) = try_parse_function(input) {
+        return Node::Function(Function::new_anonymous(body))
+    }
+    parse_parentheses(input)
+}
+
+/// Tries to parse the main components of a function:
+///   - The parameters (eg. `(a, b)`)
+///   - The arrow (`->`)
+///   - The body (an expression)
+///
+/// If successful it returns a tuple of the parameters and body, if unsuccessful
+/// it backtracks the input and returns `None`.
+fn try_parse_function(input: &mut TokenStream) -> Option<((), Box<Node>)> {
+    let savepoint = input.clone();
+    // Making a closure so that we can easily `return None` anywhere to
+    // interrupt parsing and backtrack.
+    let mut inner = || {
+        input.read_if(Token::ParenthesesLeft)?;
+        // TODO: Parse parameters list.
+        input.read_if(Token::ParenthesesRight)?;
+        // TODO: Parse return type if present.
+        input.read_if(Token::Arrow)?;
+        Some(((), Box::new(parse_expression(input))))
+    };
+    match inner() {
+        None => {
+            input.backtrack(&savepoint);
+            None
+        },
+        Some(pair) => Some(pair),
     }
 }
 
@@ -229,6 +237,7 @@ fn parse_assignment(input: &mut TokenStream) -> Node {
     if input.peek() == Token::Equals {
         input.read(); // Equals sign
         let rhs = parse_expression(input);
+        // FIXME: Check that assignment left-hand-side doesn't end with a call.
         Node::Assignment(Assignment::new(lhs, rhs))
     } else {
         lhs
@@ -237,6 +246,20 @@ fn parse_assignment(input: &mut TokenStream) -> Node {
 
 fn parse_postfix(input: &mut TokenStream) -> Node {
     let mut target = parse_atom(input);
+    // If the base atom was an identifier and it was immediately followed by
+    // a left-parentheses then we might have a named function declaration on
+    // our hands rather than a call.
+    if let Node::Identifier(identifier) = &target {
+        if let Token::ParenthesesLeft = input.peek() {
+            let name = identifier.value.clone();
+            if let Some((_, body)) = try_parse_function(input) {
+                return Node::Function(Function::new_named(
+                    name,
+                    body,
+                ))
+            }
+        }
+    }
     loop {
         if let Some(new_target) = try_parse_postfix_property(input, &target) {
             target = new_target;
@@ -466,14 +489,37 @@ mod tests {
     }
 
     #[test]
-    fn it_parses_func() {
+    fn it_parses_anonymous_function() {
         assert_eq!(
-            parse_complete("func foo() { 123 }"),
-            vec![Node::Function(Function::new(
-                "foo".to_string(),
-                Block {
+            parse_complete("() -> { 123 }"),
+            vec![Node::Function(Function::new_anonymous(
+                Box::new(Node::Block(Block {
                     nodes: vec![Node::Integer(Integer { value: 123 })],
-                },
+                })),
+            ))],
+        );
+        assert_eq!(
+            parse_complete("foo(() -> 123)"),
+            vec![Node::PostfixCall(PostfixCall::new(
+                Node::Identifier(Identifier::new("foo")),
+                vec![
+                    Node::Function(Function::new_anonymous(
+                        Box::new(Node::Integer(Integer { value: 123 })),
+                    )),
+                ],
+            ))],
+        );
+    }
+
+    #[test]
+    fn it_parses_named_function() {
+        assert_eq!(
+            parse_complete("foo() -> { 123 }"),
+            vec![Node::Function(Function::new_named(
+                "foo".to_string(),
+                Box::new(Node::Block(Block {
+                    nodes: vec![Node::Integer(Integer { value: 123 })],
+                })),
             ))],
         );
     }

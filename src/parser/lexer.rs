@@ -71,6 +71,7 @@ impl StringStream {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    Arrow,
     BraceLeft,
     BraceRight,
     Comma,
@@ -80,7 +81,6 @@ pub enum Token {
     Identifier(String, Location),
     Integer(i64),
     Let(Location),
-    Func(Location),
     Minus,
     ParenthesesLeft,
     ParenthesesRight,
@@ -94,7 +94,7 @@ pub enum Token {
 impl Token {
     pub fn location(&self) -> Option<Location> {
         match self {
-            Token::Func(location) | Token::Let(location) | Token::Var(location) => {
+            Token::Let(location) | Token::Var(location) => {
                 Some(location.clone())
             }
             Token::Identifier(_, location) => Some(location.clone()),
@@ -146,6 +146,15 @@ impl TokenStream {
         self.next_token.clone().unwrap()
     }
 
+    pub fn read_if(&mut self, expected: Token) -> Option<Token> {
+        let got = self.peek();
+        if expected == got {
+            Some(self.read())
+        } else {
+            None
+        }
+    }
+
     pub fn read(&mut self) -> Token {
         let token = self.peek();
         self.peeking = false;
@@ -162,7 +171,7 @@ impl TokenStream {
             if identifier_head(character) {
                 return self.lex_identifier(location);
             } else if numeric_head(character) {
-                return self.lex_numeric_or_minus();
+                return self.lex_arrow_minus_or_numeric();
             } else {
                 self.input.read();
                 match character {
@@ -201,15 +210,18 @@ impl TokenStream {
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
             "let" => Token::Let(location),
-            "func" => Token::Func(location),
             "var" => Token::Var(location),
             "return" => Token::Return,
             _ => Token::Identifier(identifier_string, location),
         }
     }
 
-    fn lex_numeric_or_minus(&mut self) -> Token {
+    fn lex_arrow_minus_or_numeric(&mut self) -> Token {
         let first_character = self.input.read();
+        if first_character == '-' && self.input.peek() == '>' {
+            self.input.read();
+            return Token::Arrow;
+        }
         if first_character == '-' && !digit(self.input.peek()) {
             return Token::Minus;
         }
@@ -314,17 +326,32 @@ mod tests {
     #[test]
     fn it_parses_keywords() {
         assert_eq!(
-            parse("func"),
-            vec![Token::Func(Location::new(0, 1, 1)), Token::EOF,]
-        );
-        assert_eq!(
             parse("let"),
             vec![Token::Let(Location::new(0, 1, 1)), Token::EOF,]
         );
-        assert_eq!(parse("return"), vec![Token::Return, Token::EOF,]);
+        assert_eq!(
+            parse("return"),
+            vec![Token::Return, Token::EOF,],
+        );
         assert_eq!(
             parse("var"),
             vec![Token::Var(Location::new(0, 1, 1)), Token::EOF,]
+        );
+    }
+
+    #[test]
+    fn it_parses_arrows() {
+        assert_eq!(
+            parse("foo() -> {}"),
+            vec![
+                Token::Identifier("foo".to_string(), Location::new(0, 1, 1)),
+                Token::ParenthesesLeft,
+                Token::ParenthesesRight,
+                Token::Arrow,
+                Token::BraceLeft,
+                Token::BraceRight,
+                Token::EOF,
+            ],
         );
     }
 
