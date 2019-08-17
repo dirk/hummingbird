@@ -647,6 +647,18 @@ mod tests {
                 Node::Integer(Integer { value: 2 }),
             )),
         );
+        assert_eq!(
+            parse_infix(&mut input("1 * 2 * 3")),
+            Node::Infix(Infix::new(
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Token::Star,
+                    Node::Integer(Integer { value: 2 }),
+                )),
+                Token::Star,
+                Node::Integer(Integer { value: 3 }),
+            )),
+        );
         // Now with associativity!
         assert_eq!(
             parse_infix(&mut input("1 * 2 + 3 * 4")),
@@ -662,6 +674,23 @@ mod tests {
                     Token::Star,
                     Node::Integer(Integer { value: 4 }),
                 )),
+            )),
+        );
+        // Now with parentheses!
+        assert_eq!(
+            parse_infix(&mut input("1 * (2 + 3) * 4")),
+            Node::Infix(Infix::new(
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Token::Star,
+                    Node::Infix(Infix::new(
+                        Node::Integer(Integer { value: 2 }),
+                        Token::Plus,
+                        Node::Integer(Integer { value: 3 }),
+                    )),
+                )),
+                Token::Star,
+                Node::Integer(Integer { value: 4 }),
             )),
         );
     }
