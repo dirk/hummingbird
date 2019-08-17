@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use super::super::ast::nodes::{
     Assignment, Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall,
     PostfixProperty, Program, Return, Var,
@@ -142,6 +144,7 @@ fn parse_expression(input: &mut TokenStream) -> Node {
 }
 
 fn parse_infix(input: &mut TokenStream) -> Node {
+    #[derive(Debug)]
     enum Subnode {
         Node(Node),
         Op(Token),
@@ -169,9 +172,13 @@ fn parse_infix(input: &mut TokenStream) -> Node {
 
                     // Then turn that 3-vector into stuff we can work with.
                     let rhs = removed_nodes.pop().unwrap();
-                    let op = match removed_nodes.pop().unwrap() {
+                    let op_node = removed_nodes.pop().unwrap();
+                    let op = match op_node {
                         Subnode::Op(token) => token,
-                        _ => unreachable!(),
+                        _ => {
+                            panic_unexpected_names(op_node, "Op");
+                            unreachable!()
+                        },
                     };
                     let lhs = removed_nodes.pop().unwrap();
 
@@ -385,7 +392,7 @@ fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
     panic!("Unexpected token: {:?}{}", token, expected)
 }
 
-fn panic_unexpected_names(token: Token, expected_names: &str) {
+fn panic_unexpected_names<T: Debug>(token: T, expected_names: &str) {
     panic!(
         "Unexpected token: {:?} (expected {})",
         token, expected_names
