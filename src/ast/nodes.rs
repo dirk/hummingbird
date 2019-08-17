@@ -1,6 +1,6 @@
 use std::boxed::Box;
 
-use super::super::parser::{Location, Token};
+use super::super::parser::{Location, Span, Token};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
@@ -71,14 +71,14 @@ impl PartialEq for Function {
 #[derive(Clone, Debug)]
 pub struct Identifier {
     pub value: String,
-    pub location: Option<Location>,
+    pub span: Option<Span>,
 }
 
 impl Identifier {
     pub fn new<V: Into<String>>(value: V) -> Self {
         Self {
             value: value.into(),
-            location: None,
+            span: None,
         }
     }
 }

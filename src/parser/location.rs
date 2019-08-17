@@ -22,3 +22,18 @@ impl Location {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Span {
+    pub start: Location,
+    pub end: Location,
+}
+
+impl Span {
+    pub fn new(start: Location, end: Location) -> Self {
+        Self {
+            start,
+            end,
+        }
+    }
+}

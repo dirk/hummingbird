@@ -375,9 +375,9 @@ fn panic_unexpected_names(token: Token, expected_names: &str) {
 impl From<Token> for Identifier {
     fn from(token: Token) -> Identifier {
         match token {
-            Token::Identifier(value, location) => {
+            Token::Identifier(value, span) => {
                 let mut identifier = Identifier::new(value);
-                identifier.location = Some(location);
+                identifier.span = Some(span);
                 identifier
             }
             _ => {
@@ -396,7 +396,7 @@ mod tests {
     };
 
     use super::super::lexer::{Token, TokenStream};
-    use super::super::location::Location;
+    use super::super::{Location, Span};
 
     use super::{parse_block, parse_infix, parse_postfix, parse_program};
 
@@ -531,7 +531,13 @@ mod tests {
         let node = nodes.remove(0);
         match node {
             Node::Identifier(identifier) => {
-                assert_eq!(identifier.location, Some(Location::new(8, 2, 3)));
+                assert_eq!(
+                    identifier.span,
+                    Some(Span::new(
+                        Location::new(8, 2, 3),
+                        Location::new(11, 2, 6),
+                    )),
+                );
             }
             _ => unreachable!(),
         }
