@@ -5,10 +5,7 @@ use std::process::exit;
 use std::{env, fs};
 
 mod ast;
-mod ir;
 mod parser;
-mod target;
-mod vm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -26,21 +23,4 @@ fn main() {
     printer
         .print_program(program.clone())
         .expect("Unable to print AST");
-
-    let ir_unit = ast::compiler::compile(&program);
-    println!("\nIR:");
-    let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
-    ir_printer
-        .print_module(&ir_unit)
-        .expect("Unable to print IR");
-
-    let bytecode_unit = ir::compiler::compile(&ir_unit);
-    println!("\nBytecode:");
-    let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
-    bytecode_printer
-        .print_unit(&bytecode_unit)
-        .expect("Unable to print bytecode");
-
-    vm::Vm::run_file(filename);
-    // println!("Bytecode:\n{:?}", bytecode_unit);
 }
