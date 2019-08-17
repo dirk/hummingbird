@@ -416,15 +416,14 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall, PostfixProperty,
-        Program, Return,
+        Assignment, Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall,
+        PostfixProperty, Program, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
     use super::super::{Location, Span};
 
     use super::{parse_block, parse_infix, parse_postfix, parse_program};
-    use crate::ast::Assignment;
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
