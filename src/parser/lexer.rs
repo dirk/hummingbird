@@ -146,9 +146,13 @@ impl TokenStream {
         self.next_token.clone().unwrap()
     }
 
+    /// Peeks, and if the peeked token is the same type as the expected then
+    /// read that type and return the read (not expected) token.
     pub fn read_if(&mut self, expected: Token) -> Option<Token> {
+        use std::mem::discriminant;
+
         let got = self.peek();
-        if expected == got {
+        if discriminant(&expected) == discriminant(&got) {
             Some(self.read())
         } else {
             None
@@ -298,9 +302,13 @@ fn digit(character: char) -> bool {
 mod tests {
     use super::{Location, StringStream, Token, TokenStream};
 
-    fn parse(input: &str) -> Vec<Token> {
+    fn make_token_stream(input: &str) -> TokenStream {
         let string_stream = StringStream::new(input);
-        let mut token_stream = TokenStream::new(string_stream);
+        TokenStream::new(string_stream)
+    }
+
+    fn parse(input: &str) -> Vec<Token> {
+        let mut token_stream = make_token_stream(input);
         let mut tokens = vec![];
         loop {
             let token = token_stream.read();
@@ -433,6 +441,36 @@ mod tests {
                 Token::BraceRight,
                 Token::EOF,
             ]
+        );
+    }
+
+    #[test]
+    fn test_read_if() {
+        let input = "a";
+        // Check that `read` works correctly.
+        let actual = Token::Identifier("a".to_string(), Location::new(0, 1, 1));
+        assert_eq!(
+            make_token_stream(input).read(),
+            actual,
+        );
+        // Now check that the contents of the expected token don't equal the
+        // actual token.
+        let expected = Token::Identifier("".to_string(), Location::new(0, 0, 0));
+        assert_ne!(
+            make_token_stream(input).read(),
+            expected,
+        );
+        // But `read_if` should still return the actual token since they're
+        // both `Identifier`s.
+        assert_eq!(
+            make_token_stream("a").read_if(expected),
+            Some(actual),
+        );
+        // And finally if we look for something that isn't an identifier it
+        // should return `None`.
+        assert_eq!(
+            make_token_stream("a").read_if(Token::ParenthesesLeft),
+            None,
         );
     }
 }
