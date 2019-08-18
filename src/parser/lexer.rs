@@ -94,9 +94,7 @@ pub enum Token {
 impl Token {
     pub fn location(&self) -> Option<Location> {
         match self {
-            Token::Let(location) | Token::Var(location) => {
-                Some(location.clone())
-            }
+            Token::Let(location) | Token::Var(location) => Some(location.clone()),
             Token::Identifier(_, location) => Some(location.start.clone()),
             _ => None,
         }
@@ -216,10 +214,7 @@ impl TokenStream {
             "let" => Token::Let(start),
             "var" => Token::Var(start),
             "return" => Token::Return,
-            _ => Token::Identifier(
-                identifier_string,
-                Span::new(start, self.input.location()),
-            ),
+            _ => Token::Identifier(identifier_string, Span::new(start, self.input.location())),
         }
     }
 
@@ -330,10 +325,7 @@ mod tests {
             vec![
                 Token::Identifier(
                     "foo".to_string(),
-                    Span::new(
-                        Location::new(0, 1, 1),
-                        Location::new(3, 1, 4),
-                    ),
+                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
                 ),
                 Token::EOF,
             ]
@@ -344,15 +336,12 @@ mod tests {
     fn it_parses_keywords() {
         assert_eq!(
             parse("let"),
-            vec![Token::Let(Location::new(0, 1, 1)), Token::EOF,]
+            vec![Token::Let(Location::new(0, 1, 1)), Token::EOF],
         );
-        assert_eq!(
-            parse("return"),
-            vec![Token::Return, Token::EOF,],
-        );
+        assert_eq!(parse("return"), vec![Token::Return, Token::EOF]);
         assert_eq!(
             parse("var"),
-            vec![Token::Var(Location::new(0, 1, 1)), Token::EOF,]
+            vec![Token::Var(Location::new(0, 1, 1)), Token::EOF],
         );
     }
 
@@ -363,10 +352,7 @@ mod tests {
             vec![
                 Token::Identifier(
                     "foo".to_string(),
-                    Span::new(
-                        Location::new(0, 1, 1),
-                        Location::new(3, 1, 4),
-                    ),
+                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
                 ),
                 Token::ParenthesesLeft,
                 Token::ParenthesesRight,
@@ -385,17 +371,11 @@ mod tests {
             vec![
                 Token::Identifier(
                     "foo".to_string(),
-                    Span::new(
-                        Location::new(0, 1, 1),
-                        Location::new(3, 1, 4),
-                    ),
+                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
                 ),
                 Token::Identifier(
                     "bar".to_string(),
-                    Span::new(
-                        Location::new(18, 1, 19),
-                        Location::new(21, 1, 22),
-                    ),
+                    Span::new(Location::new(18, 1, 19), Location::new(21, 1, 22)),
                 ),
                 Token::EOF,
             ]
@@ -406,18 +386,12 @@ mod tests {
             vec![
                 Token::Identifier(
                     "foo".to_string(),
-                    Span::new(
-                        Location::new(0, 1, 1),
-                        Location::new(3, 1, 4),
-                    ),
+                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
                 ),
                 Token::Terminal('\n'),
                 Token::Identifier(
                     "bar".to_string(),
-                    Span::new(
-                        Location::new(17, 2, 2),
-                        Location::new(20, 2, 5),
-                    ),
+                    Span::new(Location::new(17, 2, 2), Location::new(20, 2, 5)),
                 ),
                 Token::EOF,
             ]
@@ -433,18 +407,12 @@ mod tests {
             vec![
                 Token::Identifier(
                     "foo".to_string(),
-                    Span::new(
-                        Location::new(0, 1, 1),
-                        Location::new(3, 1, 4),
-                    ),
+                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
                 ),
                 Token::Terminal('\n'),
                 Token::Identifier(
                     "bar".to_string(),
-                    Span::new(
-                        Location::new(100, 4, 13),
-                        Location::new(103, 4, 16),
-                    ),
+                    Span::new(Location::new(100, 4, 13), Location::new(103, 4, 16)),
                 ),
                 Token::ParenthesesLeft,
                 Token::ParenthesesRight,
@@ -501,39 +469,21 @@ mod tests {
         // Check that `read` works correctly.
         let actual = Token::Identifier(
             "a".to_string(),
-            Span::new(
-                Location::new(0, 1, 1),
-                Location::new(1, 1, 2),
-            ),
+            Span::new(Location::new(0, 1, 1), Location::new(1, 1, 2)),
         );
-        assert_eq!(
-            make_token_stream(input).read(),
-            actual,
-        );
+        assert_eq!(make_token_stream(input).read(), actual,);
         // Now check that the contents of the expected token don't equal the
         // actual token.
         let expected = Token::Identifier(
             "".to_string(),
-            Span::new(
-                Location::unknown(),
-                Location::unknown(),
-            ),
+            Span::new(Location::unknown(), Location::unknown()),
         );
-        assert_ne!(
-            make_token_stream(input).read(),
-            expected,
-        );
+        assert_ne!(make_token_stream(input).read(), expected);
         // But `read_if` should still return the actual token since they're
         // both `Identifier`s.
-        assert_eq!(
-            make_token_stream("a").read_if(expected),
-            Some(actual),
-        );
+        assert_eq!(make_token_stream("a").read_if(expected), Some(actual));
         // And finally if we look for something that isn't an identifier it
         // should return `None`.
-        assert_eq!(
-            make_token_stream("a").read_if(Token::ParenthesesLeft),
-            None,
-        );
+        assert_eq!(make_token_stream("a").read_if(Token::ParenthesesLeft), None);
     }
 }

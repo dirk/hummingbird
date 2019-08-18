@@ -35,11 +35,7 @@ impl PartialEq for Location {
         if self.is_unknown() || other.is_unknown() {
             true
         } else {
-            (
-                self.index == other.index &&
-                self.line == other.line &&
-                self.column == other.column
-            )
+            (self.index == other.index && self.line == other.line && self.column == other.column)
         }
     }
 }
@@ -47,11 +43,7 @@ impl PartialEq for Location {
 #[cfg(not(test))]
 impl PartialEq for Location {
     fn eq(&self, other: &Self) -> bool {
-        (
-            self.index == other.index &&
-            self.line == other.line &&
-            self.column == other.column
-        )
+        (self.index == other.index && self.line == other.line && self.column == other.column)
     }
 }
 
@@ -63,10 +55,7 @@ pub struct Span {
 
 impl Span {
     pub fn new(start: Location, end: Location) -> Self {
-        Self {
-            start,
-            end,
-        }
+        Self { start, end }
     }
 
     pub fn unknown() -> Self {

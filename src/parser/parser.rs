@@ -78,14 +78,11 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
         _ => {
             panic_unexpected_names(node, "Identifier");
             unreachable!()
-        },
+        }
     };
     if let Token::ParenthesesLeft = input.peek() {
         if let Some((_, body)) = try_parse_function(input) {
-            return Some(Node::Function(Function::new_named(
-                name,
-                body,
-            )))
+            return Some(Node::Function(Function::new_named(name, body)));
         }
     };
     // If we fall through that means we didn't find a named function and
@@ -177,7 +174,7 @@ fn parse_infix(input: &mut TokenStream) -> Node {
                         unexpected @ _ => {
                             panic_unexpected_names(unexpected, "Op");
                             unreachable!()
-                        },
+                        }
                     };
                     let lhs = removed_nodes.pop().unwrap();
 
@@ -226,7 +223,7 @@ fn parse_block(input: &mut TokenStream) -> Node {
 
 fn parse_anonymous_function(input: &mut TokenStream) -> Node {
     if let Some((_, body)) = try_parse_function(input) {
-        return Node::Function(Function::new_anonymous(body))
+        return Node::Function(Function::new_anonymous(body));
     }
     parse_assignment(input)
 }
@@ -254,7 +251,7 @@ fn try_parse_function(input: &mut TokenStream) -> Option<((), Box<Node>)> {
         None => {
             input.backtrack(&savepoint);
             None
-        },
+        }
         Some(pair) => Some(pair),
     }
 }
@@ -488,14 +485,14 @@ mod tests {
             parse_complete("return 1"),
             vec![Node::Return(Return::new(Some(Node::Integer(Integer {
                 value: 1
-            })),))],
+            }))))],
         );
         assert_eq!(
             parse_complete("{ return 1 }"),
             vec![Node::Block(Block {
                 nodes: vec![Node::Return(Return::new(Some(Node::Integer(Integer {
                     value: 1
-                })),)),],
+                }))))],
             })],
         );
         assert_eq!(
@@ -503,7 +500,7 @@ mod tests {
             vec![Node::Block(Block {
                 nodes: vec![Node::Return(Return::new(Some(Node::Integer(Integer {
                     value: 1
-                })),)),],
+                }))))],
             })],
         );
     }
@@ -512,19 +509,19 @@ mod tests {
     fn it_parses_anonymous_function() {
         assert_eq!(
             parse_complete("() -> { 123 }"),
-            vec![Node::Function(Function::new_anonymous(
-                Box::new(Node::Block(Block {
+            vec![Node::Function(Function::new_anonymous(Box::new(
+                Node::Block(Block {
                     nodes: vec![Node::Integer(Integer { value: 123 })],
-                })),
-            ))],
+                }),
+            )))],
         );
         assert_eq!(
             parse_complete("foo = () -> 123"),
             vec![Node::Assignment(Assignment::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
-                Node::Function(Function::new_anonymous(
-                    Box::new(Node::Integer(Integer { value: 123 })),
-                ))
+                Node::Function(Function::new_anonymous(Box::new(Node::Integer(Integer {
+                    value: 123
+                })))),
             ))],
         );
         assert_eq!(
@@ -532,9 +529,9 @@ mod tests {
             vec![Node::Assignment(Assignment::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 Node::PostfixCall(PostfixCall::new(
-                    Node::Function(Function::new_anonymous(
-                        Box::new(Node::Integer(Integer { value: 123 })),
-                    )),
+                    Node::Function(Function::new_anonymous(Box::new(Node::Integer(Integer {
+                        value: 123
+                    })))),
                     vec![],
                 )),
             ))],
@@ -543,11 +540,9 @@ mod tests {
             parse_complete("foo(() -> 123)"),
             vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
-                vec![
-                    Node::Function(Function::new_anonymous(
-                        Box::new(Node::Integer(Integer { value: 123 })),
-                    )),
-                ],
+                vec![Node::Function(Function::new_anonymous(Box::new(
+                    Node::Integer(Integer { value: 123 })
+                )))],
             ))],
         );
     }
@@ -569,15 +564,10 @@ mod tests {
     fn it_parses_atom() {
         assert_eq!(
             parse_complete("/* */\n  foo"),
-            vec![
-                Node::Identifier(Identifier::new(
-                    "foo",
-                    Span::new(
-                        Location::new(8, 2, 3),
-                        Location::new(11, 2, 6),
-                    ),
-                )),
-            ],
+            vec![Node::Identifier(Identifier::new(
+                "foo",
+                Span::new(Location::new(8, 2, 3), Location::new(11, 2, 6)),
+            )),],
         );
     }
 

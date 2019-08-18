@@ -67,7 +67,11 @@ impl<O: Write> Printer<O> {
     }
 
     fn print_function(&mut self, function: Function) -> Result<()> {
-        writeln!(self, "Function({}", function.name.clone().unwrap_or("".to_string()))?;
+        writeln!(
+            self,
+            "Function({}",
+            function.name.clone().unwrap_or("".to_string()),
+        )?;
         self.indented(|printer| printer.print_node(*function.body))?;
         writeln!(self, ")")
     }
