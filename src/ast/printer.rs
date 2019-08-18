@@ -26,8 +26,8 @@ impl<O: Write> Printer<O> {
         result
     }
 
-    pub fn print_program(&mut self, program: Program) -> Result<()> {
-        for node in program.nodes {
+    pub fn print_root(&mut self, root: Root) -> Result<()> {
+        for node in root.nodes {
             self.print_node(node)?
         }
         Ok(())

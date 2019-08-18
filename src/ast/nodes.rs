@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::fmt::{Display, Error, Formatter};
 
 use super::super::parser::{Location, Span, Token};
 
@@ -15,6 +16,25 @@ pub enum Node {
     PostfixProperty(PostfixProperty),
     Return(Return),
     Var(Var),
+}
+
+impl Display for Node {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        use Node::*;
+        match self {
+            Assignment(_) => f.write_str("Assignment"),
+            Block(_) => f.write_str("Block"),
+            Function(_) => f.write_str("Function"),
+            Identifier(_) => f.write_str("Identifier"),
+            Infix(_) => f.write_str("Infix"),
+            Integer(_) => f.write_str("Integer"),
+            Let(_) => f.write_str("Let"),
+            PostfixCall(_) => f.write_str("PostfixCall"),
+            PostfixProperty(_) => f.write_str("PostfixProperty"),
+            Return(_) => f.write_str("Return"),
+            Var(_) => f.write_str("Var"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -172,7 +192,7 @@ impl PostfixProperty {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Program {
+pub struct Root {
     pub nodes: Vec<Node>,
 }
 

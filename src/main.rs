@@ -6,6 +6,7 @@ use std::{env, fs};
 
 mod ast;
 mod parser;
+mod vm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,11 +17,14 @@ fn main() {
     let filename = &args[1];
     let source = fs::read_to_string(filename).expect("Unable to read source file");
 
-    let program = parser::parse(source);
+    let program = parser::parse(source.clone());
 
     println!("AST:");
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
-        .print_program(program.clone())
+        .print_root(program.clone())
         .expect("Unable to print AST");
+
+    let vm = vm::Vm::new();
+    vm.eval_source(source);
 }
