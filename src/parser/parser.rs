@@ -400,11 +400,7 @@ fn panic_unexpected_names<T: Debug>(token: T, expected_names: &str) {
 impl From<Token> for Identifier {
     fn from(token: Token) -> Identifier {
         match token {
-            Token::Identifier(value, span) => {
-                let mut identifier = Identifier::new(value);
-                identifier.span = Some(span);
-                identifier
-            }
+            Token::Identifier(value, span) => Identifier::new(value, span),
             _ => {
                 panic_unexpected_names(token, "Identifier");
                 unreachable!()
@@ -462,7 +458,7 @@ mod tests {
         assert_eq!(
             nodes,
             vec![Node::Let(Let::new(
-                Identifier::new("a"),
+                Identifier::new("a", Span::unknown()),
                 Some(Node::Integer(Integer { value: 1 })),
             ))],
         );
@@ -526,7 +522,7 @@ mod tests {
         assert_eq!(
             parse_complete("foo = () -> 123"),
             vec![Node::Assignment(Assignment::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 Node::Function(Function::new_anonymous(
                     Box::new(Node::Integer(Integer { value: 123 })),
                 ))
@@ -535,7 +531,7 @@ mod tests {
         assert_eq!(
             parse_complete("foo = (() -> 123)()"),
             vec![Node::Assignment(Assignment::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 Node::PostfixCall(PostfixCall::new(
                     Node::Function(Function::new_anonymous(
                         Box::new(Node::Integer(Integer { value: 123 })),
@@ -547,7 +543,7 @@ mod tests {
         assert_eq!(
             parse_complete("foo(() -> 123)"),
             vec![Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![
                     Node::Function(Function::new_anonymous(
                         Box::new(Node::Integer(Integer { value: 123 })),
@@ -572,21 +568,18 @@ mod tests {
 
     #[test]
     fn it_parses_atom() {
-        let mut nodes = parse_complete("/* */\n  foo");
-        assert_eq!(nodes, vec![Node::Identifier(Identifier::new("foo"))]);
-        let node = nodes.remove(0);
-        match node {
-            Node::Identifier(identifier) => {
-                assert_eq!(
-                    identifier.span,
-                    Some(Span::new(
+        assert_eq!(
+            parse_complete("/* */\n  foo"),
+            vec![
+                Node::Identifier(Identifier::new(
+                    "foo",
+                    Span::new(
                         Location::new(8, 2, 3),
                         Location::new(11, 2, 6),
-                    )),
-                );
-            }
-            _ => unreachable!(),
-        }
+                    ),
+                )),
+            ],
+        );
     }
 
     #[test]
@@ -699,7 +692,7 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo.bar")),
             Node::PostfixProperty(PostfixProperty::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 "bar".to_string(),
             ))
         );
@@ -710,28 +703,28 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo()")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![Node::Integer(Integer { value: 1 }),],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1,)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![Node::Integer(Integer { value: 1 }),],
             )),
         );
         assert_eq!(
             parse_postfix(&mut input("foo(1, 2)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
@@ -741,7 +734,7 @@ mod tests {
         assert_eq!(
             parse_postfix(&mut input("foo(1, 2,)")),
             Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
@@ -751,9 +744,9 @@ mod tests {
         assert_eq!(
             parse_complete("foo(bar())"),
             vec![Node::PostfixCall(PostfixCall::new(
-                Node::Identifier(Identifier::new("foo")),
+                Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![Node::PostfixCall(PostfixCall::new(
-                    Node::Identifier(Identifier::new("bar")),
+                    Node::Identifier(Identifier::new("bar", Span::unknown())),
                     vec![],
                 )),],
             )),]

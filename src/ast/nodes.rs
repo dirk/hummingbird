@@ -68,24 +68,18 @@ impl PartialEq for Function {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Identifier {
     pub value: String,
-    pub span: Option<Span>,
+    pub span: Span,
 }
 
 impl Identifier {
-    pub fn new<V: Into<String>>(value: V) -> Self {
+    pub fn new<V: Into<String>>(value: V, span: Span) -> Self {
         Self {
             value: value.into(),
-            span: None,
+            span,
         }
-    }
-}
-
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Identifier) -> bool {
-        self.value == other.value
     }
 }
 

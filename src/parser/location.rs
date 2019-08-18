@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Location {
     pub index: u32,
     pub line: i32,
@@ -21,6 +21,38 @@ impl Location {
             column: -1,
         }
     }
+
+    pub fn is_unknown(&self) -> bool {
+        self.index == 0 && self.line == -1 && self.column == -1
+    }
+}
+
+#[cfg(test)]
+impl PartialEq for Location {
+    /// Unknown equals anything and anything equals unknown. This makes life
+    /// easier in testing.
+    fn eq(&self, other: &Self) -> bool {
+        if self.is_unknown() || other.is_unknown() {
+            true
+        } else {
+            (
+                self.index == other.index &&
+                self.line == other.line &&
+                self.column == other.column
+            )
+        }
+    }
+}
+
+#[cfg(not(test))]
+impl PartialEq for Location {
+    fn eq(&self, other: &Self) -> bool {
+        (
+            self.index == other.index &&
+            self.line == other.line &&
+            self.column == other.column
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,6 +66,13 @@ impl Span {
         Self {
             start,
             end,
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self {
+            start: Location::unknown(),
+            end: Location::unknown(),
         }
     }
 }
