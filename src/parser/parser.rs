@@ -172,11 +172,10 @@ fn parse_infix(input: &mut TokenStream) -> Node {
 
                     // Then turn that 3-vector into stuff we can work with.
                     let rhs = removed_nodes.pop().unwrap();
-                    let op_node = removed_nodes.pop().unwrap();
-                    let op = match op_node {
+                    let op = match removed_nodes.pop().unwrap() {
                         Subnode::Op(token) => token,
-                        _ => {
-                            panic_unexpected_names(op_node, "Op");
+                        unexpected @ _ => {
+                            panic_unexpected_names(unexpected, "Op");
                             unreachable!()
                         },
                     };
