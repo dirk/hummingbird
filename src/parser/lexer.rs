@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn it_parse_comments_and_terminals() {
+    fn it_parses_comments_and_terminals() {
         assert_eq!(
             parse("foo /* Comment */ bar"),
             vec![
@@ -427,7 +427,11 @@ mod tests {
         assert_eq!(parse("-1"), vec![Token::Integer(-1), Token::EOF]);
         assert_eq!(
             parse("- 1"),
-            vec![Token::Minus, Token::Integer(1), Token::EOF]
+            vec![Token::Minus, Token::Integer(1), Token::EOF],
+        );
+        assert_eq!(
+            parse("- -2"),
+            vec![Token::Minus, Token::Integer(-2), Token::EOF],
         );
         assert_eq!(
             parse("1+2"),
@@ -436,7 +440,7 @@ mod tests {
                 Token::Plus,
                 Token::Integer(2),
                 Token::EOF,
-            ]
+            ],
         );
         assert_eq!(
             parse("1 + 2"),
@@ -445,7 +449,16 @@ mod tests {
                 Token::Plus,
                 Token::Integer(2),
                 Token::EOF,
-            ]
+            ],
+        );
+        assert_eq!(
+            parse("1 + -2"),
+            vec![
+                Token::Integer(1),
+                Token::Plus,
+                Token::Integer(-2),
+                Token::EOF,
+            ],
         );
     }
 
