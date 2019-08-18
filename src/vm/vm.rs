@@ -4,7 +4,7 @@ use std::fmt::{Debug, Error, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
 
-use super::super::ast::{Node, Root};
+use super::super::ast::{Function as AstFunction, Node, Root};
 use super::super::parser;
 
 struct InnerBuiltinFunction {
@@ -48,9 +48,33 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
     Value::Null
 }
 
+#[derive(Clone)]
+struct Function {
+    /// The static frame (module scope) in which this function was defined.
+    static_frame: StaticFrame,
+    /// If it's a closure then this is the captured/closed-over frame.
+    // captured_frame: Option<Box<dyn Frame>>,
+    root: AstFunction,
+}
+
+impl Function {
+    fn new(static_frame: StaticFrame, root: AstFunction) -> Self {
+        Self { static_frame, root }
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.write_str("function")
+    }
+}
+
 trait Frame {
     fn get(&self, name: String) -> Option<Value>;
     fn set(&mut self, name: String, value: Value);
+    /// Every function gets access to the static frame (module scope) in
+    /// which it was defined.
+    fn capture_static(&self) -> StaticFrame;
 }
 
 #[derive(Clone)]
@@ -61,10 +85,7 @@ impl BuiltinFrame {
         let mut locals = HashMap::<String, Value>::new();
         let functions = vec![("println".to_string(), builtin_println)];
         for (name, function) in functions.into_iter() {
-            locals.insert(
-                name.clone(),
-                BuiltinFunction::new(name, function).into(),
-            );
+            locals.insert(name.clone(), BuiltinFunction::new(name, function).into());
         }
         Self(Rc::new(locals))
     }
@@ -76,7 +97,11 @@ impl Frame for BuiltinFrame {
     }
 
     fn set(&mut self, _name: String, _value: Value) {
-        unreachable!("Cannot set in builtin scope")
+        unreachable!("BuiltinFrame doesn't support set")
+    }
+
+    fn capture_static(&self) -> StaticFrame {
+        unreachable!("BuiltinFrame doesn't support capture_static")
     }
 }
 
@@ -84,6 +109,7 @@ impl Frame for BuiltinFrame {
 enum Value {
     Null,
     BuiltinFunction(BuiltinFunction),
+    Function(Function),
     Integer(i64),
 }
 
@@ -124,6 +150,10 @@ impl Frame for StaticFrame {
         let mut inner = self.0.borrow_mut();
         inner.locals.insert(name, value);
     }
+
+    fn capture_static(&self) -> StaticFrame {
+        self.clone()
+    }
 }
 
 struct Module {
@@ -143,22 +173,58 @@ impl Module {
     }
 }
 
+#[derive(Debug)]
+enum Action {
+    // Regular implicit return of evaluating a statement or expression.
+    Value(Value),
+    // "Interrupt" to return a value from a function.
+    Return(Option<Value>),
+}
+
+// Get the value or early-return if it's a `Return` action.
+macro_rules! value {
+    ($x:expr) => {{
+        match $x {
+            Action::Value(val) => val,
+            ret @ Action::Return(_) => return ret,
+        }
+    }};
+}
+
 trait Eval<F: Frame> {
-    fn eval(&self, frame: &mut F) -> Value;
+    fn eval(&self, frame: &mut F) -> Action;
 }
 
 impl<F: Frame> Eval<F> for Module {
-    fn eval(&self, frame: &mut F) -> Value {
+    fn eval(&self, frame: &mut F) -> Action {
         for node in self.root.nodes.iter() {
             node.eval(frame);
         }
-        Value::Null
+        Action::Value(Value::Null)
     }
 }
 
 impl<F: Frame> Eval<F> for Node {
-    fn eval(&self, frame: &mut F) -> Value {
-        match self {
+    fn eval(&self, frame: &mut F) -> Action {
+        let value: Value = match self {
+            Node::Block(block) => {
+                if let Some((last_node, nodes)) = block.nodes.split_last() {
+                    for node in nodes {
+                        value!(node.eval(frame));
+                    }
+                    value!(last_node.eval(frame))
+                } else {
+                    Value::Null
+                }
+            }
+            Node::Function(ast_function) => {
+                let function = Function::new(frame.capture_static(), ast_function.clone());
+                let value = Value::Function(function);
+                if let Some(name) = &ast_function.name {
+                    frame.set(name.clone(), value.clone())
+                }
+                value
+            }
             Node::Identifier(identifier) => {
                 let name = identifier.value.clone();
                 frame
@@ -168,7 +234,7 @@ impl<F: Frame> Eval<F> for Node {
             Node::Integer(integer) => Value::Integer(integer.value),
             Node::Let(let_) => {
                 let rhs = match &let_.rhs {
-                    Some(rhs) => rhs.eval(frame),
+                    Some(rhs) => value!(rhs.eval(frame)),
                     None => Value::Null,
                 };
                 let lhs: String = let_.lhs.value.clone();
@@ -176,20 +242,26 @@ impl<F: Frame> Eval<F> for Node {
                 Value::Null
             }
             Node::PostfixCall(call) => {
-                let target = call.target.eval(frame);
-                let arguments: Vec<Value> = call
-                    .arguments
-                    .iter()
-                    .map(|argument| argument.eval(frame))
-                    .collect();
-                match target {
-                    Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
-                    other @ _ => unreachable!("Cannot call: {:?}", other),
+                let target = value!(call.target.eval(frame));
+                let mut arguments = Vec::<Value>::with_capacity(call.arguments.len());
+                for (index, argument) in call.arguments.iter().enumerate() {
+                    let value = value!(argument.eval(frame));
+                    arguments.push(value)
+                }
+                assert_eq!(arguments.len(), call.arguments.len(),);
+                eval_function(target, arguments)
+            }
+            Node::Return(ret) => {
+                if let Some(rhs) = &ret.rhs {
+                    let value = value!(rhs.eval(frame));
+                    return Action::Return(Some(value))
+                } else {
+                    return Action::Return(None)
                 }
             }
             Node::Var(var) => {
                 let rhs = match &var.rhs {
-                    Some(rhs) => rhs.eval(frame),
+                    Some(rhs) => value!(rhs.eval(frame)),
                     None => Value::Null,
                 };
                 let lhs: String = var.lhs.value.clone();
@@ -197,7 +269,25 @@ impl<F: Frame> Eval<F> for Node {
                 Value::Null
             }
             other @ _ => unreachable!("Cannot eval: {}", other),
+        };
+        Action::Value(value)
+    }
+}
+
+fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
+    match target {
+        Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
+        Value::Function(function) => {
+            let new_frame = function.static_frame;
+            let action = function.root.body.eval(&mut new_frame.clone());
+            match action {
+                // Implicit return.
+                Action::Value(value) => value,
+                // Explicit return.
+                Action::Return(value) => value.unwrap_or(Value::Null),
+            }
         }
+        other @ _ => unreachable!("Cannot call: {:?}", other),
     }
 }
 
