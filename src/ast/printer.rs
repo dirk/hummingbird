@@ -72,6 +72,21 @@ impl<O: Write> Printer<O> {
             "Function({}",
             function.name.clone().unwrap_or("".to_string()),
         )?;
+        if function.captured {
+            self.indented(|printer| writeln!(printer, "captured"))?;
+        }
+        if let Some(captures) = &function.captures {
+            self.indented(|printer| {
+                writeln!(printer, "captures [")?;
+                printer.indented(|captures_printer| {
+                    for capture in captures.iter() {
+                        writeln!(captures_printer, "{}", capture)?;
+                    }
+                    Ok(())
+                })?;
+                writeln!(printer, "]")
+            })?;
+        }
         self.indented(|printer| printer.print_node(*function.body))?;
         writeln!(self, ")")
     }

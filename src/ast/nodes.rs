@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::collections::HashSet;
 use std::fmt::{Display, Error, Formatter};
 
 use super::super::parser::{Location, Span, Token};
@@ -62,22 +63,128 @@ pub struct Function {
     pub name: Option<String>,
     pub body: Box<Node>,
     pub location: Option<Location>,
+    /// If this function contains functions which capture its environment. If this is true then
+    /// the stack frame for this function needs to be allocated on the heap.
+    pub captured: bool,
+    /// The variables that this function captures from its environment.
+    pub captures: Option<HashSet<String>>,
 }
 
 impl Function {
     pub fn new_anonymous(body: Box<Node>) -> Self {
+        let (captured, captures) = Function::detect_captures(&body);
         Self {
             name: None,
             body,
             location: None,
+            captured,
+            captures,
         }
     }
 
     pub fn new_named(name: String, body: Box<Node>) -> Self {
+        let (captured, captures) = Function::detect_captures(&body);
         Self {
             name: Some(name),
             body,
             location: None,
+            captured,
+            captures,
+        }
+    }
+
+    fn detect_captures(body: &Node) -> (bool, Option<HashSet<String>>) {
+        // Keep track of `let` and `var` declarations as we go.
+        let mut locals = HashSet::new();
+        let mut captures = HashSet::new();
+        let mut captured = false;
+        Function::detect_captures_visitor(body, &mut locals, &mut captures, &mut captured);
+        (
+            captured,
+            if captures.is_empty() {
+                None
+            } else {
+                Some(captures)
+            },
+        )
+    }
+
+    fn detect_captures_visitor(
+        node: &Node,
+        locals: &mut HashSet<String>,
+        captures: &mut HashSet<String>,
+        captured: &mut bool,
+    ) {
+        // Using macros to make things more concise and avoid extra allocations.
+        macro_rules! identify {
+            ($i:expr) => {{
+                if !locals.contains($i) {
+                    captures.insert($i.clone());
+                }
+            }};
+        }
+        macro_rules! visit {
+            ($x:expr) => {
+                Function::detect_captures_visitor($x, locals, captures, captured)
+            };
+        }
+        match node {
+            Node::Assignment(assignment) => {
+                visit!(&assignment.lhs);
+                visit!(&assignment.rhs);
+            }
+            Node::Block(block) => {
+                for node in block.nodes.iter() {
+                    visit!(node);
+                }
+            }
+            Node::Function(function) => {
+                if let Some(name) = &function.name {
+                    locals.insert(name.clone());
+                }
+                if let Some(nested_captures) = &function.captures {
+                    *captured = true;
+                    for capture in nested_captures.iter() {
+                        // Functions defined within this function could be referencing things that
+                        // are also not defined in this function.
+                        identify!(capture);
+                    }
+                }
+            }
+            Node::Identifier(identifier) => {
+                identify!(&identifier.value);
+            }
+            Node::Infix(infix) => {
+                visit!(&infix.lhs);
+                visit!(&infix.rhs);
+            }
+            Node::Integer(_) => (),
+            Node::Let(let_) => {
+                locals.insert(let_.lhs.value.clone());
+                if let Some(rhs) = &let_.rhs {
+                    visit!(rhs);
+                }
+            }
+            Node::PostfixCall(call) => {
+                visit!(&call.target);
+                for argument in call.arguments.iter() {
+                    visit!(argument);
+                }
+            }
+            Node::PostfixProperty(property) => {
+                visit!(&property.target);
+            }
+            Node::Return(ret) => {
+                if let Some(rhs) = &ret.rhs {
+                    visit!(rhs);
+                }
+            }
+            Node::Var(var) => {
+                locals.insert(var.lhs.value.clone());
+                if let Some(rhs) = &var.rhs {
+                    visit!(rhs);
+                }
+            }
         }
     }
 }
