@@ -1,9 +1,10 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
 use super::super::ast::{Function as AstFunction, Node, Root};
 use super::super::parser;
-use super::frame::{BuiltinFrame, CapturedFrame, Frame, HeapFrame, StackFrame, StaticFrame};
+use super::frame::{Closure, Frame};
 use super::value::Value;
 
 struct InnerBuiltinFunction {
@@ -37,21 +38,26 @@ impl Debug for BuiltinFunction {
 
 #[derive(Clone)]
 pub struct Function {
-    /// The captured/closed-over frame for functions which use external variables.
-    captured_frame: Option<CapturedFrame>,
-    /// Whether this function's own frame should be captured for functions within it.
-    captured: bool,
+    /// The closure in which this function was defined.
+    pub closure: Option<Closure>,
     /// The AST node defining this function.
     node: AstFunction,
 }
 
 impl Function {
-    fn new(captured_frame: Option<CapturedFrame>, root: AstFunction) -> Self {
+    fn new(closure: Option<Closure>, root: AstFunction) -> Self {
         Self {
-            captured_frame,
-            captured: root.captured,
+            closure,
             node: root,
         }
+    }
+
+    pub fn bindings(&self) -> Option<HashSet<String>> {
+        self.node.bindings.clone()
+    }
+
+    pub fn has_parent_bindings(&self) -> bool {
+        self.node.parent_bindings.is_some()
     }
 }
 
@@ -61,21 +67,56 @@ impl Debug for Function {
     }
 }
 
+fn merge_bindings(dest: &mut HashSet<String>, src: &Option<HashSet<String>>) {
+    if let Some(bindings) = src {
+        for binding in bindings.iter() {
+            dest.insert(binding.clone());
+        }
+    }
+}
+
 struct Module {
     source: String,
     root: Root,
-    static_frame: StaticFrame,
+    closure: Closure,
 }
 
 impl Module {
-    fn new_from_source(source: String, builtin_frame: BuiltinFrame) -> Self {
+    fn new_from_source(source: String) -> Self {
         let root = parser::parse(&source);
+
+        let mut combined_bindings = HashSet::new();
+        merge_bindings(&mut combined_bindings, &root.bindings);
+        combined_bindings.insert("println".to_string());
+        // NOTE: Parent bindings should only be imports. Anything else is
+        //   probably use of undefined variables.
+        // merge_bindings(&mut combined_bindings, &root.parent_bindings);
+        // TODO: Make the builtins a "closure" that all other module closures
+        //   can have as their parent for easier reuse and efficiency.
+        let closure = Closure::new(Some(combined_bindings), None);
+        closure.set(
+            "println".to_string(),
+            BuiltinFunction::new("println".to_string(), builtin_println).into(),
+        );
+
         Self {
             source,
             root,
-            static_frame: StaticFrame::new(builtin_frame),
+            closure,
         }
     }
+}
+
+fn builtin_println(arguments: Vec<Value>) -> Value {
+    for argument in arguments.into_iter() {
+        use Value::*;
+        match argument {
+            BuiltinFunction(builtin_function) => println!("{:?}", builtin_function),
+            Integer(value) => println!("{}", value),
+            other @ _ => println!("{:?}", other),
+        };
+    }
+    Value::Null
 }
 
 #[derive(Debug)]
@@ -86,12 +127,12 @@ enum Action {
     Return(Option<Value>),
 }
 
-trait Eval<F: Frame> {
-    fn eval(&self, frame: &mut F) -> Action;
+trait Eval {
+    fn eval(&self, frame: &mut Frame) -> Action;
 }
 
-impl<F: Frame> Eval<F> for Module {
-    fn eval(&self, frame: &mut F) -> Action {
+impl Eval for Module {
+    fn eval(&self, frame: &mut Frame) -> Action {
         for node in self.root.nodes.iter() {
             node.eval(frame);
         }
@@ -99,8 +140,8 @@ impl<F: Frame> Eval<F> for Module {
     }
 }
 
-impl<F: Frame> Eval<F> for Node {
-    fn eval(&self, frame: &mut F) -> Action {
+impl Eval for Node {
+    fn eval(&self, frame: &mut Frame) -> Action {
         // Utility macro to get the value or early-return if it's a
         // `Return` action.
         macro_rules! value {
@@ -124,14 +165,7 @@ impl<F: Frame> Eval<F> for Node {
                 }
             }
             Node::Function(ast_function) => {
-                // If the function captures its environment then we need to capture the current
-                // frame since that is its declaring environment.
-                let captured_frame = if ast_function.captures.is_some() {
-                    Some(frame.capture())
-                } else {
-                    None
-                };
-                let function = Function::new(captured_frame, ast_function.clone());
+                let function = Function::new(frame.closure_cloned(), ast_function.clone());
                 let value = Value::Function(function);
                 if let Some(name) = &ast_function.name {
                     frame.set(name.clone(), value.clone())
@@ -191,17 +225,8 @@ fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
     match target {
         Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
         Value::Function(function) => {
-            // If the function's own frame/environment is captured (for
-            // functions within it) then its frame needs to be on the heap
-            // rather than on the stack.
-            let action = if function.captured {
-                let mut frame = HeapFrame::new(function.captured_frame);
-                function.node.body.eval(&mut frame)
-            } else {
-                let mut frame = StackFrame::new(function.captured_frame);
-                function.node.body.eval(&mut frame)
-            };
-            match action {
+            let mut frame = Frame::new_for_function(&function);
+            match function.node.body.eval(&mut frame) {
                 // Implicit return.
                 Action::Value(value) => value,
                 // Explicit return.
@@ -212,19 +237,16 @@ fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
     }
 }
 
-pub struct Vm {
-    builtin_frame: BuiltinFrame,
-}
+pub struct Vm {}
 
 impl Vm {
     pub fn new() -> Self {
-        Self {
-            builtin_frame: BuiltinFrame::bootstrap(),
-        }
+        Self {}
     }
 
     pub fn eval_source(&self, source: String) {
-        let module = Module::new_from_source(source, self.builtin_frame.clone());
-        module.eval(&mut module.static_frame.clone());
+        let module = Module::new_from_source(source);
+        let mut frame = Frame::new_with_closure(module.closure.clone());
+        module.eval(&mut frame);
     }
 }

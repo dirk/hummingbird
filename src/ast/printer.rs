@@ -27,6 +27,26 @@ impl<O: Write> Printer<O> {
     }
 
     pub fn print_root(&mut self, root: Root) -> Result<()> {
+        if let Some(bindings) = &root.bindings {
+            writeln!(self, "bindings [")?;
+            self.indented(|printer| {
+                for capture in bindings.iter() {
+                    writeln!(printer, "{}", capture)?;
+                }
+                Ok(())
+            })?;
+            writeln!(self, "]")?;
+        }
+        if let Some(parent_bindings) = &root.parent_bindings {
+            writeln!(self, "parent_bindings [")?;
+            self.indented(|printer| {
+                for capture in parent_bindings.iter() {
+                    writeln!(printer, "{}", capture)?;
+                }
+                Ok(())
+            })?;
+            writeln!(self, "]")?;
+        }
         for node in root.nodes {
             self.print_node(node)?
         }
@@ -36,6 +56,7 @@ impl<O: Write> Printer<O> {
     fn print_node(&mut self, node: Node) -> Result<()> {
         match node {
             Node::Assignment(assignment) => self.print_assignment(assignment),
+            Node::Block(block) => self.print_block(block),
             Node::Function(function) => self.print_function(function),
             Node::Identifier(identifier) => self.print_identifier(identifier),
             Node::Integer(integer) => self.print_integer(integer),
@@ -72,15 +93,24 @@ impl<O: Write> Printer<O> {
             "Function({}",
             function.name.clone().unwrap_or("".to_string()),
         )?;
-        if function.captured {
-            self.indented(|printer| writeln!(printer, "captured"))?;
-        }
-        if let Some(captures) = &function.captures {
+        if let Some(bindings) = &function.bindings {
             self.indented(|printer| {
-                writeln!(printer, "captures [")?;
-                printer.indented(|captures_printer| {
-                    for capture in captures.iter() {
-                        writeln!(captures_printer, "{}", capture)?;
+                writeln!(printer, "bindings [")?;
+                printer.indented(|bindings_printer| {
+                    for capture in bindings.iter() {
+                        writeln!(bindings_printer, "{}", capture)?;
+                    }
+                    Ok(())
+                })?;
+                writeln!(printer, "]")
+            })?;
+        }
+        if let Some(parent_bindings) = &function.parent_bindings {
+            self.indented(|printer| {
+                writeln!(printer, "parent_bindings [")?;
+                printer.indented(|parent_bindings_printer| {
+                    for capture in parent_bindings.iter() {
+                        writeln!(parent_bindings_printer, "{}", capture)?;
                     }
                     Ok(())
                 })?;

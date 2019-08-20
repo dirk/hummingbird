@@ -1,192 +1,141 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::value::Value;
-use super::vm::BuiltinFunction;
+use crate::vm::vm::Function;
 
-pub trait Frame {
-    fn get(&self, name: String) -> Option<Value>;
-    fn set(&mut self, name: String, value: Value);
-    /// Every function gets access to the static frame (module scope) in
-    /// which it was defined.
-    fn capture(&self) -> CapturedFrame;
+struct InnerClosure {
+    locals: HashMap<String, Option<Value>>,
+    parent: Option<Closure>,
 }
 
+/// Holds the variables in a frame that outlive that frame.
 #[derive(Clone)]
-pub struct BuiltinFrame(Rc<HashMap<String, Value>>);
+pub struct Closure(Rc<RefCell<InnerClosure>>);
 
-impl BuiltinFrame {
-    pub fn bootstrap() -> Self {
-        let mut locals = HashMap::<String, Value>::new();
-        let functions = vec![("println".to_string(), builtin_println)];
-        for (name, function) in functions.into_iter() {
-            locals.insert(name.clone(), BuiltinFunction::new(name, function).into());
-        }
-        Self(Rc::new(locals))
-    }
-}
-
-impl Frame for BuiltinFrame {
-    fn get(&self, name: String) -> Option<Value> {
-        self.0.get(&name).map(Value::to_owned)
-    }
-
-    fn set(&mut self, _name: String, _value: Value) {
-        unreachable!("BuiltinFrame doesn't support set")
-    }
-
-    fn capture(&self) -> CapturedFrame {
-        unreachable!("BuiltinFrame cannot be captured")
-    }
-}
-
-fn builtin_println(arguments: Vec<Value>) -> Value {
-    for argument in arguments.into_iter() {
-        use Value::*;
-        match argument {
-            BuiltinFunction(builtin_function) => println!("{:?}", builtin_function),
-            Integer(value) => println!("{}", value),
-            other @ _ => println!("{:?}", other),
+impl Closure {
+    pub fn new(bindings: Option<HashSet<String>>, parent: Option<Closure>) -> Self {
+        let mut locals = HashMap::<String, Option<Value>>::new();
+        if let Some(bindings) = bindings {
+            for binding in bindings.iter() {
+                locals.insert(binding.clone(), None);
+            }
         };
+        Self(Rc::new(RefCell::new(InnerClosure { locals, parent })))
     }
-    Value::Null
-}
 
-struct InnerStaticFrame {
-    locals: HashMap<String, Value>,
-    builtin_frame: BuiltinFrame,
-}
-
-#[derive(Clone)]
-pub struct StaticFrame(Rc<RefCell<InnerStaticFrame>>);
-
-impl StaticFrame {
-    pub fn new(builtin_frame: BuiltinFrame) -> Self {
-        Self(Rc::new(RefCell::new(InnerStaticFrame {
-            locals: HashMap::new(),
-            builtin_frame,
-        })))
+    pub fn has(&self, name: String) -> bool {
+        let inner = &self.0.borrow();
+        if inner.locals.contains_key(&name) {
+            return true;
+        }
+        if let Some(parent) = &inner.parent {
+            return parent.has(name);
+        }
+        false
     }
-}
 
-impl Frame for StaticFrame {
     fn get(&self, name: String) -> Option<Value> {
-        let inner = self.0.borrow();
+        let inner = &self.0.borrow();
         if let Some(value) = inner.locals.get(&name) {
-            Some(value.to_owned())
-        } else {
-            inner.builtin_frame.get(name)
+            return match value {
+                initialized @ Some(_) => initialized.clone(),
+                None => unreachable!("ERROR: Uninitialized closure variable: {}", name),
+            };
         }
-    }
-
-    fn set(&mut self, name: String, value: Value) {
-        let mut inner = self.0.borrow_mut();
-        inner.locals.insert(name, value);
-    }
-
-    fn capture(&self) -> CapturedFrame {
-        CapturedFrame::Static(self.clone())
-    }
-}
-
-pub struct StackFrame {
-    locals: HashMap<String, Value>,
-    captured_frame: Option<CapturedFrame>,
-}
-
-impl StackFrame {
-    pub fn new(captured_frame: Option<CapturedFrame>) -> Self {
-        Self {
-            locals: HashMap::new(),
-            captured_frame,
-        }
-    }
-}
-
-impl Frame for StackFrame {
-    fn get(&self, name: String) -> Option<Value> {
-        if let Some(value) = self.locals.get(&name) {
-            return Some(value.to_owned());
-        }
-        if let Some(captured_frame) = &self.captured_frame {
-            return captured_frame.get(name);
+        if let Some(parent) = &inner.parent {
+            return parent.get(name);
         }
         None
     }
 
-    fn set(&mut self, name: String, value: Value) {
+    pub fn set(&self, name: String, value: Value) {
+        let inner = &mut self.0.borrow_mut();
+        if inner.locals.contains_key(&name) {
+            inner.locals.insert(name.clone(), Some(value));
+            return;
+        }
+        if let Some(parent) = &inner.parent {
+            // If we found a parent with this name and were able to set the
+            // value then all is good.
+            if parent.set_as_parent(name.clone(), value) {
+                return;
+            }
+        }
+        // If we couldn't find the value to set in any parent then crash.
+        unreachable!("ERROR: Couldn't find closure variable: {}", name)
+    }
+
+    // Recursive call to set in parent closures. Returns true if it found
+    // a local and set, false if not.
+    fn set_as_parent(&self, name: String, value: Value) -> bool {
+        let inner = &mut self.0.borrow_mut();
+        if inner.locals.contains_key(&name) {
+            inner.locals.insert(name.clone(), Some(value));
+            return true;
+        }
+        if let Some(parent) = &inner.parent {
+            parent.set_as_parent(name, value)
+        } else {
+            false
+        }
+    }
+}
+
+/// A frame on the stack.
+pub struct Frame {
+    locals: HashMap<String, Value>,
+    /// Locals within this frame which are closed over and therefore must
+    /// outlive this frame.
+    closure: Option<Closure>,
+}
+
+impl Frame {
+    pub fn new_with_closure(closure: Closure) -> Self {
+        Self {
+            locals: HashMap::new(),
+            closure: Some(closure),
+        }
+    }
+
+    pub fn new_for_function(function: &Function) -> Self {
+        let bindings = function.bindings();
+        // If the function has its own bindings or if it uses bindings from
+        // its parent then we need to set up a closure for it.
+        let closure = if bindings.is_some() || function.has_parent_bindings() {
+            Some(Closure::new(bindings, function.closure.clone()))
+        } else {
+            None
+        };
+        Self {
+            locals: HashMap::new(),
+            closure,
+        }
+    }
+
+    pub fn get(&self, name: String) -> Option<Value> {
+        if let Some(value) = self.locals.get(&name) {
+            return Some(value.clone());
+        }
+        if let Some(closure) = &self.closure {
+            return closure.get(name);
+        }
+        None
+    }
+
+    pub fn set(&mut self, name: String, value: Value) {
+        if let Some(closure) = &self.closure {
+            if closure.has(name.clone()) {
+                closure.set(name, value);
+                return;
+            }
+        }
         self.locals.insert(name, value);
     }
 
-    fn capture(&self) -> CapturedFrame {
-        unreachable!("StackFrame cannot be captured")
-    }
-}
-
-struct InnerHeapFrame {
-    locals: HashMap<String, Value>,
-    captured_frame: Option<CapturedFrame>,
-}
-
-#[derive(Clone)]
-pub struct HeapFrame(Rc<RefCell<InnerHeapFrame>>);
-
-impl HeapFrame {
-    pub fn new(captured_frame: Option<CapturedFrame>) -> Self {
-        Self(Rc::new(RefCell::new(InnerHeapFrame {
-            locals: HashMap::new(),
-            captured_frame,
-        })))
-    }
-}
-
-impl Frame for HeapFrame {
-    fn get(&self, name: String) -> Option<Value> {
-        let inner = self.0.borrow();
-        if let Some(value) = inner.locals.get(&name) {
-            return Some(value.to_owned());
-        }
-        if let Some(captured_frame) = &inner.captured_frame {
-            return captured_frame.get(name);
-        }
-        None
-    }
-
-    fn set(&mut self, name: String, value: Value) {
-        let mut inner = self.0.borrow_mut();
-        inner.locals.insert(name, value);
-    }
-
-    fn capture(&self) -> CapturedFrame {
-        CapturedFrame::Heap(self.clone())
-    }
-}
-
-/// Sized object which holds a frame on the heap that has been captured by
-/// a function.
-#[derive(Clone)]
-pub enum CapturedFrame {
-    Static(StaticFrame),
-    Heap(HeapFrame),
-}
-
-impl Frame for CapturedFrame {
-    fn get(&self, name: String) -> Option<Value> {
-        match self {
-            CapturedFrame::Static(static_frame) => static_frame.get(name),
-            CapturedFrame::Heap(heap_frame) => heap_frame.get(name),
-        }
-    }
-
-    fn set(&mut self, name: String, value: Value) {
-        match self {
-            CapturedFrame::Static(static_frame) => static_frame.set(name, value),
-            CapturedFrame::Heap(heap_frame) => heap_frame.set(name, value),
-        }
-    }
-
-    fn capture(&self) -> CapturedFrame {
-        unreachable!("CapturedFrame not implemented")
+    /// The frame owns its closure, but it's happy to give out clones.
+    pub fn closure_cloned(&self) -> Option<Closure> {
+        self.closure.clone()
     }
 }

@@ -63,127 +63,142 @@ pub struct Function {
     pub name: Option<String>,
     pub body: Box<Node>,
     pub location: Option<Location>,
-    /// If this function contains functions which capture its environment. If this is true then
-    /// the stack frame for this function needs to be allocated on the heap.
-    pub captured: bool,
-    /// The variables that this function captures from its environment.
-    pub captures: Option<HashSet<String>>,
+    /// The variables of this function which must be stored in the `Closure`
+    /// on the heap.
+    pub bindings: Option<HashSet<String>>,
+    /// The variables that this function depends on its parent closure to
+    /// provide. To ensure nested closure forwarding a `Closure` will be
+    /// created if this is present, even if `bindings` is not present.
+    pub parent_bindings: Option<HashSet<String>>,
 }
 
 impl Function {
     pub fn new_anonymous(body: Box<Node>) -> Self {
-        let (captured, captures) = Function::detect_captures(&body);
+        let (bindings, parent_bindings) = detect_bindings(&body);
         Self {
             name: None,
             body,
             location: None,
-            captured,
-            captures,
+            bindings,
+            parent_bindings,
         }
     }
 
     pub fn new_named(name: String, body: Box<Node>) -> Self {
-        let (captured, captures) = Function::detect_captures(&body);
+        let (bindings, parent_bindings) = detect_bindings(&body);
         Self {
             name: Some(name),
             body,
             location: None,
-            captured,
-            captures,
+            bindings,
+            parent_bindings,
         }
     }
+}
 
-    fn detect_captures(body: &Node) -> (bool, Option<HashSet<String>>) {
-        // Keep track of `let` and `var` declarations as we go.
-        let mut locals = HashSet::new();
-        let mut captures = HashSet::new();
-        let mut captured = false;
-        Function::detect_captures_visitor(body, &mut locals, &mut captures, &mut captured);
-        (
-            captured,
-            if captures.is_empty() {
-                None
-            } else {
-                Some(captures)
-            },
-        )
+fn none_if_empty(set: HashSet<String>) -> Option<HashSet<String>> {
+    if set.is_empty() {
+        None
+    } else {
+        Some(set)
     }
+}
 
-    fn detect_captures_visitor(
-        node: &Node,
-        locals: &mut HashSet<String>,
-        captures: &mut HashSet<String>,
-        captured: &mut bool,
-    ) {
-        // Using macros to make things more concise and avoid extra allocations.
-        macro_rules! identify {
-            ($i:expr) => {{
-                if !locals.contains($i) {
-                    captures.insert($i.clone());
-                }
-            }};
-        }
-        macro_rules! visit {
-            ($x:expr) => {
-                Function::detect_captures_visitor($x, locals, captures, captured)
-            };
-        }
-        match node {
-            Node::Assignment(assignment) => {
-                visit!(&assignment.lhs);
-                visit!(&assignment.rhs);
+// FIXME: Flip this visitor on its head and make it a top-down walk to
+//   discover variables, their usages (closures), and catch undefined
+//   variables early.
+
+/// Detect which locals need to be bound into a closure for functions within
+/// this function. Also detect which variables this functions depends on a
+/// parent closure for.
+///
+/// Returns a 2-tuple with `bound` and `parent_bound`.
+fn detect_bindings(body: &Node) -> (Option<HashSet<String>>, Option<HashSet<String>>) {
+    // Keep track of `let` and `var` declarations as we go.
+    let mut locals = HashSet::new();
+    // Locals which are bound by functions within.
+    let mut bindings = HashSet::new();
+    // Variables we depend on our parent for.
+    let mut parent_bindings = HashSet::new();
+    detect_bindings_visitor(body, &mut locals, &mut bindings, &mut parent_bindings);
+    (none_if_empty(bindings), none_if_empty(parent_bindings))
+}
+
+fn detect_bindings_visitor(
+    node: &Node,
+    locals: &mut HashSet<String>,
+    bindings: &mut HashSet<String>,
+    parent_bindings: &mut HashSet<String>,
+) {
+    // Using macros to make things more concise and avoid extra allocations.
+    macro_rules! identify {
+        ($i:expr) => {{
+            if !locals.contains($i) {
+                parent_bindings.insert($i.clone());
             }
-            Node::Block(block) => {
-                for node in block.nodes.iter() {
-                    visit!(node);
-                }
+        }};
+    }
+    macro_rules! visit {
+        ($x:expr) => {
+            detect_bindings_visitor($x, locals, bindings, parent_bindings)
+        };
+    }
+    match node {
+        Node::Assignment(assignment) => {
+            visit!(&assignment.lhs);
+            visit!(&assignment.rhs);
+        }
+        Node::Block(block) => {
+            for node in block.nodes.iter() {
+                visit!(node);
             }
-            Node::Function(function) => {
-                if let Some(name) = &function.name {
-                    locals.insert(name.clone());
-                }
-                if let Some(nested_captures) = &function.captures {
-                    *captured = true;
-                    for capture in nested_captures.iter() {
-                        // Functions defined within this function could be referencing things that
-                        // are also not defined in this function.
-                        identify!(capture);
+        }
+        Node::Function(function) => {
+            if let Some(name) = &function.name {
+                locals.insert(name.clone());
+            }
+            if let Some(nested_parent_bindings) = &function.parent_bindings {
+                for nested_parent_binding in nested_parent_bindings.iter() {
+                    if locals.contains(nested_parent_binding) {
+                        bindings.insert(nested_parent_binding.clone());
+                    } else {
+                        parent_bindings.insert(nested_parent_binding.clone());
                     }
                 }
             }
-            Node::Identifier(identifier) => {
-                identify!(&identifier.value);
+        }
+        Node::Identifier(identifier) => {
+            identify!(&identifier.value);
+        }
+        Node::Infix(infix) => {
+            visit!(&infix.lhs);
+            visit!(&infix.rhs);
+        }
+        Node::Integer(_) => (),
+        Node::Let(let_) => {
+            locals.insert(let_.lhs.value.clone());
+            if let Some(rhs) = &let_.rhs {
+                visit!(rhs);
             }
-            Node::Infix(infix) => {
-                visit!(&infix.lhs);
-                visit!(&infix.rhs);
+        }
+        Node::PostfixCall(call) => {
+            visit!(&call.target);
+            for argument in call.arguments.iter() {
+                visit!(argument);
             }
-            Node::Integer(_) => (),
-            Node::Let(let_) => {
-                locals.insert(let_.lhs.value.clone());
-                if let Some(rhs) = &let_.rhs {
-                    visit!(rhs);
-                }
+        }
+        Node::PostfixProperty(property) => {
+            visit!(&property.target);
+        }
+        Node::Return(ret) => {
+            if let Some(rhs) = &ret.rhs {
+                visit!(rhs);
             }
-            Node::PostfixCall(call) => {
-                visit!(&call.target);
-                for argument in call.arguments.iter() {
-                    visit!(argument);
-                }
-            }
-            Node::PostfixProperty(property) => {
-                visit!(&property.target);
-            }
-            Node::Return(ret) => {
-                if let Some(rhs) = &ret.rhs {
-                    visit!(rhs);
-                }
-            }
-            Node::Var(var) => {
-                locals.insert(var.lhs.value.clone());
-                if let Some(rhs) = &var.rhs {
-                    visit!(rhs);
-                }
+        }
+        Node::Var(var) => {
+            locals.insert(var.lhs.value.clone());
+            if let Some(rhs) = &var.rhs {
+                visit!(rhs);
             }
         }
     }
@@ -301,6 +316,26 @@ impl PostfixProperty {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Root {
     pub nodes: Vec<Node>,
+    /// The root is like a function in that it's evaluated within a frame,
+    /// therefore it needs to have closure bindings like a frame.
+    pub bindings: Option<HashSet<String>>,
+    /// These should be the union of imports and builtins.
+    pub parent_bindings: Option<HashSet<String>>,
+}
+
+impl Root {
+    pub fn new(nodes: Vec<Node>) -> Self {
+        // Make a fake block for us to discover bindings in.
+        let block = Block {
+            nodes: nodes.clone(),
+        };
+        let (bindings, parent_bindings) = detect_bindings(&Node::Block(block));
+        Self {
+            nodes,
+            bindings,
+            parent_bindings,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

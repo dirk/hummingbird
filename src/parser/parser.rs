@@ -12,7 +12,7 @@ pub fn parse_program(input: &mut TokenStream) -> Root {
     while input.peek() != Token::EOF {
         nodes.append(&mut parse_statements(input, Token::EOF))
     }
-    Root { nodes }
+    Root::new(nodes)
 }
 
 fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
