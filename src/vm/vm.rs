@@ -50,16 +50,43 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
 
 #[derive(Clone)]
 struct Function {
-    /// The static frame (module scope) in which this function was defined.
-    static_frame: StaticFrame,
-    /// If it's a closure then this is the captured/closed-over frame.
-    // captured_frame: Option<Box<dyn Frame>>,
-    root: AstFunction,
+    /// The captured/closed-over frame for functions which use external variables.
+    captured_frame: Option<CapturedFrame>,
+    /// Whether this function's own frame should be captured for functions within it.
+    captured: bool,
+    /// The AST node defining this function.
+    node: AstFunction,
+}
+
+#[derive(Clone)]
+enum CapturedFrame {
+    Static(StaticFrame),
+    Heap(HeapFrame),
+}
+
+impl Frame for CapturedFrame {
+    fn get(&self, name: String) -> Option<Value> {
+        match self {
+            CapturedFrame::Static(static_frame) => static_frame.get(name),
+            CapturedFrame::Heap(heap_frame) => heap_frame.get(name),
+        }
+    }
+
+    fn set(&mut self, name: String, value: Value) {
+        match self {
+            CapturedFrame::Static(static_frame) => static_frame.set(name, value),
+            CapturedFrame::Heap(heap_frame) => heap_frame.set(name, value),
+        }
+    }
+
+    fn capture(&self) -> CapturedFrame {
+        unreachable!("CapturedFrame not implemented")
+    }
 }
 
 impl Function {
-    fn new(static_frame: StaticFrame, root: AstFunction) -> Self {
-        Self { static_frame, root }
+    fn new(captured_frame: Option<CapturedFrame>, root: AstFunction) -> Self {
+        Self { captured_frame, captured: root.captured, node: root }
     }
 }
 
@@ -74,7 +101,7 @@ trait Frame {
     fn set(&mut self, name: String, value: Value);
     /// Every function gets access to the static frame (module scope) in
     /// which it was defined.
-    fn capture_static(&self) -> StaticFrame;
+    fn capture(&self) -> CapturedFrame;
 }
 
 #[derive(Clone)]
@@ -100,8 +127,8 @@ impl Frame for BuiltinFrame {
         unreachable!("BuiltinFrame doesn't support set")
     }
 
-    fn capture_static(&self) -> StaticFrame {
-        unreachable!("BuiltinFrame doesn't support capture_static")
+    fn capture(&self) -> CapturedFrame {
+        unreachable!("BuiltinFrame cannot be captured")
     }
 }
 
@@ -151,8 +178,81 @@ impl Frame for StaticFrame {
         inner.locals.insert(name, value);
     }
 
-    fn capture_static(&self) -> StaticFrame {
-        self.clone()
+    fn capture(&self) -> CapturedFrame {
+        CapturedFrame::Static(self.clone())
+    }
+}
+
+struct StackFrame {
+    locals: HashMap<String, Value>,
+    captured_frame: Option<CapturedFrame>,
+}
+
+impl StackFrame {
+    fn new(captured_frame: Option<CapturedFrame>) -> Self {
+        Self {
+            locals: HashMap::new(),
+            captured_frame,
+        }
+    }
+}
+
+impl Frame for StackFrame {
+    fn get(&self, name: String) -> Option<Value> {
+        if let Some(value) = self.locals.get(&name) {
+            return Some(value.to_owned())
+        }
+        if let Some(captured_frame) = &self.captured_frame {
+            return captured_frame.get(name)
+        }
+        None
+    }
+
+    fn set(&mut self, name: String, value: Value) {
+        self.locals.insert(name, value);
+    }
+
+    fn capture(&self) -> CapturedFrame {
+        unreachable!("StackFrame cannot be captured")
+    }
+}
+
+struct InnerHeapFrame {
+    locals: HashMap<String, Value>,
+    captured_frame: Option<CapturedFrame>,
+}
+
+#[derive(Clone)]
+struct HeapFrame(Rc<RefCell<InnerHeapFrame>>);
+
+impl HeapFrame {
+    fn new(captured_frame: Option<CapturedFrame>) -> Self {
+        Self(Rc::new(RefCell::new(InnerHeapFrame {
+            locals: HashMap::new(),
+            captured_frame,
+        })))
+    }
+}
+
+impl Frame for HeapFrame {
+    fn get(&self, name: String) -> Option<Value> {
+        let inner = self.0.borrow();
+        if let Some(value) = inner.locals.get(&name) {
+            return Some(value.to_owned())
+        }
+        if let Some(captured_frame) = &inner.captured_frame {
+            return captured_frame.get(name)
+        }
+        None
+    }
+
+    fn set(&mut self, name: String, value: Value) {
+        let mut inner = self.0.borrow_mut();
+        inner.locals.insert(name, value);
+    }
+
+    fn capture(&self) -> CapturedFrame {
+        CapturedFrame::Heap(self.clone())
     }
 }
 
@@ -218,7 +318,14 @@ impl<F: Frame> Eval<F> for Node {
                 }
             }
             Node::Function(ast_function) => {
-                let function = Function::new(frame.capture_static(), ast_function.clone());
+                // If the function captures its environment then we need to capture the current
+                // frame since that is its declaring environment.
+                let captured_frame = if ast_function.captures.is_some() {
+                    Some(frame.capture())
+                } else {
+                    None
+                };
+                let function = Function::new(captured_frame, ast_function.clone());
                 let value = Value::Function(function);
                 if let Some(name) = &ast_function.name {
                     frame.set(name.clone(), value.clone())
@@ -254,9 +361,9 @@ impl<F: Frame> Eval<F> for Node {
             Node::Return(ret) => {
                 if let Some(rhs) = &ret.rhs {
                     let value = value!(rhs.eval(frame));
-                    return Action::Return(Some(value))
+                    return Action::Return(Some(value));
                 } else {
-                    return Action::Return(None)
+                    return Action::Return(None);
                 }
             }
             Node::Var(var) => {
@@ -278,8 +385,16 @@ fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
     match target {
         Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
         Value::Function(function) => {
-            let new_frame = function.static_frame;
-            let action = function.root.body.eval(&mut new_frame.clone());
+            // If the function's own frame/environment is captured (for
+            // functions within it) then its frame needs to be on the heap
+            // rather than on the stack.
+            let action = if function.captured {
+                let mut frame = HeapFrame::new(function.captured_frame);
+                function.node.body.eval(&mut frame)
+            } else {
+                let mut frame = StackFrame::new(function.captured_frame);
+                function.node.body.eval(&mut frame)
+            };
             match action {
                 // Implicit return.
                 Action::Value(value) => value,
