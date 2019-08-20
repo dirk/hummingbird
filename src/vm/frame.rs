@@ -104,7 +104,7 @@ impl Frame {
         // If the function has its own bindings or if it uses bindings from
         // its parent then we need to set up a closure for it.
         let closure = if bindings.is_some() || function.has_parent_bindings() {
-            Some(Closure::new(bindings, function.closure.clone()))
+            Some(Closure::new(bindings, function.closure_cloned()))
         } else {
             None
         };

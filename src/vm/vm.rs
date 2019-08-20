@@ -39,7 +39,7 @@ impl Debug for BuiltinFunction {
 #[derive(Clone)]
 pub struct Function {
     /// The closure in which this function was defined.
-    pub closure: Option<Closure>,
+    closure: Option<Closure>,
     /// The AST node defining this function.
     node: AstFunction,
 }
@@ -58,6 +58,10 @@ impl Function {
 
     pub fn has_parent_bindings(&self) -> bool {
         self.node.parent_bindings.is_some()
+    }
+
+    pub fn closure_cloned(&self) -> Option<Closure> {
+        self.closure.clone()
     }
 }
 
