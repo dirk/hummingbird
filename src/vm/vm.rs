@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
-use std::ops::Deref;
 use std::rc::Rc;
 
 use super::super::ast::{Function as AstFunction, Node, Root};
 use super::super::parser;
+use super::value::Value;
 
 struct InnerBuiltinFunction {
     name: String,
@@ -13,7 +13,7 @@ struct InnerBuiltinFunction {
 }
 
 #[derive(Clone)]
-struct BuiltinFunction(Rc<InnerBuiltinFunction>);
+pub struct BuiltinFunction(Rc<InnerBuiltinFunction>);
 
 impl BuiltinFunction {
     pub fn new(name: String, call_target: fn(Vec<Value>) -> Value) -> Self {
@@ -49,7 +49,7 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
 }
 
 #[derive(Clone)]
-struct Function {
+pub struct Function {
     /// The captured/closed-over frame for functions which use external variables.
     captured_frame: Option<CapturedFrame>,
     /// Whether this function's own frame should be captured for functions within it.
@@ -86,7 +86,11 @@ impl Frame for CapturedFrame {
 
 impl Function {
     fn new(captured_frame: Option<CapturedFrame>, root: AstFunction) -> Self {
-        Self { captured_frame, captured: root.captured, node: root }
+        Self {
+            captured_frame,
+            captured: root.captured,
+            node: root,
+        }
     }
 }
 
@@ -129,20 +133,6 @@ impl Frame for BuiltinFrame {
 
     fn capture(&self) -> CapturedFrame {
         unreachable!("BuiltinFrame cannot be captured")
-    }
-}
-
-#[derive(Clone, Debug)]
-enum Value {
-    Null,
-    BuiltinFunction(BuiltinFunction),
-    Function(Function),
-    Integer(i64),
-}
-
-impl From<BuiltinFunction> for Value {
-    fn from(builtin_function: BuiltinFunction) -> Self {
-        Self::BuiltinFunction(builtin_function)
     }
 }
 
@@ -200,10 +190,10 @@ impl StackFrame {
 impl Frame for StackFrame {
     fn get(&self, name: String) -> Option<Value> {
         if let Some(value) = self.locals.get(&name) {
-            return Some(value.to_owned())
+            return Some(value.to_owned());
         }
         if let Some(captured_frame) = &self.captured_frame {
-            return captured_frame.get(name)
+            return captured_frame.get(name);
         }
         None
     }
@@ -238,10 +228,10 @@ impl Frame for HeapFrame {
     fn get(&self, name: String) -> Option<Value> {
         let inner = self.0.borrow();
         if let Some(value) = inner.locals.get(&name) {
-            return Some(value.to_owned())
+            return Some(value.to_owned());
         }
         if let Some(captured_frame) = &inner.captured_frame {
-            return captured_frame.get(name)
+            return captured_frame.get(name);
         }
         None
     }
@@ -281,16 +271,6 @@ enum Action {
     Return(Option<Value>),
 }
 
-// Get the value or early-return if it's a `Return` action.
-macro_rules! value {
-    ($x:expr) => {{
-        match $x {
-            Action::Value(val) => val,
-            ret @ Action::Return(_) => return ret,
-        }
-    }};
-}
-
 trait Eval<F: Frame> {
     fn eval(&self, frame: &mut F) -> Action;
 }
@@ -306,6 +286,17 @@ impl<F: Frame> Eval<F> for Module {
 
 impl<F: Frame> Eval<F> for Node {
     fn eval(&self, frame: &mut F) -> Action {
+        // Utility macro to get the value or early-return if it's a
+        // `Return` action.
+        macro_rules! value {
+            ($x:expr) => {{
+                match $x {
+                    Action::Value(val) => val,
+                    ret @ Action::Return(_) => return ret,
+                }
+            }};
+        }
+
         let value: Value = match self {
             Node::Block(block) => {
                 if let Some((last_node, nodes)) = block.nodes.split_last() {
@@ -351,7 +342,7 @@ impl<F: Frame> Eval<F> for Node {
             Node::PostfixCall(call) => {
                 let target = value!(call.target.eval(frame));
                 let mut arguments = Vec::<Value>::with_capacity(call.arguments.len());
-                for (index, argument) in call.arguments.iter().enumerate() {
+                for argument in call.arguments.iter() {
                     let value = value!(argument.eval(frame));
                     arguments.push(value)
                 }
