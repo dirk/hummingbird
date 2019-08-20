@@ -439,12 +439,10 @@ mod tests {
 
             "
             )),
-            Root {
-                nodes: vec![
-                    Node::Integer(Integer { value: 1 }),
-                    Node::Integer(Integer { value: 2 }),
-                ],
-            },
+            Root::new(vec![
+                Node::Integer(Integer { value: 1 }),
+                Node::Integer(Integer { value: 2 }),
+            ]),
         );
     }
 
