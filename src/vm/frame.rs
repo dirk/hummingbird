@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::value::Value;
-use crate::vm::vm::Function;
+use super::vm::{Function, Module};
 
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
@@ -92,10 +92,11 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new_with_closure(closure: Closure) -> Self {
+    /// Build a stack frame in which to evaluate a module.
+    pub fn new_for_module(module: &Module) -> Self {
         Self {
             locals: HashMap::new(),
-            closure: Some(closure),
+            closure: Some(module.get_closure()),
         }
     }
 

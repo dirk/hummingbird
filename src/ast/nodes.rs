@@ -331,9 +331,9 @@ pub struct Root {
     pub nodes: Vec<Node>,
     /// The root is like a function in that it's evaluated within a frame,
     /// therefore it needs to have closure bindings like a frame.
-    pub bindings: Option<HashSet<String>>,
+    bindings: Option<HashSet<String>>,
     /// These should be the union of imports and builtins.
-    pub parent_bindings: Option<HashSet<String>>,
+    parent_bindings: Option<HashSet<String>>,
 }
 
 impl Root {
@@ -348,6 +348,14 @@ impl Root {
             bindings,
             parent_bindings,
         }
+    }
+
+    pub fn get_bindings(&self) -> Option<HashSet<String>> {
+        self.bindings.clone()
+    }
+
+    pub fn get_parent_bindings(&self) -> Option<HashSet<String>> {
+        self.parent_bindings.clone()
     }
 }
 

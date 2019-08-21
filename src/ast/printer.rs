@@ -27,7 +27,7 @@ impl<O: Write> Printer<O> {
     }
 
     pub fn print_root(&mut self, root: Root) -> Result<()> {
-        if let Some(bindings) = &root.bindings {
+        if let Some(bindings) = root.get_bindings() {
             writeln!(self, "bindings [")?;
             self.indented(|printer| {
                 for capture in bindings.iter() {
@@ -37,7 +37,7 @@ impl<O: Write> Printer<O> {
             })?;
             writeln!(self, "]")?;
         }
-        if let Some(parent_bindings) = &root.parent_bindings {
+        if let Some(parent_bindings) = root.get_parent_bindings() {
             writeln!(self, "parent_bindings [")?;
             self.indented(|printer| {
                 for capture in parent_bindings.iter() {

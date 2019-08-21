@@ -73,7 +73,7 @@ impl Debug for Function {
     }
 }
 
-struct Module {
+pub struct Module {
     source: String,
     root: Root,
     closure: Closure,
@@ -85,7 +85,7 @@ impl Module {
 
         // NOTE: Parent bindings should only be imports or builtins. Anything
         //   else is probably use of undefined variables.
-        if let Some(parent_bindings) = &root.parent_bindings {
+        if let Some(parent_bindings) = root.get_parent_bindings() {
             for binding in parent_bindings.iter() {
                 if !builtins
                     .as_ref()
@@ -96,13 +96,17 @@ impl Module {
                 }
             }
         }
-        let closure = Closure::new(root.bindings.clone(), builtins);
+        let closure = Closure::new(root.get_bindings(), builtins);
 
         Self {
             source,
             root,
             closure,
         }
+    }
+
+    pub fn get_closure(&self) -> Closure {
+        self.closure.clone()
     }
 }
 
@@ -147,9 +151,7 @@ impl Eval for Node {
                     Node::Identifier(identifier) => {
                         frame.set(identifier.value.clone(), rhs.clone());
                     }
-                    other @ _ => {
-                        unreachable!("Cannot assign to: {}", other)
-                    }
+                    other @ _ => unreachable!("Cannot assign to: {}", other),
                 }
                 rhs
             }
@@ -249,7 +251,7 @@ impl Vm {
 
     pub fn eval_source(&self, source: String) {
         let module = Module::new_from_source(source, self.builtins.clone());
-        let mut frame = Frame::new_with_closure(module.closure.clone());
+        let mut frame = Frame::new_for_module(&module);
         module.eval(&mut frame);
     }
 }
