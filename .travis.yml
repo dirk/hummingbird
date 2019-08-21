@@ -1,45 +1,6 @@
 sudo: false
 
-# Support for Node.js v4.x
-env:
-  - CXX=g++-4.8
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.6
-    packages:
-      - g++-4.8
-      # Support for LLVM
-      - libstdc++6
-      # Install LLVM
-      - llvm-3.6
-      - llvm-3.6-dev
-      - llvm-3.6-runtime
-      - libllvm3.6
-      - libllvm3.6-dbg
-      - clang-3.6
-      # BDW GC build dependency
-      - libc6-dev
-      - libgc-dev
+language: rust
 
-language: node_js
-
-node_js:
-  - "stable"
-  - "4.1.0"
-  - "0.12"
-
-before_script:
-  # Add LLVM shared library
-  - "export LD_LIBRARY_PATH=/usr/lib/llvm-3.6/lib:$LD_LIBRARY_PATH"
-  # Setup library for development building
-  - "./jake all"
-
-script:
-  - "node_modules/.bin/mocha test"
-  - "node_modules/.bin/mocha test/spec"
-  - "node_modules/.bin/mocha test/llvm"
-
-after_script:
-  - "npm run report-coverage"
+rust:
+  - "1.37.0"
