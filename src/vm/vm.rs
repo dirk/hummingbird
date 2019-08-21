@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
-use super::super::ast::{Function as AstFunction, Node, Root};
+use super::super::ast::{Function as AstFunction, Module as AstModule, Node};
 use super::super::parser;
 use super::builtins::build as build_builtins;
 use super::frame::{Closure, Frame};
@@ -75,17 +75,17 @@ impl Debug for Function {
 
 pub struct Module {
     source: String,
-    root: Root,
+    node: AstModule,
     closure: Closure,
 }
 
 impl Module {
     fn new_from_source(source: String, builtins: Option<Closure>) -> Self {
-        let root = parser::parse(&source);
+        let node = parser::parse(&source);
 
         // NOTE: Parent bindings should only be imports or builtins. Anything
         //   else is probably use of undefined variables.
-        if let Some(parent_bindings) = root.get_parent_bindings() {
+        if let Some(parent_bindings) = node.get_parent_bindings() {
             for binding in parent_bindings.iter() {
                 if !builtins
                     .as_ref()
@@ -96,11 +96,11 @@ impl Module {
                 }
             }
         }
-        let closure = Closure::new(root.get_bindings(), builtins);
+        let closure = Closure::new(node.get_bindings(), builtins);
 
         Self {
             source,
-            root,
+            node,
             closure,
         }
     }
@@ -124,7 +124,7 @@ trait Eval {
 
 impl Eval for Module {
     fn eval(&self, frame: &mut Frame) -> Action {
-        for node in self.root.nodes.iter() {
+        for node in self.node.nodes.iter() {
             node.eval(frame);
         }
         Action::Value(Value::Null)

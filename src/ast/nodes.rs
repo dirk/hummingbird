@@ -16,6 +16,7 @@ pub enum Node {
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Return(Return),
+    Module(Module),
     Var(Var),
 }
 
@@ -30,6 +31,7 @@ impl Display for Node {
             Infix(_) => f.write_str("Infix"),
             Integer(_) => f.write_str("Integer"),
             Let(_) => f.write_str("Let"),
+            Module(_) => f.write_str("Module"),
             PostfixCall(_) => f.write_str("PostfixCall"),
             PostfixProperty(_) => f.write_str("PostfixProperty"),
             Return(_) => f.write_str("Return"),
@@ -208,6 +210,11 @@ fn detect_bindings_visitor(
                 visit!(rhs);
             }
         }
+        Node::Module(root) => {
+            for node in root.nodes.iter() {
+                visit!(node);
+            }
+        }
         Node::Var(var) => {
             locals.insert(var.lhs.value.clone());
             if let Some(rhs) = &var.rhs {
@@ -327,7 +334,7 @@ impl PostfixProperty {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Root {
+pub struct Module {
     pub nodes: Vec<Node>,
     /// The root is like a function in that it's evaluated within a frame,
     /// therefore it needs to have closure bindings like a frame.
@@ -336,17 +343,21 @@ pub struct Root {
     parent_bindings: Option<HashSet<String>>,
 }
 
-impl Root {
+impl Module {
     pub fn new(nodes: Vec<Node>) -> Self {
-        // Make a fake block for us to discover bindings in.
-        let block = Block {
-            nodes: nodes.clone(),
-        };
-        let (bindings, parent_bindings) = detect_bindings(&Node::Block(block));
-        Self {
+        let node = Node::Module(Self {
             nodes,
-            bindings,
-            parent_bindings,
+            bindings: None,
+            parent_bindings: None,
+        });
+        let (bindings, parent_bindings) = detect_bindings(&node);
+        match node {
+            Node::Module(mut module) => {
+                module.bindings = bindings;
+                module.parent_bindings = parent_bindings;
+                module
+            }
+            _ => unreachable!(),
         }
     }
 

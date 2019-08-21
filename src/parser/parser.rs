@@ -1,18 +1,18 @@
 use std::fmt::Debug;
 
 use super::super::ast::nodes::{
-    Assignment, Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall,
-    PostfixProperty, Return, Root, Var,
+    Assignment, Block, Function, Identifier, Infix, Integer, Let, Module, Node, PostfixCall,
+    PostfixProperty, Return, Var,
 };
 
 use super::lexer::{Token, TokenStream};
 
-pub fn parse_program(input: &mut TokenStream) -> Root {
+pub fn parse_program(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
         nodes.append(&mut parse_statements(input, Token::EOF))
     }
-    Root::new(nodes)
+    Module::new(nodes)
 }
 
 fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
@@ -408,8 +408,8 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Assignment, Block, Function, Identifier, Infix, Integer, Let, Node, PostfixCall,
-        PostfixProperty, Return, Root,
+        Assignment, Block, Function, Identifier, Infix, Integer, Let, Module, Node, PostfixCall,
+        PostfixProperty, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -439,7 +439,7 @@ mod tests {
 
             "
             )),
-            Root::new(vec![
+            Module::new(vec![
                 Node::Integer(Integer { value: 1 }),
                 Node::Integer(Integer { value: 2 }),
             ]),

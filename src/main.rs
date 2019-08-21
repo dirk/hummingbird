@@ -22,7 +22,7 @@ fn main() {
     println!("AST:");
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
-        .print_root(program.clone())
+        .print_module(program.clone())
         .expect("Unable to print AST");
 
     let vm = vm::Vm::new();

@@ -26,7 +26,7 @@ impl<O: Write> Printer<O> {
         result
     }
 
-    pub fn print_root(&mut self, root: Root) -> Result<()> {
+    pub fn print_module(&mut self, root: Module) -> Result<()> {
         if let Some(bindings) = root.get_bindings() {
             writeln!(self, "bindings [")?;
             self.indented(|printer| {
