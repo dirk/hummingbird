@@ -1,0 +1,2 @@
+#!/bin/sh
+RUSTFLAGS="-A dead_code" cargo build
