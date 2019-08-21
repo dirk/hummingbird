@@ -141,6 +141,18 @@ impl Eval for Node {
         }
 
         let value: Value = match self {
+            Node::Assignment(assignment) => {
+                let rhs = value!(assignment.rhs.eval(frame));
+                match assignment.lhs.as_ref() {
+                    Node::Identifier(identifier) => {
+                        frame.set(identifier.value.clone(), rhs.clone());
+                    }
+                    other @ _ => {
+                        unreachable!("Cannot assign to: {}", other)
+                    }
+                }
+                rhs
+            }
             Node::Block(block) => {
                 if let Some((last_node, nodes)) = block.nodes.split_last() {
                     for node in nodes {
