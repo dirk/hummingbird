@@ -119,20 +119,20 @@ enum Action {
 }
 
 trait Eval {
-    fn eval(&self, frame: &mut Frame) -> Action;
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action;
 }
 
 impl Eval for Module {
-    fn eval(&self, frame: &mut Frame) -> Action {
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
         for node in self.node.nodes.iter() {
-            node.eval(frame);
+            node.eval(frame, vm);
         }
         Action::Value(Value::Null)
     }
 }
 
 impl Eval for Node {
-    fn eval(&self, frame: &mut Frame) -> Action {
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
         // Utility macro to get the value or early-return if it's a
         // `Return` action.
         macro_rules! value {
@@ -146,7 +146,7 @@ impl Eval for Node {
 
         let value: Value = match self {
             Node::Assignment(assignment) => {
-                let rhs = value!(assignment.rhs.eval(frame));
+                let rhs = value!(assignment.rhs.eval(frame, vm));
                 match assignment.lhs.as_ref() {
                     Node::Identifier(identifier) => {
                         frame.set(identifier.value.clone(), rhs.clone());
@@ -158,9 +158,9 @@ impl Eval for Node {
             Node::Block(block) => {
                 if let Some((last_node, nodes)) = block.nodes.split_last() {
                     for node in nodes {
-                        value!(node.eval(frame));
+                        value!(node.eval(frame, vm));
                     }
-                    value!(last_node.eval(frame))
+                    value!(last_node.eval(frame, vm))
                 } else {
                     Value::Null
                 }
@@ -182,7 +182,7 @@ impl Eval for Node {
             Node::Integer(integer) => Value::Integer(integer.value),
             Node::Let(let_) => {
                 let rhs = match &let_.rhs {
-                    Some(rhs) => value!(rhs.eval(frame)),
+                    Some(rhs) => value!(rhs.eval(frame, vm)),
                     None => Value::Null,
                 };
                 let lhs: String = let_.lhs.value.clone();
@@ -190,18 +190,18 @@ impl Eval for Node {
                 Value::Null
             }
             Node::PostfixCall(call) => {
-                let target = value!(call.target.eval(frame));
+                let target = value!(call.target.eval(frame, vm));
                 let mut arguments = Vec::<Value>::with_capacity(call.arguments.len());
                 for argument in call.arguments.iter() {
-                    let value = value!(argument.eval(frame));
+                    let value = value!(argument.eval(frame, vm));
                     arguments.push(value)
                 }
                 assert_eq!(arguments.len(), call.arguments.len(),);
-                eval_function(target, arguments)
+                eval_function(target, arguments, vm)
             }
             Node::Return(ret) => {
                 if let Some(rhs) = &ret.rhs {
-                    let value = value!(rhs.eval(frame));
+                    let value = value!(rhs.eval(frame, vm));
                     return Action::Return(Some(value));
                 } else {
                     return Action::Return(None);
@@ -209,7 +209,7 @@ impl Eval for Node {
             }
             Node::Var(var) => {
                 let rhs = match &var.rhs {
-                    Some(rhs) => value!(rhs.eval(frame)),
+                    Some(rhs) => value!(rhs.eval(frame, vm)),
                     None => Value::Null,
                 };
                 let lhs: String = var.lhs.value.clone();
@@ -222,12 +222,12 @@ impl Eval for Node {
     }
 }
 
-fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
+fn eval_function(target: Value, arguments: Vec<Value>, vm: &mut Vm) -> Value {
     match target {
         Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
         Value::Function(function) => {
             let mut frame = Frame::new_for_function(&function);
-            match function.node.body.eval(&mut frame) {
+            match function.node.body.eval(&mut frame, vm) {
                 // Implicit return.
                 Action::Value(value) => value,
                 // Explicit return.
@@ -249,9 +249,9 @@ impl Vm {
         }
     }
 
-    pub fn eval_source(&self, source: String) {
+    pub fn eval_source(&mut self, source: String) {
         let module = Module::new_from_source(source, self.builtins.clone());
         let mut frame = Frame::new_for_module(&module);
-        module.eval(&mut frame);
+        module.eval(&mut frame, self);
     }
 }
