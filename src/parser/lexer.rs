@@ -79,6 +79,7 @@ pub enum Token {
     EOF,
     Equals,
     Identifier(String, Span),
+    Import,
     Integer(i64),
     Let(Location),
     Minus,
@@ -87,6 +88,7 @@ pub enum Token {
     Plus,
     Return,
     Star,
+    String(String),
     Terminal(char),
     Var(Location),
 }
@@ -174,6 +176,8 @@ impl TokenStream {
                 return self.lex_identifier(location);
             } else if numeric_head(character) {
                 return self.lex_arrow_minus_or_numeric();
+            } else if string_head(character) {
+                return self.lex_string();
             } else {
                 self.input.read();
                 match character {
@@ -212,10 +216,27 @@ impl TokenStream {
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
             "let" => Token::Let(start),
-            "var" => Token::Var(start),
+            "import" => Token::Import,
             "return" => Token::Return,
+            "var" => Token::Var(start),
             _ => Token::Identifier(identifier_string, Span::new(start, self.input.location())),
         }
+    }
+
+    fn lex_string(&mut self) -> Token {
+        let opening = self.input.read();
+        assert_eq!(opening, '"');
+        let mut characters = vec![];
+        loop {
+            let character = self.input.read();
+            if character != '"' {
+                characters.push(character);
+            } else {
+                break;
+            }
+        }
+        let string: String = characters.into_iter().collect();
+        Token::String(string)
     }
 
     fn lex_arrow_minus_or_numeric(&mut self) -> Token {
@@ -238,7 +259,7 @@ impl TokenStream {
             }
         }
         let number_string: String = number.into_iter().collect();
-        return Token::Integer(number_string.parse().unwrap());
+        Token::Integer(number_string.parse().unwrap())
     }
 
     fn consume_more_newline_terminals(&mut self) {
@@ -286,6 +307,10 @@ fn identifier_tail(character: char) -> bool {
 
 fn numeric_head(character: char) -> bool {
     digit(character) || (character == '-')
+}
+
+fn string_head(character: char) -> bool {
+    character == '"'
 }
 
 fn alphabetical(character: char) -> bool {
@@ -459,6 +484,18 @@ mod tests {
                 Token::Integer(-2),
                 Token::EOF,
             ],
+        );
+    }
+
+    #[test]
+    fn it_parses_strings() {
+        assert_eq!(
+            parse("\"\""),
+            vec![Token::String("".to_string()), Token::EOF]
+        );
+        assert_eq!(
+            parse("\"abc123\""),
+            vec![Token::String("abc123".to_string()), Token::EOF]
         );
     }
 

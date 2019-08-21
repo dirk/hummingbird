@@ -10,6 +10,7 @@ pub enum Node {
     Block(Block),
     Function(Function),
     Identifier(Identifier),
+    Import(Import),
     Infix(Infix),
     Integer(Integer),
     Let(Let),
@@ -28,6 +29,7 @@ impl Display for Node {
             Block(_) => f.write_str("Block"),
             Function(_) => f.write_str("Function"),
             Identifier(_) => f.write_str("Identifier"),
+            Import(_) => f.write_str("Import"),
             Infix(_) => f.write_str("Infix"),
             Integer(_) => f.write_str("Integer"),
             Let(_) => f.write_str("Let"),
@@ -185,6 +187,7 @@ fn detect_bindings_visitor(
         Node::Identifier(identifier) => {
             identify!(&identifier.value);
         }
+        Node::Import(_) => {}
         Node::Infix(infix) => {
             visit!(&infix.lhs);
             visit!(&infix.rhs);
@@ -242,6 +245,28 @@ impl Identifier {
             value: value.into(),
             span,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ImportBindings {
+    /// Using `*` to import all bindings.
+    All,
+    /// Using `{ a, b }` to import `a` and `b` bindings.
+    Named(Vec<String>),
+    /// Using `A` to import the module as `A` (doing `A.a` to get `a`).
+    Module,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Import {
+    source: String,
+    bindings: ImportBindings,
+}
+
+impl Import {
+    pub fn new(source: String, bindings: ImportBindings) -> Self {
+        Self { source, bindings }
     }
 }
 
