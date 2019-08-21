@@ -65,11 +65,11 @@ pub struct Function {
     pub location: Option<Location>,
     /// The variables of this function which must be stored in the `Closure`
     /// on the heap.
-    pub bindings: Option<HashSet<String>>,
+    bindings: Option<HashSet<String>>,
     /// The variables that this function depends on its parent closure to
     /// provide. To ensure nested closure forwarding a `Closure` will be
     /// created if this is present, even if `bindings` is not present.
-    pub parent_bindings: Option<HashSet<String>>,
+    parent_bindings: Option<HashSet<String>>,
 }
 
 impl Function {
@@ -93,6 +93,22 @@ impl Function {
             bindings,
             parent_bindings,
         }
+    }
+
+    pub fn has_bindings(&self) -> bool {
+        self.bindings.is_some()
+    }
+
+    pub fn get_bindings(&self) -> Option<HashSet<String>> {
+        self.bindings.clone()
+    }
+
+    pub fn has_parent_bindings(&self) -> bool {
+        self.parent_bindings.is_some()
+    }
+
+    pub fn get_parent_bindings(&self) -> Option<HashSet<String>> {
+        self.parent_bindings.clone()
     }
 }
 

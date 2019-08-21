@@ -93,7 +93,7 @@ impl<O: Write> Printer<O> {
             "Function({}",
             function.name.clone().unwrap_or("".to_string()),
         )?;
-        if let Some(bindings) = &function.bindings {
+        if let Some(bindings) = function.get_bindings() {
             self.indented(|printer| {
                 writeln!(printer, "bindings [")?;
                 printer.indented(|bindings_printer| {
@@ -105,7 +105,7 @@ impl<O: Write> Printer<O> {
                 writeln!(printer, "]")
             })?;
         }
-        if let Some(parent_bindings) = &function.parent_bindings {
+        if let Some(parent_bindings) = function.get_parent_bindings() {
             self.indented(|printer| {
                 writeln!(printer, "parent_bindings [")?;
                 printer.indented(|parent_bindings_printer| {

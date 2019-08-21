@@ -99,18 +99,11 @@ impl Frame {
         }
     }
 
+    /// Build a stack frame to evaluate the contents of the given function.
     pub fn new_for_function(function: &Function) -> Self {
-        let bindings = function.bindings();
-        // If the function has its own bindings or if it uses bindings from
-        // its parent then we need to set up a closure for it.
-        let closure = if bindings.is_some() || function.has_parent_bindings() {
-            Some(Closure::new(bindings, function.closure_cloned()))
-        } else {
-            None
-        };
         Self {
             locals: HashMap::new(),
-            closure,
+            closure: function.build_closure(),
         }
     }
 
@@ -135,7 +128,7 @@ impl Frame {
     }
 
     /// The frame owns its closure, but it's happy to give out clones.
-    pub fn closure_cloned(&self) -> Option<Closure> {
+    pub fn get_closure(&self) -> Option<Closure> {
         self.closure.clone()
     }
 }

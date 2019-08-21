@@ -52,16 +52,18 @@ impl Function {
         }
     }
 
-    pub fn bindings(&self) -> Option<HashSet<String>> {
-        self.node.bindings.clone()
-    }
-
-    pub fn has_parent_bindings(&self) -> bool {
-        self.node.parent_bindings.is_some()
-    }
-
-    pub fn closure_cloned(&self) -> Option<Closure> {
-        self.closure.clone()
+    pub fn build_closure(&self) -> Option<Closure> {
+        // If the function has its own bindings (used by child function(s)) or
+        // if it uses bindings from its parent then we need to set up a closure
+        // for it.
+        let needs_closure = self.node.has_bindings() || self.node.has_parent_bindings();
+        if needs_closure {
+            let bindings = self.node.get_bindings();
+            let parent = self.closure.clone();
+            Some(Closure::new(bindings, parent))
+        } else {
+            None
+        }
     }
 }
 
@@ -169,7 +171,7 @@ impl Eval for Node {
                 }
             }
             Node::Function(ast_function) => {
-                let function = Function::new(frame.closure_cloned(), ast_function.clone());
+                let function = Function::new(frame.get_closure(), ast_function.clone());
                 let value = Value::Function(function);
                 if let Some(name) = &ast_function.name {
                     frame.set(name.clone(), value.clone())
