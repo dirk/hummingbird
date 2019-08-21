@@ -1,5 +1,4 @@
 [![Build Status][travis-image]][travis-url]
-[![Coverage Status][coveralls-image]][coveralls-url]
 
 [travis-image]: https://travis-ci.org/dirk/hummingbird.svg
 [travis-url]: https://travis-ci.org/dirk/hummingbird
