@@ -1,9 +1,9 @@
-use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
 use super::super::ast::{Function as AstFunction, Node, Root};
 use super::super::parser;
+use super::builtins::build as build_builtins;
 use super::frame::{Closure, Frame};
 use super::value::Value;
 
@@ -73,14 +73,6 @@ impl Debug for Function {
     }
 }
 
-fn merge_bindings(dest: &mut HashSet<String>, src: &Option<HashSet<String>>) {
-    if let Some(bindings) = src {
-        for binding in bindings.iter() {
-            dest.insert(binding.clone());
-        }
-    }
-}
-
 struct Module {
     source: String,
     root: Root,
@@ -88,22 +80,23 @@ struct Module {
 }
 
 impl Module {
-    fn new_from_source(source: String) -> Self {
+    fn new_from_source(source: String, builtins: Option<Closure>) -> Self {
         let root = parser::parse(&source);
 
-        let mut combined_bindings = HashSet::new();
-        merge_bindings(&mut combined_bindings, &root.bindings);
-        combined_bindings.insert("println".to_string());
-        // NOTE: Parent bindings should only be imports. Anything else is
-        //   probably use of undefined variables.
-        // merge_bindings(&mut combined_bindings, &root.parent_bindings);
-        // TODO: Make the builtins a "closure" that all other module closures
-        //   can have as their parent for easier reuse and efficiency.
-        let closure = Closure::new(Some(combined_bindings), None);
-        closure.set(
-            "println".to_string(),
-            BuiltinFunction::new("println".to_string(), builtin_println).into(),
-        );
+        // NOTE: Parent bindings should only be imports or builtins. Anything
+        //   else is probably use of undefined variables.
+        if let Some(parent_bindings) = &root.parent_bindings {
+            for binding in parent_bindings.iter() {
+                if !builtins
+                    .as_ref()
+                    .map(|closure| closure.has(binding.clone()))
+                    .unwrap_or(false)
+                {
+                    panic!("Dangling root parent binding: {}", binding);
+                }
+            }
+        }
+        let closure = Closure::new(root.bindings.clone(), builtins);
 
         Self {
             source,
@@ -111,18 +104,6 @@ impl Module {
             closure,
         }
     }
-}
-
-fn builtin_println(arguments: Vec<Value>) -> Value {
-    for argument in arguments.into_iter() {
-        use Value::*;
-        match argument {
-            BuiltinFunction(builtin_function) => println!("{:?}", builtin_function),
-            Integer(value) => println!("{}", value),
-            other @ _ => println!("{:?}", other),
-        };
-    }
-    Value::Null
 }
 
 #[derive(Debug)]
@@ -243,15 +224,19 @@ fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
     }
 }
 
-pub struct Vm {}
+pub struct Vm {
+    builtins: Option<Closure>,
+}
 
 impl Vm {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            builtins: Some(build_builtins()),
+        }
     }
 
     pub fn eval_source(&self, source: String) {
-        let module = Module::new_from_source(source);
+        let module = Module::new_from_source(source, self.builtins.clone());
         let mut frame = Frame::new_with_closure(module.closure.clone());
         module.eval(&mut frame);
     }

@@ -74,20 +74,17 @@ pub struct Function {
 
 impl Function {
     pub fn new_anonymous(body: Box<Node>) -> Self {
-        let (bindings, parent_bindings) = detect_bindings(&body);
-        Self {
-            name: None,
-            body,
-            location: None,
-            bindings,
-            parent_bindings,
-        }
+        Self::new(None, body)
     }
 
     pub fn new_named(name: String, body: Box<Node>) -> Self {
+        Self::new(Some(name), body)
+    }
+
+    fn new(name: Option<String>, body: Box<Node>) -> Self {
         let (bindings, parent_bindings) = detect_bindings(&body);
         Self {
-            name: Some(name),
+            name,
             body,
             location: None,
             bindings,
