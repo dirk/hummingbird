@@ -6,7 +6,7 @@ use super::super::ast::nodes::{
 };
 
 use super::lexer::{Token, TokenStream};
-use crate::ast::{Import, ImportBindings};
+use crate::ast::{Import, ImportBindings, StringLiteral};
 
 pub fn parse_program(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
@@ -395,6 +395,7 @@ fn parse_atom(input: &mut TokenStream) -> Node {
     match next {
         Token::Identifier(_, _) => Node::Identifier(next.into()),
         Token::Integer(value) => Node::Integer(Integer { value }),
+        Token::String(value) => Node::String(StringLiteral { value }),
         _ => {
             panic_unexpected(next, None);
             unreachable!()

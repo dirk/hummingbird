@@ -25,6 +25,7 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
         match argument {
             BuiltinFunction(builtin_function) => println!("{:?}", builtin_function),
             Integer(value) => println!("{}", value),
+            String(value) => println!("{}", value),
             other @ _ => println!("{:?}", other),
         };
     }

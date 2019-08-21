@@ -1,6 +1,7 @@
 use std::boxed::Box;
 use std::collections::HashSet;
 use std::fmt::{Display, Error, Formatter};
+use std::path::PathBuf;
 
 use super::super::parser::{Location, Span, Token};
 
@@ -14,10 +15,11 @@ pub enum Node {
     Infix(Infix),
     Integer(Integer),
     Let(Let),
+    Module(Module),
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Return(Return),
-    Module(Module),
+    String(StringLiteral),
     Var(Var),
 }
 
@@ -37,6 +39,7 @@ impl Display for Node {
             PostfixCall(_) => f.write_str("PostfixCall"),
             PostfixProperty(_) => f.write_str("PostfixProperty"),
             Return(_) => f.write_str("Return"),
+            String(_) => f.write_str("String"),
             Var(_) => f.write_str("Var"),
         }
     }
@@ -213,6 +216,7 @@ fn detect_bindings_visitor(
                 visit!(rhs);
             }
         }
+        Node::String(_) => (),
         Node::Module(root) => {
             for node in root.nodes.iter() {
                 visit!(node);
@@ -268,6 +272,10 @@ impl Import {
     pub fn new(source: String, bindings: ImportBindings) -> Self {
         Self { source, bindings }
     }
+
+    pub fn path(&self) -> PathBuf {
+        self.source.clone().into()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -296,6 +304,11 @@ impl PartialEq for Let {
     fn eq(&self, other: &Let) -> bool {
         self.lhs == other.lhs && self.rhs == other.rhs
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringLiteral {
+    pub value: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -353,7 +366,7 @@ impl PostfixProperty {
     pub fn new(target: Node, value: String) -> Self {
         Self {
             target: Box::new(target),
-            value: value,
+            value,
         }
     }
 }
