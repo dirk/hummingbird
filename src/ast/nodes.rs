@@ -1,6 +1,7 @@
 use std::boxed::Box;
 use std::collections::HashSet;
 use std::fmt::{Display, Error, Formatter};
+use std::path::PathBuf;
 
 use super::super::parser::{Location, Span, Token};
 
@@ -10,13 +11,15 @@ pub enum Node {
     Block(Block),
     Function(Function),
     Identifier(Identifier),
+    Import(Import),
     Infix(Infix),
     Integer(Integer),
     Let(Let),
+    Module(Module),
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
     Return(Return),
-    Module(Module),
+    String(StringLiteral),
     Var(Var),
 }
 
@@ -28,6 +31,7 @@ impl Display for Node {
             Block(_) => f.write_str("Block"),
             Function(_) => f.write_str("Function"),
             Identifier(_) => f.write_str("Identifier"),
+            Import(_) => f.write_str("Import"),
             Infix(_) => f.write_str("Infix"),
             Integer(_) => f.write_str("Integer"),
             Let(_) => f.write_str("Let"),
@@ -35,6 +39,7 @@ impl Display for Node {
             PostfixCall(_) => f.write_str("PostfixCall"),
             PostfixProperty(_) => f.write_str("PostfixProperty"),
             Return(_) => f.write_str("Return"),
+            String(_) => f.write_str("String"),
             Var(_) => f.write_str("Var"),
         }
     }
@@ -185,6 +190,7 @@ fn detect_bindings_visitor(
         Node::Identifier(identifier) => {
             identify!(&identifier.value);
         }
+        Node::Import(_) => {}
         Node::Infix(infix) => {
             visit!(&infix.lhs);
             visit!(&infix.rhs);
@@ -210,6 +216,7 @@ fn detect_bindings_visitor(
                 visit!(rhs);
             }
         }
+        Node::String(_) => (),
         Node::Module(root) => {
             for node in root.nodes.iter() {
                 visit!(node);
@@ -246,6 +253,32 @@ impl Identifier {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum ImportBindings {
+    /// Using `*` to import all bindings.
+    All,
+    /// Using `{ a, b }` to import `a` and `b` bindings.
+    Named(Vec<String>),
+    /// Using `A` to import the module as `A` (doing `A.a` to get `a`).
+    Module,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Import {
+    source: String,
+    bindings: ImportBindings,
+}
+
+impl Import {
+    pub fn new(source: String, bindings: ImportBindings) -> Self {
+        Self { source, bindings }
+    }
+
+    pub fn path(&self) -> PathBuf {
+        self.source.clone().into()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Integer {
     pub value: i64,
 }
@@ -271,6 +304,11 @@ impl PartialEq for Let {
     fn eq(&self, other: &Let) -> bool {
         self.lhs == other.lhs && self.rhs == other.rhs
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringLiteral {
+    pub value: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -328,7 +366,7 @@ impl PostfixProperty {
     pub fn new(target: Node, value: String) -> Self {
         Self {
             target: Box::new(target),
-            value: value,
+            value,
         }
     }
 }

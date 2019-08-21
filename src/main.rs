@@ -25,6 +25,6 @@ fn main() {
         .print_module(program.clone())
         .expect("Unable to print AST");
 
-    let vm = vm::Vm::new();
-    vm.eval_source(source);
+    let mut vm = vm::Vm::new();
+    vm.load_module(filename);
 }

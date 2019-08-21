@@ -6,6 +6,7 @@ pub enum Value {
     BuiltinFunction(BuiltinFunction),
     Function(Function),
     Integer(i64),
+    String(String),
 }
 
 impl From<BuiltinFunction> for Value {

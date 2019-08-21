@@ -6,16 +6,33 @@ use super::super::ast::nodes::{
 };
 
 use super::lexer::{Token, TokenStream};
+use crate::ast::{Import, ImportBindings, StringLiteral};
 
 pub fn parse_program(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
-        nodes.append(&mut parse_statements(input, Token::EOF))
+        nodes.append(&mut parse_statements(
+            input,
+            Token::EOF,
+            StatementContext::Module,
+        ))
     }
     Module::new(nodes)
 }
 
-fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
+// `import` and `export` statements are allowed at the module-level but not at
+// the block-level.
+#[derive(Copy, Clone, Debug)]
+enum StatementContext {
+    Module,
+    Block,
+}
+
+fn parse_statements(
+    input: &mut TokenStream,
+    terminator: Token,
+    ctx: StatementContext,
+) -> Vec<Node> {
     let mut nodes = vec![];
     loop {
         consume_terminals(input);
@@ -23,7 +40,7 @@ fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
             break;
         }
 
-        nodes.push(parse_statement(input, terminator.clone()));
+        nodes.push(parse_statement(input, terminator.clone(), ctx));
 
         consume_terminals(input);
         if input.peek() == terminator {
@@ -36,7 +53,7 @@ fn parse_statements(input: &mut TokenStream, terminator: Token) -> Vec<Node> {
 // `terminator` is a pseudo-terminal (eg. a closing brace) that can act like a
 // terminal. However, when it is encountered it will be peeked, not read, from
 // the input.
-fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
+fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementContext) -> Node {
     let next = input.peek();
     let maybe_named_function = match next {
         Token::Identifier(_, _) => try_parse_named_function(input),
@@ -48,6 +65,10 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
         named_function
     } else {
         match next {
+            Token::Import => match ctx {
+                StatementContext::Module => parse_import(input),
+                other @ _ => unreachable!("Cannot parse import in {:?}", other),
+            },
             Token::Let(_) => parse_let_and_var(input),
             Token::Return => parse_return(input, terminator.clone()),
             Token::Var(_) => parse_let_and_var(input),
@@ -72,11 +93,10 @@ fn parse_statement(input: &mut TokenStream, terminator: Token) -> Node {
 
 fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     let savepoint = input.clone();
-    let node = input.read();
-    let name = match node {
+    let name = match input.read() {
         Token::Identifier(name, _) => name.clone(),
-        _ => {
-            panic_unexpected_names(node, "Identifier");
+        other @ _ => {
+            panic_unexpected_names(other, "Identifier");
             unreachable!()
         }
     };
@@ -89,6 +109,24 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     // need to backtrack.
     input.backtrack(&savepoint);
     None
+}
+
+fn parse_import(input: &mut TokenStream) -> Node {
+    expect_to_read(input, Token::Import);
+    let bindings = if input.peek() == Token::Star {
+        input.read();
+        ImportBindings::All
+    } else {
+        unreachable!("Cannot yet parse in import: {:?}", input.peek())
+    };
+    let source = match input.read() {
+        Token::String(value) => value,
+        other @ _ => {
+            panic_unexpected_names(other, "String");
+            unreachable!()
+        }
+    };
+    Node::Import(Import::new(source, bindings))
 }
 
 fn parse_let_and_var(input: &mut TokenStream) -> Node {
@@ -213,7 +251,7 @@ fn infix(token: Token) -> bool {
 fn parse_block(input: &mut TokenStream) -> Node {
     if let Token::BraceLeft = input.peek() {
         input.read(); // Opening brace
-        let nodes = parse_statements(input, Token::BraceRight);
+        let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block);
         expect_to_read(input, Token::BraceRight); // Closing brace
         Node::Block(Block { nodes })
     } else {
@@ -357,6 +395,7 @@ fn parse_atom(input: &mut TokenStream) -> Node {
     match next {
         Token::Identifier(_, _) => Node::Identifier(next.into()),
         Token::Integer(value) => Node::Integer(Integer { value }),
+        Token::String(value) => Node::String(StringLiteral { value }),
         _ => {
             panic_unexpected(next, None);
             unreachable!()
@@ -408,8 +447,8 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Assignment, Block, Function, Identifier, Infix, Integer, Let, Module, Node, PostfixCall,
-        PostfixProperty, Return,
+        Assignment, Block, Function, Identifier, Import, ImportBindings, Infix, Integer, Let,
+        Module, Node, PostfixCall, PostfixProperty, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -463,6 +502,18 @@ mod tests {
             }
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn it_parses_import() {
+        let nodes = parse_complete("import * \"foo\"");
+        assert_eq!(
+            nodes,
+            vec![Node::Import(Import::new(
+                "foo".to_string(),
+                ImportBindings::All,
+            ))],
+        );
     }
 
     #[test]

@@ -1,4 +1,9 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::super::ast::{Function as AstFunction, Module as AstModule, Node};
@@ -73,16 +78,50 @@ impl Debug for Function {
     }
 }
 
-pub struct Module {
+/// Canonicalized/fully-resolved path to a module.
+#[derive(Eq, Debug, Hash, PartialEq)]
+struct ModuleLocator(PathBuf);
+
+impl From<PathBuf> for ModuleLocator {
+    fn from(path: PathBuf) -> Self {
+        let canonicalized = path.canonicalize().expect("Couldn't canonicalize path");
+        Self(canonicalized)
+    }
+}
+
+struct InnerModule {
+    locator: Option<ModuleLocator>,
     source: String,
     node: AstModule,
     closure: Closure,
 }
 
+#[derive(Clone)]
+pub struct Module(Rc<RefCell<InnerModule>>);
+
 impl Module {
+    fn new_from_file<P: Into<PathBuf>>(path: P, builtins: Option<Closure>) -> Self {
+        let path = path.into();
+        let mut source = String::new();
+        let mut file = File::open(&path).expect("Couldn't open file");
+        file.read_to_string(&mut source)
+            .expect("Couldn't read file");
+
+        let node = parser::parse(&source);
+        Self::new(Some(path.into()), source, node, builtins)
+    }
+
     fn new_from_source(source: String, builtins: Option<Closure>) -> Self {
         let node = parser::parse(&source);
+        Self::new(None, source, node, builtins)
+    }
 
+    fn new(
+        locator: Option<ModuleLocator>,
+        source: String,
+        node: AstModule,
+        builtins: Option<Closure>,
+    ) -> Self {
         // NOTE: Parent bindings should only be imports or builtins. Anything
         //   else is probably use of undefined variables.
         if let Some(parent_bindings) = node.get_parent_bindings() {
@@ -98,15 +137,17 @@ impl Module {
         }
         let closure = Closure::new(node.get_bindings(), builtins);
 
-        Self {
+        Self(Rc::new(RefCell::new(InnerModule {
+            locator,
             source,
             node,
             closure,
-        }
+        })))
     }
 
     pub fn get_closure(&self) -> Closure {
-        self.closure.clone()
+        let inner = &self.0.borrow();
+        inner.closure.clone()
     }
 }
 
@@ -119,20 +160,21 @@ enum Action {
 }
 
 trait Eval {
-    fn eval(&self, frame: &mut Frame) -> Action;
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action;
 }
 
 impl Eval for Module {
-    fn eval(&self, frame: &mut Frame) -> Action {
-        for node in self.node.nodes.iter() {
-            node.eval(frame);
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
+        let inner = &self.0.borrow();
+        for node in inner.node.nodes.iter() {
+            node.eval(frame, vm);
         }
         Action::Value(Value::Null)
     }
 }
 
 impl Eval for Node {
-    fn eval(&self, frame: &mut Frame) -> Action {
+    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
         // Utility macro to get the value or early-return if it's a
         // `Return` action.
         macro_rules! value {
@@ -146,7 +188,7 @@ impl Eval for Node {
 
         let value: Value = match self {
             Node::Assignment(assignment) => {
-                let rhs = value!(assignment.rhs.eval(frame));
+                let rhs = value!(assignment.rhs.eval(frame, vm));
                 match assignment.lhs.as_ref() {
                     Node::Identifier(identifier) => {
                         frame.set(identifier.value.clone(), rhs.clone());
@@ -158,9 +200,9 @@ impl Eval for Node {
             Node::Block(block) => {
                 if let Some((last_node, nodes)) = block.nodes.split_last() {
                     for node in nodes {
-                        value!(node.eval(frame));
+                        value!(node.eval(frame, vm));
                     }
-                    value!(last_node.eval(frame))
+                    value!(last_node.eval(frame, vm))
                 } else {
                     Value::Null
                 }
@@ -179,10 +221,15 @@ impl Eval for Node {
                     .get(name.clone())
                     .expect(&format!("Not found: {}", name))
             }
+            Node::Import(import) => {
+                let path = import.path();
+                vm.load_module(path);
+                Value::Null
+            }
             Node::Integer(integer) => Value::Integer(integer.value),
             Node::Let(let_) => {
                 let rhs = match &let_.rhs {
-                    Some(rhs) => value!(rhs.eval(frame)),
+                    Some(rhs) => value!(rhs.eval(frame, vm)),
                     None => Value::Null,
                 };
                 let lhs: String = let_.lhs.value.clone();
@@ -190,26 +237,27 @@ impl Eval for Node {
                 Value::Null
             }
             Node::PostfixCall(call) => {
-                let target = value!(call.target.eval(frame));
+                let target = value!(call.target.eval(frame, vm));
                 let mut arguments = Vec::<Value>::with_capacity(call.arguments.len());
                 for argument in call.arguments.iter() {
-                    let value = value!(argument.eval(frame));
+                    let value = value!(argument.eval(frame, vm));
                     arguments.push(value)
                 }
                 assert_eq!(arguments.len(), call.arguments.len(),);
-                eval_function(target, arguments)
+                eval_function(target, arguments, vm)
             }
             Node::Return(ret) => {
                 if let Some(rhs) = &ret.rhs {
-                    let value = value!(rhs.eval(frame));
+                    let value = value!(rhs.eval(frame, vm));
                     return Action::Return(Some(value));
                 } else {
                     return Action::Return(None);
                 }
             }
+            Node::String(string) => Value::String(string.value.clone()),
             Node::Var(var) => {
                 let rhs = match &var.rhs {
-                    Some(rhs) => value!(rhs.eval(frame)),
+                    Some(rhs) => value!(rhs.eval(frame, vm)),
                     None => Value::Null,
                 };
                 let lhs: String = var.lhs.value.clone();
@@ -222,12 +270,12 @@ impl Eval for Node {
     }
 }
 
-fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
+fn eval_function(target: Value, arguments: Vec<Value>, vm: &mut Vm) -> Value {
     match target {
         Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
         Value::Function(function) => {
             let mut frame = Frame::new_for_function(&function);
-            match function.node.body.eval(&mut frame) {
+            match function.node.body.eval(&mut frame, vm) {
                 // Implicit return.
                 Action::Value(value) => value,
                 // Explicit return.
@@ -240,18 +288,33 @@ fn eval_function(target: Value, arguments: Vec<Value>) -> Value {
 
 pub struct Vm {
     builtins: Option<Closure>,
+    loaded_modules: HashMap<ModuleLocator, Module>,
 }
 
 impl Vm {
     pub fn new() -> Self {
         Self {
             builtins: Some(build_builtins()),
+            loaded_modules: HashMap::new(),
         }
     }
 
-    pub fn eval_source(&self, source: String) {
+    pub fn load_module<P: Into<PathBuf>>(&mut self, path: P) -> Module {
+        let path = path.into();
+        let locator: ModuleLocator = path.clone().into();
+        if self.loaded_modules.contains_key(&locator) {
+            return self.loaded_modules.get(&locator).unwrap().clone()
+        }
+        let module = Module::new_from_file(path, self.builtins.clone());
+        let mut frame = Frame::new_for_module(&module);
+        module.eval(&mut frame, self);
+        assert!(self.loaded_modules.insert(locator, module.clone()).is_none(), "Module was already loaded");
+        module
+    }
+
+    pub fn eval_source(&mut self, source: String) {
         let module = Module::new_from_source(source, self.builtins.clone());
         let mut frame = Frame::new_for_module(&module);
-        module.eval(&mut frame);
+        module.eval(&mut frame, self);
     }
 }
