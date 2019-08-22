@@ -11,7 +11,7 @@ impl<O: Write> Printer<O> {
         Self { output }
     }
 
-    pub fn print_unit(&mut self, unit: &Unit) -> Result<()> {
+    pub fn print_unit(&mut self, unit: &Module) -> Result<()> {
         for function in unit.functions.iter() {
             self.print_function(function)?;
         }

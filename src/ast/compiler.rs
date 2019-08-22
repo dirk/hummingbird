@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use super::super::ir::layout::{
-    Address, Import, Instruction, InstructionBuilder, Module, SharedFunction, SharedValue,
+    Address, Import, Instruction, InstructionBuilder, Module as IrModule, SharedFunction, SharedValue,
 };
 use super::super::vm::prelude::is_in_prelude;
 use super::nodes::*;
@@ -43,7 +43,7 @@ impl<'a> Scope for FunctionScope<'a> {
 }
 
 struct ModuleScope {
-    module: Rc<RefCell<Module>>,
+    module: Rc<RefCell<IrModule>>,
     // Map an import name to its source.
     imports: HashMap<String, Import>,
 }
@@ -63,37 +63,37 @@ impl Scope for ModuleScope {
 }
 
 struct Compiler {
-    unit: Rc<RefCell<Module>>,
+    module: Rc<RefCell<IrModule>>,
     current: SharedFunction,
 }
 
 impl Compiler {
     fn new() -> Self {
-        let unit = Rc::new(RefCell::new(Module::new()));
-        let current = unit.borrow().main_function();
-        Self { unit, current }
+        let module = Rc::new(RefCell::new(IrModule::new()));
+        let current = module.borrow().main_function();
+        Self { module, current }
     }
 
-    fn compile_program(&mut self, program: &Program) {
+    fn compile_module(&mut self, module: &Module) {
         let mut module_scope = ModuleScope {
-            module: self.unit.clone(),
+            module: self.module.clone(),
             imports: HashMap::new(),
         };
 
         // We should start in the main function.
-        assert_eq!(self.current, self.unit.borrow().main_function());
+        assert_eq!(self.current, self.module.borrow().main_function());
 
         let mut scope = FunctionScope::new(&mut module_scope, self.current.clone());
 
-        for node in program.nodes.iter() {
+        for node in module.nodes.iter() {
             self.compile_node(node, &mut scope);
             // We should always end up back in the main function.
-            assert_eq!(self.current, self.unit.borrow().main_function());
+            assert_eq!(self.current, self.module.borrow().main_function());
         }
 
         // Now that we've visited the whole program we can write out the
         // imports we've found.
-        self.unit.borrow_mut().imports = module_scope.imports;
+        self.module.borrow_mut().imports = module_scope.imports;
     }
 
     fn compile_node(&mut self, node: &Node, scope: &mut Scope) -> SharedValue {
@@ -161,21 +161,28 @@ impl Compiler {
 
     fn compile_function(&mut self, function: &Function, scope: &mut Scope) -> SharedValue {
         let name = function.name.to_owned();
-        let outer_function = self.current.clone();
-        let new_function = self.unit.borrow_mut().new_function(name.clone());
+        let enclosing_function = self.current.clone();
+        let new_function = match name {
+            Some(name) => self.module.borrow_mut().new_named_function(name.clone()),
+            None => self.module.borrow_mut().new_anonymous_function(enclosing_function.clone()),
+        };
         self.current = new_function.clone();
 
         let mut function_scope = FunctionScope::new(scope, self.current.clone());
-        for node in function.block.nodes.iter() {
-            self.compile_node(node, &mut function_scope);
-        }
-        self.build_return_null();
+        let body = &*function.body;
+        let lval = self.compile_node(body, &mut function_scope);
+        match body {
+            Node::Block(_) => self.build_return_null(),
+            _ => self.build_return(lval),
+        };
 
-        self.current = outer_function;
+        self.current = enclosing_function;
         let lval = self.build_make_function(new_function);
-        let index = self.get_or_add_local(name);
-        self.build_set_local(index, lval);
-        self.null_value()
+        if let Some(name) = &function.name {
+            let index = self.get_or_add_local(name.to_owned());
+            self.build_set_local(index, lval.clone());
+        };
+        lval
     }
 
     fn compile_identifier(&mut self, identifier: &Identifier, scope: &mut Scope) -> SharedValue {
@@ -248,10 +255,10 @@ impl InstructionBuilder for Compiler {
     }
 }
 
-pub fn compile(program: &Program) -> Module {
+pub fn compile(module: &Module) -> IrModule {
     let mut compiler = Compiler::new();
-    compiler.compile_program(program);
+    compiler.compile_module(module);
     // The reference count should be 1 at this point.
-    let module_cell = Rc::try_unwrap(compiler.unit).unwrap();
+    let module_cell = Rc::try_unwrap(compiler.module).unwrap();
     module_cell.into_inner()
 }

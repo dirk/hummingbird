@@ -36,8 +36,16 @@ impl Module {
         self.functions[0].clone()
     }
 
-    pub fn new_function(&mut self, name: String) -> SharedFunction {
+    pub fn new_named_function(&mut self, name: String) -> SharedFunction {
         let id = self.functions.len();
+        let function = Rc::new(RefCell::new(Function::new(id as u16, name)));
+        self.functions.push(function.clone());
+        function
+    }
+
+    pub fn new_anonymous_function(&mut self, enclosing_function: SharedFunction) -> SharedFunction {
+        let id = self.functions.len();
+        let name = format!("{}.{}", enclosing_function.borrow().name, id);
         let function = Rc::new(RefCell::new(Function::new(id as u16, name)));
         self.functions.push(function.clone());
         function

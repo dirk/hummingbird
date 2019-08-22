@@ -16,7 +16,7 @@ pub enum Instruction {
 }
 
 #[derive(Clone, Debug)]
-pub struct Unit {
+pub struct Module {
     pub functions: Vec<Function>,
 }
 

@@ -123,14 +123,14 @@ impl RegisterAllocator {
 struct Compiler {}
 
 impl Compiler {
-    fn compile_unit(unit: &ir::Module) -> bytecode::Unit {
-        let functions = unit
+    fn compile_module(module: &ir::Module) -> bytecode::Module {
+        let functions = module
             .functions
             .iter()
             .map(|function| Compiler::compile_function(function.borrow()))
             .collect::<Vec<bytecode::Function>>();
 
-        bytecode::Unit {
+        bytecode::Module {
             functions: functions,
         }
     }
@@ -237,6 +237,6 @@ impl Compiler {
     }
 }
 
-pub fn compile(unit: &ir::Module) -> bytecode::Unit {
-    Compiler::compile_unit(unit)
+pub fn compile(unit: &ir::Module) -> bytecode::Module {
+    Compiler::compile_module(unit)
 }

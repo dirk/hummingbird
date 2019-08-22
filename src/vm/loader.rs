@@ -34,12 +34,12 @@ impl Loader {
     fn read_file_into_program<P: AsRef<Path>>(
         &mut self,
         path: P,
-    ) -> Result<ast::Program, Box<dyn Error>> {
+    ) -> Result<ast::Module, Box<dyn Error>> {
         let source = fs::read_to_string(path)?;
         Ok(parser::parse(source))
     }
 
-    fn load_program(&mut self, program: ast::Program) -> Result<LoadedModule, Box<dyn Error>> {
+    fn load_program(&mut self, program: ast::Module) -> Result<LoadedModule, Box<dyn Error>> {
         let ir_unit = ast::compiler::compile(&program);
         let bytecode_unit = ir::compiler::compile(&ir_unit);
 

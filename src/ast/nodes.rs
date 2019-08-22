@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::path::PathBuf;
 
 use super::super::parser::{Location, Span, Token};
 
@@ -57,7 +58,6 @@ impl Function {
     }
 
     fn new(name: Option<String>, body: Box<Node>) -> Self {
-        let (bindings, parent_bindings) = detect_bindings(&body);
         Self {
             name,
             body,
@@ -209,6 +209,12 @@ impl PostfixProperty {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
     pub nodes: Vec<Node>,
+}
+
+impl Module {
+    pub fn new(nodes: Vec<Node>) -> Self {
+        Self { nodes }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

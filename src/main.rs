@@ -19,26 +19,26 @@ fn main() {
     let filename = &args[1];
     let source = fs::read_to_string(filename).expect("Unable to read source file");
 
-    let program = parser::parse(source);
+    let module = parser::parse(source);
 
     println!("AST:");
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
-        .print_program(program.clone())
+        .print_module(module.clone())
         .expect("Unable to print AST");
 
-    let ir_unit = ast::compiler::compile(&program);
+    let ir_module = ast::compiler::compile(&module);
     println!("\nIR:");
     let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
     ir_printer
-        .print_module(&ir_unit)
+        .print_module(&ir_module)
         .expect("Unable to print IR");
 
-    let bytecode_unit = ir::compiler::compile(&ir_unit);
+    let bytecode_module = ir::compiler::compile(&ir_module);
     println!("\nBytecode:");
     let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
     bytecode_printer
-        .print_unit(&bytecode_unit)
+        .print_unit(&bytecode_module)
         .expect("Unable to print bytecode");
 
     vm::Vm::run_file(filename);

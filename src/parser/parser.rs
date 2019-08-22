@@ -8,7 +8,7 @@ use super::super::ast::nodes::{
 use super::lexer::{Token, TokenStream};
 use crate::ast::{Import, ImportBindings, StringLiteral};
 
-pub fn parse_program(input: &mut TokenStream) -> Module {
+pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
         nodes.append(&mut parse_statements(
@@ -454,7 +454,7 @@ mod tests {
     use super::super::lexer::{Token, TokenStream};
     use super::super::{Location, Span};
 
-    use super::{parse_block, parse_infix, parse_postfix, parse_program};
+    use super::{parse_block, parse_infix, parse_postfix, parse_module};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
@@ -462,7 +462,7 @@ mod tests {
 
     fn parse_complete(program: &str) -> Vec<Node> {
         let mut token_stream = input(program);
-        let program = parse_program(&mut token_stream);
+        let program = parse_module(&mut token_stream);
         program.nodes
     }
 
@@ -470,7 +470,7 @@ mod tests {
     fn it_parses_program() {
         // Test handling of multiple newlines (terminals).
         assert_eq!(
-            parse_program(&mut input(
+            parse_module(&mut input(
                 "
                 1
 
