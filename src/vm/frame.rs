@@ -1,135 +1,200 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::value::Value;
-use super::vm::{Function, Module};
+use super::super::target::bytecode::layout::{Instruction, Reg};
 
-struct InnerClosure {
-    locals: HashMap<String, Option<Value>>,
-    parent: Option<Closure>,
+use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
+use super::value::Value;
+
+// Frames can live outside of the stack (eg. closures) and can be mutated from
+// places outside the stack (again, closures), therefore we need reference
+// counting (`Rc`) and interior mutability (`RefCell`).
+pub type SharedFrame = Rc<RefCell<Frame>>;
+
+// An action for the VM to do.
+pub enum Action {
+    Call(SharedFrame),
+    Return(Reg, Value),
 }
 
-/// Holds the variables in a frame that outlive that frame.
-#[derive(Clone)]
-pub struct Closure(Rc<RefCell<InnerClosure>>);
+pub trait Frame {
+    // Run the frame's fetch-execute loop. Will be different depending on if
+    // it's a bytecode or native frame.
+    fn run(&mut self) -> Action;
 
-impl Closure {
-    pub fn new(bindings: Option<HashSet<String>>, parent: Option<Closure>) -> Self {
-        let mut locals = HashMap::<String, Option<Value>>::new();
-        if let Some(bindings) = bindings {
-            for binding in bindings.iter() {
-                locals.insert(binding.clone(), None);
+    fn write_register(&mut self, index: Reg, value: Value);
+
+    fn get_local_lexical(&self, name: &String) -> Value;
+}
+
+// Frame evaluating a bytecode function.
+//
+// The first three fields should *not* be changed after the frame
+// is initialized.
+pub struct BytecodeFrame {
+    // TODO: Replace `LoadedFunction` with an abstraction that can support
+    //   specialized instruction sequences.
+    function: LoadedFunction,
+    bytecode: BytecodeFunction,
+    lexical_parent: Option<SharedFrame>,
+    pub return_register: Reg,
+    registers: Vec<Value>,
+    locals: Vec<Value>,
+    current_address: usize,
+}
+
+impl BytecodeFrame {
+    pub fn new(
+        function: LoadedFunction,
+        lexical_parent: Option<SharedFrame>,
+        return_register: Reg,
+    ) -> Self {
+        let bytecode = function.bytecode();
+        let registers = bytecode.registers();
+        let locals = bytecode.locals();
+        Self {
+            function,
+            bytecode,
+            lexical_parent,
+            return_register,
+            registers: vec![Value::Null; registers as usize],
+            locals: vec![Value::Null; locals as usize],
+            current_address: 0,
+        }
+    }
+
+    pub fn unit(&self) -> LoadedModule {
+        self.function.module()
+    }
+
+    #[inline]
+    pub fn current(&self) -> Instruction {
+        self.bytecode.instruction(self.current_address)
+    }
+
+    #[inline]
+    pub fn advance(&mut self) {
+        self.current_address += 1;
+    }
+
+    #[inline]
+    fn offset_register(index: Reg) -> usize {
+        (index as usize) - 1
+    }
+
+    pub fn read_register(&self, index: Reg) -> Value {
+        self.registers[BytecodeFrame::offset_register(index)].clone()
+    }
+
+    pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
+        self.function.module().constant(name.as_ref())
+    }
+
+    pub fn get_local(&self, index: u8) -> Value {
+        self.locals[index as usize].clone()
+    }
+
+    pub fn set_local(&mut self, index: u8, value: Value) {
+        self.locals[index as usize] = value;
+    }
+}
+
+impl Frame for BytecodeFrame {
+    fn run(&mut self) -> Action {
+        loop {
+            let instruction = self.current();
+
+            match &instruction {
+                Instruction::GetConstant(lval, name) => {
+                    self.write_register(*lval, self.get_constant(name));
+                    self.advance();
+                }
+                Instruction::GetLocal(lval, index) => {
+                    self.write_register(*lval, self.get_local(*index));
+                    self.advance();
+                }
+                Instruction::GetLocalLexical(lval, name) => {
+                    self.write_register(*lval, self.get_local_lexical(name));
+                    self.advance();
+                }
+                Instruction::SetLocal(index, rval) => {
+                    self.set_local(*index, self.read_register(*rval));
+                    self.advance();
+                }
+                Instruction::MakeFunction(lval, id) => {
+                    let function = self.unit().function(*id);
+                    let value = Value::from_dynamic_function(function);
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
+                Instruction::MakeInteger(lval, value) => {
+                    self.write_register(*lval, Value::Integer(*value));
+                    self.advance();
+                }
+                Instruction::Branch(destination) => {
+                    self.current_address = *destination as usize;
+                }
+                Instruction::Call(lval, target, arguments) => {
+                    let return_register = *lval;
+                    let target = self.read_register(*target);
+                    let arguments = arguments
+                        .iter()
+                        .map(|argument| self.read_register(*argument))
+                        .collect::<Vec<Value>>();
+                    match target {
+                        Value::DynamicFunction(dynamic_function) => {
+                            // TODO: Make `CallTarget` able to do specialization.
+                            let function = dynamic_function.call_target.function;
+                            let frame = Rc::new(RefCell::new(BytecodeFrame::new(
+                                function,
+                                Option::None,
+                                return_register,
+                            )));
+                            // Be at the next instruction when control flow returns to us.
+                            self.advance();
+                            return Action::Call(frame);
+                        }
+                        Value::NativeFunction(native_function) => {
+                            let result = native_function.call(arguments);
+                            self.write_register(return_register, result);
+                            self.advance();
+                        }
+                        _ => panic!("Cannot call"),
+                    }
+                }
+                Instruction::Return(rval) => {
+                    let value = self.read_register(*rval);
+                    return Action::Return(self.return_register, value);
+                }
+                Instruction::ReturnNull => {
+                    return Action::Return(self.return_register, Value::Null);
+                }
+                _ => panic!("Cannot dispatch: {:?}", instruction),
             }
-        };
-        Self(Rc::new(RefCell::new(InnerClosure { locals, parent })))
+        }
     }
 
-    pub fn has(&self, name: String) -> bool {
-        let inner = &self.0.borrow();
-        if inner.locals.contains_key(&name) {
-            return true;
+    fn get_local_lexical(&self, name: &String) -> Value {
+        let index = self
+            .bytecode
+            .locals_names()
+            .iter()
+            .position(|local| local == name);
+        if let Some(index) = index {
+            self.locals[index].clone()
+        } else {
+            if let Some(ref lexical_parent) = self.lexical_parent {
+                lexical_parent.borrow().get_local_lexical(name)
+            } else {
+                panic!("Out of parents")
+            }
         }
-        if let Some(parent) = &inner.parent {
-            return parent.has(name);
-        }
-        false
     }
 
-    fn get(&self, name: String) -> Option<Value> {
-        let inner = &self.0.borrow();
-        if let Some(value) = inner.locals.get(&name) {
-            return match value {
-                initialized @ Some(_) => initialized.clone(),
-                None => unreachable!("ERROR: Uninitialized closure variable: {}", name),
-            };
-        }
-        if let Some(parent) = &inner.parent {
-            return parent.get(name);
-        }
-        None
-    }
-
-    pub fn set(&self, name: String, value: Value) {
-        let inner = &mut self.0.borrow_mut();
-        if inner.locals.contains_key(&name) {
-            inner.locals.insert(name.clone(), Some(value));
+    fn write_register(&mut self, index: Reg, value: Value) {
+        if index == 0 {
             return;
         }
-        if let Some(parent) = &inner.parent {
-            // If we found a parent with this name and were able to set the
-            // value then all is good.
-            if parent.set_as_parent(name.clone(), value) {
-                return;
-            }
-        }
-        // If we couldn't find the value to set in any parent then crash.
-        unreachable!("ERROR: Couldn't find closure variable: {}", name)
-    }
-
-    // Recursive call to set in parent closures. Returns true if it found
-    // a local and set, false if not.
-    fn set_as_parent(&self, name: String, value: Value) -> bool {
-        let inner = &mut self.0.borrow_mut();
-        if inner.locals.contains_key(&name) {
-            inner.locals.insert(name.clone(), Some(value));
-            return true;
-        }
-        if let Some(parent) = &inner.parent {
-            parent.set_as_parent(name, value)
-        } else {
-            false
-        }
-    }
-}
-
-/// A frame on the stack.
-pub struct Frame {
-    locals: HashMap<String, Value>,
-    /// Locals within this frame which are closed over and therefore must
-    /// outlive this frame.
-    closure: Option<Closure>,
-}
-
-impl Frame {
-    /// Build a stack frame in which to evaluate a module.
-    pub fn new_for_module(module: &Module) -> Self {
-        Self {
-            locals: HashMap::new(),
-            closure: Some(module.get_closure()),
-        }
-    }
-
-    /// Build a stack frame to evaluate the contents of the given function.
-    pub fn new_for_function(function: &Function) -> Self {
-        Self {
-            locals: HashMap::new(),
-            closure: function.build_closure(),
-        }
-    }
-
-    pub fn get(&self, name: String) -> Option<Value> {
-        if let Some(value) = self.locals.get(&name) {
-            return Some(value.clone());
-        }
-        if let Some(closure) = &self.closure {
-            return closure.get(name);
-        }
-        None
-    }
-
-    pub fn set(&mut self, name: String, value: Value) {
-        if let Some(closure) = &self.closure {
-            if closure.has(name.clone()) {
-                closure.set(name, value);
-                return;
-            }
-        }
-        self.locals.insert(name, value);
-    }
-
-    /// The frame owns its closure, but it's happy to give out clones.
-    pub fn get_closure(&self) -> Option<Closure> {
-        self.closure.clone()
+        self.registers[BytecodeFrame::offset_register(index)] = value;
     }
 }
