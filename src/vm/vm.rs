@@ -27,12 +27,9 @@ impl Vm {
 
         // FIXME: Actually do imports on request instead of just copying the
         //   whole prelude.
-        for (name, export) in prelude.borrow().exports.named_exports.iter() {
+        for (name, export) in prelude.get_named_exports().iter() {
             if let Some(export) = export {
-                module
-                    .borrow_mut()
-                    .imports
-                    .set_import(name.to_owned(), export.clone());
+                module.set_import(name.to_owned(), export.clone());
             }
         }
 

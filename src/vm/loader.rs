@@ -48,18 +48,34 @@ impl Loader {
             .functions
             .into_iter()
             .map(|function| {
-                InnerLoadedFunction {
-                    unit: Rc::downgrade(&loaded_module.0),
-                    id: function.id,
-                    bytecode: InnerBytecodeFunction { function }.into(),
-                }
-                .into()
+                LoadedFunction::new(Rc::downgrade(&loaded_module.0), function)
             })
             .collect::<Vec<LoadedFunction>>();
         loaded_module.0.borrow_mut().functions = functions;
 
         self.modules.push(loaded_module.clone());
         Ok(loaded_module)
+    }
+}
+
+// TODO: Hold on to all stages of compilation.
+pub struct InnerLoadedModule {
+    functions: Vec<LoadedFunction>,
+    // A module loaded into memory is uninitialized. Only after it has been
+    // evaluated (and imports and exports resolved) is it initialized.
+    initialized: bool,
+    imports: ModuleImports,
+    exports: ModuleExports,
+}
+
+impl InnerLoadedModule {
+    fn empty() -> Self {
+        Self {
+            functions: vec![],
+            initialized: false,
+            imports: ModuleImports::new(),
+            exports: ModuleExports::new(),
+        }
     }
 }
 
@@ -71,7 +87,7 @@ type WeakLoadedModule = Weak<RefCell<InnerLoadedModule>>;
 
 impl LoadedModule {
     pub fn empty() -> Self {
-        InnerLoadedModule::empty().into()
+        Self(Rc::new(RefCell::new(InnerLoadedModule::empty())))
     }
 
     pub fn main(&self) -> LoadedFunction {
@@ -88,56 +104,25 @@ impl LoadedModule {
             .clone()
     }
 
-    pub fn constant<N: AsRef<str>>(&self, name: N) -> Value {
-        self.0.borrow_mut().get_constant(name)
-    }
-}
-
-impl From<InnerLoadedModule> for LoadedModule {
-    fn from(loaded_unit: InnerLoadedModule) -> LoadedModule {
-        LoadedModule(Rc::new(RefCell::new(loaded_unit)))
-    }
-}
-
-impl Deref for LoadedModule {
-    type Target = RefCell<InnerLoadedModule>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-// TODO: Hold on to all stages of compilation.
-pub struct InnerLoadedModule {
-    functions: Vec<LoadedFunction>,
-    // A module loaded into memory is uninitialized. Only after it has been
-    // evaluated (and imports and exports resolved) is it initialized.
-    initialized: bool,
-    pub imports: ModuleImports,
-    pub exports: ModuleExports,
-}
-
-impl InnerLoadedModule {
-    fn empty() -> Self {
-        Self {
-            functions: vec![],
-            initialized: false,
-            imports: ModuleImports::new(),
-            exports: ModuleExports::new(),
-        }
+    pub fn get_named_exports(&self) -> HashMap<String, Option<Value>> {
+        self.0.borrow().exports.named_exports.to_owned()
     }
 
     // Used by bootstrapping: see `prelude.rs`.
-    pub fn add_named_export<N: Into<String>>(&mut self, name: N, value: Value) {
-        self.exports.named_exports.insert(name.into(), Some(value));
+    pub fn add_named_export<N: Into<String>>(&self, name: N, value: Value) {
+        self.0.borrow_mut().exports.named_exports.insert(name.into(), Some(value));
     }
 
-    pub fn get_constant<N: AsRef<str>>(&mut self, name: N) -> Value {
-        self.imports.get_import(name.as_ref())
+    pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
+        self.0.borrow().imports.get_import(name.as_ref())
+    }
+
+    pub fn set_import<N: Into<String>>(&self, name: N, value: Value) {
+        self.0.borrow_mut().imports.set_import(name, value)
     }
 }
 
-pub struct ModuleImports {
+struct ModuleImports {
     // Imports are resolved from `None`s into values at the beginning of
     // module initialization.
     imports: HashMap<String, Option<Value>>,
@@ -163,7 +148,7 @@ impl ModuleImports {
             .expect(&format!("Uninitialized import: {}", name))
     }
 
-    pub fn set_import<N: Into<String>>(&mut self, name: N, value: Value) {
+    fn set_import<N: Into<String>>(&mut self, name: N, value: Value) {
         self.imports.insert(name.into(), Some(value));
     }
 }
@@ -186,41 +171,35 @@ impl ModuleExports {
 
 // Handle to a loaded bytecode function and its unit. Used by `Frame`.
 #[derive(Clone)]
-pub struct InnerLoadedFunction {
-    unit: WeakLoadedModule,
+struct InnerLoadedFunction {
+    module: WeakLoadedModule,
     id: u16,
     bytecode: BytecodeFunction,
-}
-
-impl InnerLoadedFunction {
-    pub fn id(&self) -> u16 {
-        self.id
-    }
-
-    pub fn bytecode(&self) -> BytecodeFunction {
-        self.bytecode.clone()
-    }
-
-    pub fn module(&self) -> LoadedModule {
-        let unit = self.unit.upgrade().expect("Unit has been dropped");
-        LoadedModule(unit)
-    }
 }
 
 #[derive(Clone)]
 pub struct LoadedFunction(Rc<InnerLoadedFunction>);
 
-impl From<InnerLoadedFunction> for LoadedFunction {
-    fn from(loaded_function: InnerLoadedFunction) -> LoadedFunction {
-        LoadedFunction(Rc::new(loaded_function))
+impl LoadedFunction {
+    fn new(module: WeakLoadedModule, function: bytecode::layout::Function) -> Self {
+        Self(Rc::new(InnerLoadedFunction {
+            module,
+            id: function.id,
+            bytecode: BytecodeFunction::new(function),
+        }))
     }
-}
 
-impl Deref for LoadedFunction {
-    type Target = InnerLoadedFunction;
+    pub fn id(&self) -> u16 {
+        self.0.id
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn bytecode(&self) -> BytecodeFunction {
+        self.0.bytecode.clone()
+    }
+
+    pub fn module(&self) -> LoadedModule {
+        let module = self.0.module.upgrade().expect("Unit has been dropped");
+        LoadedModule(module)
     }
 }
 
@@ -252,9 +231,11 @@ impl InnerBytecodeFunction {
 #[derive(Clone)]
 pub struct BytecodeFunction(Rc<InnerBytecodeFunction>);
 
-impl From<InnerBytecodeFunction> for BytecodeFunction {
-    fn from(bytecode: InnerBytecodeFunction) -> BytecodeFunction {
-        BytecodeFunction(Rc::new(bytecode))
+impl BytecodeFunction {
+    pub fn new(function: bytecode::layout::Function) -> Self {
+        Self(Rc::new(InnerBytecodeFunction {
+            function
+        }))
     }
 }
 

@@ -87,7 +87,7 @@ impl BytecodeFrame {
     }
 
     pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
-        self.function.module().constant(name.as_ref())
+        self.function.module().get_constant(name.as_ref())
     }
 
     pub fn get_local(&self, index: u8) -> Value {
