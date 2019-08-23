@@ -1,43 +1,90 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{RefCell, Cell, RefMut};
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use super::super::ir::layout::{
-    Address, Import, Instruction, InstructionBuilder, Module as IrModule, SharedFunction, SharedValue,
+    Address, Import, Instruction, InstructionBuilder, Module as IrModule, Name, SharedFunction, SharedValue,
+    SharedName,
 };
 use super::super::vm::prelude::is_in_prelude;
 use super::nodes::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum ScopeResolution {
-    Local(u8),
-    Lexical(String),
+    Seen(SharedName),
     Constant(String),
     NotFound(String),
 }
 
+impl ScopeResolution {
+    fn shared_name(&self) -> SharedName {
+        match self {
+            ScopeResolution::Seen(shared_name) => shared_name.clone(),
+            other @ _ => unreachable!("Not seen: {:?}", other),
+        }
+    }
+}
+
 trait Scope {
+    fn add(&mut self, name: &String) -> SharedName;
+
     fn resolve(&mut self, name: &String) -> ScopeResolution;
+
+    /// Acts the same as `resolve`, but records bindings along the way.
+    fn resolve_as_binding(&mut self, name: &String) -> ScopeResolution;
 }
 
 struct FunctionScope<'a> {
     parent: &'a mut Scope,
     function: SharedFunction,
+    // Keep track of every variable we've seen. We'll fill in the
+    // `SharedName`s with details as we recurse upwards.
+    locals: HashMap<String, ScopeResolution>,
+    // Keep track of which variables need to be bound and come from parent
+    // bindings.
+    bindings: HashSet<String>,
+    parent_bindings: HashSet<String>,
 }
 
 impl<'a> FunctionScope<'a> {
     fn new(parent: &'a mut Scope, function: SharedFunction) -> Self {
-        Self { parent, function }
+        Self {
+            parent,
+            function,
+            locals: HashMap::new(),
+            bindings: HashSet::new(),
+            parent_bindings: HashSet::new(),
+        }
     }
 }
 
 impl<'a> Scope for FunctionScope<'a> {
+    fn add(&mut self, name: &String) -> SharedName {
+        let shared_name = SharedName::unknown(name.clone());
+        let resolution = ScopeResolution::Seen(shared_name.clone());
+        self.locals.insert(name.clone(), resolution.clone());
+        shared_name
+    }
+
     fn resolve(&mut self, name: &String) -> ScopeResolution {
-        if self.function.borrow().have_local(name) {
-            ScopeResolution::Local(self.function.borrow().get_local(name))
+        if let Some(resolution) = self.locals.get(name) {
+            resolution.clone()
         } else {
-            self.parent.resolve(name)
+            self.parent_bindings.insert(name.clone());
+            self.parent.resolve_as_binding(name)
+        }
+    }
+
+    fn resolve_as_binding(&mut self, name: &String) -> ScopeResolution {
+        if let Some(resolution) = self.locals.get(name) {
+            // Since this was called from a lower function scope we now know
+            // we need to bind it for that lower scope.
+            self.bindings.insert(name.clone());
+            resolution.clone()
+        } else {
+            self.parent_bindings.insert(name.clone());
+            self.parent.resolve_as_binding(name)
         }
     }
 }
@@ -49,16 +96,24 @@ struct ModuleScope {
 }
 
 impl Scope for ModuleScope {
+    fn add(&mut self, name: &String) -> SharedName {
+        unreachable!("Cannot add to module scope")
+    }
+
     fn resolve(&mut self, name: &String) -> ScopeResolution {
         if is_in_prelude(name) {
             self.imports.insert(
                 name.to_owned(),
                 Import::Named("prelude".to_owned(), name.to_owned()),
             );
-            ScopeResolution::Constant(name.to_owned())
+            ScopeResolution::Constant(name.clone())
         } else {
-            ScopeResolution::NotFound(name.to_owned())
+            ScopeResolution::NotFound(name.clone())
         }
+    }
+
+    fn resolve_as_binding(&mut self, name: &String) -> ScopeResolution {
+        self.resolve(name)
     }
 }
 
@@ -113,35 +168,20 @@ impl Compiler {
     fn compile_assignment(&mut self, assignment: &Assignment, scope: &mut Scope) -> SharedValue {
         let lhs = assignment.lhs.deref();
 
-        enum Assigner {
-            Local(u8),
-            LexicalLocal(String),
-        }
-
-        let assigner = match lhs {
+        let assignee = match lhs {
             &Node::Identifier(ref identifier) => {
                 let local = &identifier.value;
-                if self.current.borrow().have_local(&local) {
-                    let index = self.current.borrow().get_local(&local);
-                    Assigner::Local(index)
-                } else {
-                    Assigner::LexicalLocal(local.to_string())
+                match scope.resolve(local) {
+                    ScopeResolution::Seen(name) => name,
+                    other @ _ => unreachable!("Cannot assign to: {:?}", other),
                 }
             }
-            _ => panic!("Cannot assign to: {:?}", lhs),
+            _ => unreachable!("Cannot assign to: {:?}", lhs),
         };
 
         let rval = self.compile_node(assignment.rhs.deref(), scope);
-        match assigner {
-            Assigner::Local(index) => {
-                self.build_set_local(index, rval.clone());
-                rval
-            }
-            Assigner::LexicalLocal(local) => {
-                self.build_set_local_lexical(local, rval.clone());
-                rval
-            }
-        }
+        self.build_set(assignee, rval.clone());
+        rval
     }
 
     fn compile_anonymous_block(&mut self, block: &Block, scope: &mut Scope) -> SharedValue {
@@ -162,12 +202,15 @@ impl Compiler {
     fn compile_function(&mut self, function: &Function, scope: &mut Scope) -> SharedValue {
         let name = function.name.to_owned();
         let enclosing_function = self.current.clone();
-        let new_function = match name {
+        let new_function = match &name {
             Some(name) => self.module.borrow_mut().new_named_function(name.clone()),
             None => self.module.borrow_mut().new_anonymous_function(enclosing_function.clone()),
         };
         self.current = new_function.clone();
 
+        if let Some(name) = &name {
+            scope.add(name);
+        }
         let mut function_scope = FunctionScope::new(scope, self.current.clone());
         let body = &*function.body;
         let lval = self.compile_node(body, &mut function_scope);
@@ -175,22 +218,46 @@ impl Compiler {
             Node::Block(_) => self.build_return_null(),
             _ => self.build_return(lval),
         };
+        // Save the bindings so that we know how to build the closure.
+        Compiler::finalize_scope(new_function.clone(), &function_scope);
+        {
+            let mut borrowed_new_function = new_function.borrow_mut();
+            borrowed_new_function.bindings = function_scope.bindings;
+        }
 
         self.current = enclosing_function;
         let lval = self.build_make_function(new_function);
         if let Some(name) = &function.name {
-            let index = self.get_or_add_local(name.to_owned());
-            self.build_set_local(index, lval.clone());
+            let name = scope.add(name);
+            self.build_set(name, lval.clone());
         };
         lval
+    }
+
+    fn finalize_scope(function: SharedFunction, scope: &FunctionScope) {
+        let mut function = function.borrow_mut();
+
+        let mut unbound_locals = scope.locals.clone();
+        for binding in scope.bindings.iter() {
+            unbound_locals.remove(binding);
+        }
+
+        let mut locals = vec![];
+        for (index, (name, resolution)) in unbound_locals.iter().enumerate() {
+            locals.push(name.clone());
+            let shared_name = resolution.shared_name();
+            shared_name.set(Name::Local(index as u8));
+        }
+
+        function.locals = locals;
+        function.bindings = scope.bindings.clone();
     }
 
     fn compile_identifier(&mut self, identifier: &Identifier, scope: &mut Scope) -> SharedValue {
         let local = &identifier.value;
         let resolution = scope.resolve(local);
         match resolution {
-            ScopeResolution::Local(index) => self.build_get_local(index),
-            ScopeResolution::Lexical(name) => self.build_get_local_lexical(name),
+            ScopeResolution::Seen(shared_name) => self.build_get(shared_name),
             ScopeResolution::Constant(name) => self.build_get_constant(name),
             _ => panic!("Cannot handle resolution: {:?}", resolution),
         }
@@ -220,19 +287,15 @@ impl Compiler {
     }
 
     fn compile_var(&mut self, var: &Var, scope: &mut Scope) -> SharedValue {
-        let index = self.get_or_add_local(var.lhs.value.clone());
+        let shared_name = scope.add(&var.lhs.value);
         if let Some(ref rhs) = var.rhs {
             let rval = self.compile_node(rhs.deref(), scope);
-            self.build_set_local(index, rval);
+            self.build_set(shared_name, rval);
         }
         self.null_value()
     }
 
     // Convenience proxy methods to the current function:
-
-    fn get_or_add_local(&mut self, local: String) -> u8 {
-        self.current.borrow_mut().get_or_add_local(local)
-    }
 
     fn null_value(&self) -> SharedValue {
         self.current.borrow().null_value()

@@ -32,6 +32,11 @@ impl<O: Write> Printer<O> {
             writeln!(self.output, "    {}", local)?;
         }
         writeln!(self.output, "  }}")?;
+        writeln!(self.output, "  bindings {{")?;
+        for binding in function.bindings.iter() {
+            writeln!(self.output, "    {}", binding)?;
+        }
+        writeln!(self.output, "  }}")?;
         writeln!(self.output, "  blocks {{")?;
         for basic_block in function.basic_blocks.iter() {
             let basic_block = basic_block.deref().borrow();
@@ -77,6 +82,7 @@ impl<O: Write> Printer<O> {
         let address = instruction.0;
         let instruction = &instruction.1;
         let formatted_instruction = match instruction {
+            Instruction::Get(lval, name) => format!("{} = Get({:?})", id(lval), name),
             Instruction::GetConstant(lval, name) => format!("{} = GetConstant({})", id(lval), name),
             Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", id(lval), index),
             Instruction::GetLocalLexical(lval, name) => {

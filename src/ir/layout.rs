@@ -1,6 +1,7 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{RefCell, Cell};
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::ops::Deref;
 
 // We have to share a lot of things around, so use reference-counting to keep
 // track of them.
@@ -104,7 +105,10 @@ impl PartialEq for Value {
 pub struct Function {
     pub id: u16,
     pub name: String,
+    // Vector which is used like a set (except with fixed insertion order).
     pub locals: Vec<String>,
+    pub bindings: HashSet<String>,
+    pub parent_bindings: bool,
     // TODO: Make this precise instead of just grabbing everything.
     pub lexical_captures: bool,
 
@@ -130,6 +134,8 @@ impl Function {
             id,
             name: name.into(),
             locals: vec![],
+            bindings: HashSet::new(),
+            parent_bindings: false,
             lexical_captures: false,
             entry: entry.clone(),
             current: entry.clone(),
@@ -147,23 +153,23 @@ impl Function {
         self.locals.contains(local)
     }
 
-    pub fn get_local(&self, local: &String) -> u8 {
-        self.locals
-            .iter()
-            .position(|existing| existing == local)
-            .expect("Local not found") as u8
-    }
+    // pub fn get_local(&self, local: &String) -> u8 {
+    //     self.locals
+    //         .iter()
+    //         .position(|existing| existing == local)
+    //         .expect("Local not found") as u8
+    // }
 
-    pub fn get_or_add_local(&mut self, local: String) -> u8 {
-        let position = self.locals.iter().position(|existing| existing == &local);
-        match position {
-            Some(index) => index as u8,
-            None => {
-                self.locals.push(local);
-                (self.locals.len() - 1) as u8
-            }
-        }
-    }
+    // pub fn get_or_add_local(&mut self, local: String) -> u8 {
+    //     let position = self.locals.iter().position(|existing| existing == &local);
+    //     match position {
+    //         Some(index) => index as u8,
+    //         None => {
+    //             self.locals.push(local);
+    //             (self.locals.len() - 1) as u8
+    //         }
+    //     }
+    // }
 
     fn next_address(&mut self) -> Address {
         let address = self.instruction_counter;
@@ -198,6 +204,12 @@ pub trait InstructionBuilder {
     // Add an instruction address to the value's list of dependents.
     fn track(&mut self, rval: SharedValue, address: Address);
 
+    fn build_get(&mut self, name: SharedName) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::Get(lval.clone(), name));
+        lval
+    }
+
     fn build_get_constant(&mut self, name: String) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::GetConstant(lval.clone(), name));
@@ -214,6 +226,11 @@ pub trait InstructionBuilder {
         let lval = self.new_value();
         self.push(Instruction::GetLocalLexical(lval.clone(), name));
         lval
+    }
+
+    fn build_set(&mut self, name: SharedName, rval: SharedValue) {
+        let address = self.push(Instruction::Set(name, rval.clone()));
+        self.track(rval, address);
     }
 
     fn build_set_local(&mut self, index: u8, rval: SharedValue) {
@@ -288,8 +305,35 @@ impl InstructionBuilder for Function {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Name {
+    Unknown(String),
+    Constant(String),
+    Local(u8),
+    Lexical(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharedName(Rc<RefCell<Name>>);
+
+impl SharedName {
+    pub fn unknown(value: String) -> Self {
+        Self(Rc::new(RefCell::new(Name::Unknown(value))))
+    }
+
+    pub fn set(&self, value: Name) {
+        match self.0.borrow().deref() {
+            Name::Unknown(_) => (),
+            other @ _ => unreachable!("Trying to set an already-known name: {:?}", other),
+        }
+        *self.0.borrow_mut() = value;
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
+    Get(SharedValue, SharedName),
+    Set(SharedName, SharedValue),
     GetConstant(SharedValue, String),
     GetLocal(SharedValue, u8),
     GetLocalLexical(SharedValue, String),
