@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
@@ -6,25 +7,138 @@ use super::super::target::bytecode::layout::{Instruction, Reg};
 use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::value::Value;
 
-// Frames can live outside of the stack (eg. closures) and can be mutated from
-// places outside the stack (again, closures), therefore we need reference
-// counting (`Rc`) and interior mutability (`RefCell`).
-pub type SharedFrame = Rc<RefCell<Frame>>;
+struct InnerClosure {
+    locals: HashMap<String, Option<Value>>,
+    parent: Option<Closure>,
+}
+
+pub struct Closure(Rc<RefCell<InnerClosure>>);
+
+impl Closure {
+    pub fn new(bindings: Option<HashSet<String>>, parent: Option<Closure>) -> Self {
+        let mut locals = HashMap::<String, Option<Value>>::new();
+        if let Some(bindings) = bindings {
+            for binding in bindings.iter() {
+                locals.insert(binding.clone(), None);
+            }
+        };
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals,
+            parent,
+        })))
+    }
+
+    pub fn has(&self, name: &String) -> bool {
+        let inner = &self.0.borrow();
+        if inner.locals.contains_key(name) {
+            return true;
+        }
+        if let Some(parent) = &inner.parent {
+            return parent.has(name);
+        }
+        false
+    }
+
+    fn get(&self, name: &String) -> Option<Value> {
+        let inner = &self.0.borrow();
+        if let Some(value) = inner.locals.get(name) {
+            return match value {
+                initialized @ Some(_) => initialized.clone(),
+                None => unreachable!("ERROR: Uninitialized closure variable: {}", name),
+            };
+        }
+        if let Some(parent) = &inner.parent {
+            return parent.get(name);
+        }
+        unreachable!("ERROR: Couldn't find closure variable: {}", name)
+    }
+
+    pub fn set(&self, name: String, value: Value) {
+        let inner = &mut self.0.borrow_mut();
+        if let Some(exists) = inner.locals.get_mut(&name) {
+            *exists = Some(value);
+            return
+        }
+        if let Some(parent) = &inner.parent {
+            // If we found a parent with this name and were able to set the
+            // value then all is good.
+            if parent.set_as_parent(name.clone(), value) {
+                return;
+            }
+        }
+        // If we couldn't find the value to set in any parent then crash.
+        unreachable!("ERROR: Couldn't find closure variable: {}", name)
+    }
+
+    // Recursive call to set in parent closures. Returns true if it found
+    // a local and set, false if not.
+    fn set_as_parent(&self, name: String, value: Value) -> bool {
+        let inner = &mut self.0.borrow_mut();
+        if inner.locals.contains_key(&name) {
+            inner.locals.insert(name.clone(), Some(value));
+            return true;
+        }
+        if let Some(parent) = &inner.parent {
+            parent.set_as_parent(name, value)
+        } else {
+            false
+        }
+    }
+}
 
 // An action for the VM to do.
 pub enum Action {
-    Call(SharedFrame),
-    Return(Reg, Value),
+    Call(Frame),
+    Return(Value),
 }
 
-pub trait Frame {
+pub enum Frame {
+    Bytecode(BytecodeFrame)
+}
+
+impl FrameApi for Frame {
+    fn run(&mut self) -> Action {
+        match self {
+            Frame::Bytecode(frame) => frame.run()
+        }
+    }
+
+    fn get_lexical(&self, name: &String) -> Value {
+        match self {
+            Frame::Bytecode(frame) => frame.get_lexical(name)
+        }
+    }
+
+    fn set_lexical(&mut self, name: &String, value: Value) {
+        match self {
+            Frame::Bytecode(frame) => frame.set_lexical(name, value)
+        }
+    }
+
+    fn receive_return(&mut self, value: Value) {
+        match self {
+            Frame::Bytecode(frame) => frame.receive_return(value)
+        }
+    }
+}
+
+pub trait FrameApi {
     // Run the frame's fetch-execute loop. Will be different depending on if
     // it's a bytecode or native frame.
     fn run(&mut self) -> Action;
 
-    fn write_register(&mut self, index: Reg, value: Value);
+    fn get_lexical(&self, name: &String) -> Value;
 
-    fn get_local_lexical(&self, name: &String) -> Value;
+    fn set_lexical(&mut self, name: &String, value: Value);
+
+    /// Called before the frame resumes execution after the higher frame has
+    /// returned a value.
+    ///
+    /// [0].run() -> Call
+    ///   [1].run() -> Return(value)
+    /// [0].receive_return(value)
+    /// [0].run() -> ...
+    fn receive_return(&mut self, value: Value);
 }
 
 // Frame evaluating a bytecode function.
@@ -36,18 +150,19 @@ pub struct BytecodeFrame {
     //   specialized instruction sequences.
     function: LoadedFunction,
     bytecode: BytecodeFunction,
-    lexical_parent: Option<SharedFrame>,
-    pub return_register: Reg,
-    registers: Vec<Value>,
+    /// The slots for the local variables (not bound to a closure).
     locals: Vec<Value>,
+    closure: Option<Closure>,
+    /// The register for the returned value to be stored in.
+    return_register: Option<Reg>,
+    registers: Vec<Value>,
     current_address: usize,
 }
 
 impl BytecodeFrame {
     pub fn new(
         function: LoadedFunction,
-        lexical_parent: Option<SharedFrame>,
-        return_register: Reg,
+        closure: Option<Closure>,
     ) -> Self {
         let bytecode = function.bytecode();
         let registers = bytecode.registers();
@@ -55,10 +170,10 @@ impl BytecodeFrame {
         Self {
             function,
             bytecode,
-            lexical_parent,
-            return_register,
-            registers: vec![Value::Null; registers as usize],
             locals: vec![Value::Null; locals as usize],
+            closure,
+            return_register: None,
+            registers: vec![Value::Null; registers as usize],
             current_address: 0,
         }
     }
@@ -86,6 +201,13 @@ impl BytecodeFrame {
         self.registers[BytecodeFrame::offset_register(index)].clone()
     }
 
+    fn write_register(&mut self, index: Reg, value: Value) {
+        if index == 0 {
+            return;
+        }
+        self.registers[BytecodeFrame::offset_register(index)] = value;
+    }
+
     pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
         self.function.module().get_constant(name.as_ref())
     }
@@ -97,9 +219,17 @@ impl BytecodeFrame {
     pub fn set_local(&mut self, index: u8, value: Value) {
         self.locals[index as usize] = value;
     }
+
+    fn get_index_of_local(&self, name: &String) -> Option<usize> {
+        self
+            .bytecode
+            .locals_names()
+            .iter()
+            .position(|local| local == name)
+    }
 }
 
-impl Frame for BytecodeFrame {
+impl FrameApi for BytecodeFrame {
     fn run(&mut self) -> Action {
         loop {
             let instruction = self.current();
@@ -114,7 +244,7 @@ impl Frame for BytecodeFrame {
                     self.advance();
                 }
                 Instruction::GetLocalLexical(lval, name) => {
-                    self.write_register(*lval, self.get_local_lexical(name));
+                    self.write_register(*lval, self.get_lexical(name));
                     self.advance();
                 }
                 Instruction::SetLocal(index, rval) => {
@@ -135,7 +265,6 @@ impl Frame for BytecodeFrame {
                     self.current_address = *destination as usize;
                 }
                 Instruction::Call(lval, target, arguments) => {
-                    let return_register = *lval;
                     let target = self.read_register(*target);
                     let arguments = arguments
                         .iter()
@@ -143,20 +272,21 @@ impl Frame for BytecodeFrame {
                         .collect::<Vec<Value>>();
                     match target {
                         Value::DynamicFunction(dynamic_function) => {
+                            // Save the return register for when the VM calls `receive_return`.
+                            self.return_register = Some(*lval);
                             // TODO: Make `CallTarget` able to do specialization.
                             let function = dynamic_function.call_target.function;
-                            let frame = Rc::new(RefCell::new(BytecodeFrame::new(
+                            let frame = Frame::Bytecode(BytecodeFrame::new(
                                 function,
                                 Option::None,
-                                return_register,
-                            )));
+                            ));
                             // Be at the next instruction when control flow returns to us.
                             self.advance();
                             return Action::Call(frame);
                         }
                         Value::NativeFunction(native_function) => {
                             let result = native_function.call(arguments);
-                            self.write_register(return_register, result);
+                            self.write_register(*lval, result);
                             self.advance();
                         }
                         _ => panic!("Cannot call"),
@@ -164,37 +294,43 @@ impl Frame for BytecodeFrame {
                 }
                 Instruction::Return(rval) => {
                     let value = self.read_register(*rval);
-                    return Action::Return(self.return_register, value);
+                    return Action::Return(value);
                 }
                 Instruction::ReturnNull => {
-                    return Action::Return(self.return_register, Value::Null);
+                    return Action::Return(Value::Null);
                 }
                 _ => panic!("Cannot dispatch: {:?}", instruction),
             }
         }
     }
 
-    fn get_local_lexical(&self, name: &String) -> Value {
-        let index = self
-            .bytecode
-            .locals_names()
-            .iter()
-            .position(|local| local == name);
-        if let Some(index) = index {
-            self.locals[index].clone()
-        } else {
-            if let Some(ref lexical_parent) = self.lexical_parent {
-                lexical_parent.borrow().get_local_lexical(name)
-            } else {
-                panic!("Out of parents")
+    fn get_lexical(&self, name: &String) -> Value {
+        if let Some(index) = self.get_index_of_local(name) {
+            return self.locals[index].clone()
+        }
+        if let Some(closure) = &self.closure {
+            return closure.get(name).expect(&format!("Not found: {}", name))
+        }
+        unreachable!("Not found: {}", name)
+    }
+
+    fn set_lexical(&mut self, name: &String, value: Value) {
+        if let Some(closure) = &self.closure {
+            if closure.has(name) {
+                closure.set(name.clone(), value);
+                return;
             }
+        }
+        if let Some(index) = self.get_index_of_local(name) {
+            self.locals[index] = value;
+        } else {
+            unreachable!("Not found: {}", name)
         }
     }
 
-    fn write_register(&mut self, index: Reg, value: Value) {
-        if index == 0 {
-            return;
-        }
-        self.registers[BytecodeFrame::offset_register(index)] = value;
+    fn receive_return(&mut self, value: Value) {
+        let return_register = self.return_register.expect("Return register not set");
+        self.write_register(return_register, value);
+        self.return_register = None;
     }
 }

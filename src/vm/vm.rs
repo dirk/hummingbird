@@ -5,13 +5,13 @@ use std::rc::Rc;
 use super::super::ir::layout as ir;
 use super::super::target::bytecode::layout::Instruction;
 
-use super::frame::{Action, BytecodeFrame, SharedFrame};
+use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
 use super::loader::Loader;
 use super::prelude::build_prelude;
 use super::value::{NativeFunction, Value};
 
 pub struct Vm {
-    stack: Vec<SharedFrame>,
+    stack: Vec<Frame>,
     loader: Loader,
 }
 
@@ -33,27 +33,26 @@ impl Vm {
             }
         }
 
-        let frame = BytecodeFrame::new(module.main(), None, 0);
+        let frame = BytecodeFrame::new(module.main(), None);
 
-        vm.stack.push(Rc::new(RefCell::new(frame)));
+        vm.stack.push(Frame::Bytecode(frame));
         vm.run();
     }
 
     fn run(&mut self) {
         loop {
             let action = {
-                let mut top = self.stack.last().expect("Empty stack").borrow_mut();
+                let mut top = self.stack.last_mut().expect("Empty stack");
                 top.run()
             };
 
             match action {
                 Action::Call(frame) => self.stack.push(frame),
-                Action::Return(return_register, return_value) => {
+                Action::Return(return_value) => {
                     self.stack.pop().expect("Empty stack");
-                    match self.stack.last() {
+                    match self.stack.last_mut() {
                         Option::Some(new_top) => {
-                            let mut new_top = new_top.borrow_mut();
-                            new_top.write_register(return_register, return_value);
+                            new_top.receive_return(return_value);
                         }
                         Option::None => return,
                     }
