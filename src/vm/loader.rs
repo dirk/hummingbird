@@ -14,50 +14,33 @@ use super::super::target::bytecode;
 use super::frame::Closure;
 use super::value::Value;
 
-// Manages loading IR units and compiling them into callable functions.
-//
-// NOTE: Eventually this should probably handle loading source files. Really
-//   the whole continuum between source and specialized native code.
-pub struct Loader {
-    modules: Vec<LoadedModule>,
+fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn Error>> {
+    let source = fs::read_to_string(path)?;
+    Ok(parser::parse(source))
 }
 
-impl Loader {
-    pub fn new() -> Self {
-        Self { modules: vec![] }
-    }
+fn compile_ast_into_module(ast_module: &ast::Module) -> Result<LoadedModule, Box<dyn Error>> {
+    let ir_module = ast_to_ir::compile(ast_module);
 
-    pub fn load_file<P: AsRef<Path>>(&mut self, path: P) -> Result<LoadedModule, Box<dyn Error>> {
-        let program = self.read_file_into_program(path)?;
-        self.load_program(program)
-    }
+    let loaded_module = LoadedModule::empty();
+    let functions = ir::compiler::compile(&ir_module)
+        .functions
+        .into_iter()
+        .map(|function| {
+            let weak_loaded_module = Rc::downgrade(&loaded_module.0);
+            LoadedFunction::new(weak_loaded_module, function)
+        })
+        .collect::<Vec<LoadedFunction>>();
+    loaded_module.0.borrow_mut().functions = functions;
 
-    // TODO: Cache translation of source into AST.
-    fn read_file_into_program<P: AsRef<Path>>(
-        &mut self,
-        path: P,
-    ) -> Result<ast::Module, Box<dyn Error>> {
-        let source = fs::read_to_string(path)?;
-        Ok(parser::parse(source))
-    }
-
-    fn load_program(&mut self, program: ast::Module) -> Result<LoadedModule, Box<dyn Error>> {
-        let ir_module = ast_to_ir::compile(&program);
-
-        let loaded_module = LoadedModule::empty();
-        let functions = ir::compiler::compile(&ir_module)
-            .functions
-            .into_iter()
-            .map(|function| LoadedFunction::new(Rc::downgrade(&loaded_module.0), function))
-            .collect::<Vec<LoadedFunction>>();
-        loaded_module.0.borrow_mut().functions = functions;
-
-        self.modules.push(loaded_module.clone());
-        Ok(loaded_module)
-    }
+    Ok(loaded_module)
 }
 
-// TODO: Hold on to all stages of compilation.
+pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>> {
+    let ast_module = read_and_parse_file(path)?;
+    compile_ast_into_module(&ast_module)
+}
+
 pub struct InnerLoadedModule {
     functions: Vec<LoadedFunction>,
     /// The closure holding the static scope that holds:

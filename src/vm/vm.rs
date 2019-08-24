@@ -1,23 +1,45 @@
-use std::path::Path;
+use std::error::Error;
+use std::path::{Path, PathBuf};
 
 use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
-use super::loader::Loader;
+use super::loader::{self, LoadedModule};
 use super::prelude::build_prelude;
+use std::collections::HashMap;
 
 pub struct Vm {
     stack: Vec<Frame>,
-    loader: Loader,
+    loaded_modules: HashMap<PathBuf, LoadedModule>,
 }
 
 impl Vm {
-    pub fn run_file<P: AsRef<Path>>(path: P) {
-        let mut vm = Self {
+    pub fn new() -> Self {
+        Self {
             stack: vec![],
-            loader: Loader::new(),
-        };
+            loaded_modules: HashMap::new(),
+        }
+    }
+
+    pub fn load_file<P: AsRef<Path>>(&mut self, path: P) -> Result<LoadedModule, Box<dyn Error>> {
+        let canonicalized = path
+            .as_ref()
+            .canonicalize()
+            .expect("Could not canonicalize path");
+
+        if self.loaded_modules.contains_key(&canonicalized) {
+            panic!("Module already loaded: {:?}", canonicalized);
+        }
+
+        let loaded_module = loader::load_file(path)?;
+        self.loaded_modules
+            .insert(canonicalized, loaded_module.clone());
+        Ok(loaded_module)
+    }
+
+    pub fn run_file<P: AsRef<Path>>(path: P) {
+        let mut vm = Self::new();
 
         let prelude = build_prelude();
-        let module = vm.loader.load_file(path).expect("Unable to read file");
+        let module = vm.load_file(path).expect("Unable to read file");
 
         // FIXME: Actually do imports on request instead of just copying the
         //   whole prelude.
