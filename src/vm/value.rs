@@ -5,20 +5,22 @@ use std::rc::Rc;
 use gc::{Finalize, Gc, GcCell, Trace};
 
 use super::call_target::CallTarget;
+use super::frame::Closure;
 use super::loader::LoadedFunction;
 
 #[derive(Clone)]
 pub struct DynamicFunction {
     pub call_target: CallTarget,
+    pub closure: Option<Closure>,
 }
 
 #[derive(Clone)]
 pub struct NativeFunction {
-    call_target: Rc<Fn(Vec<Value>) -> Value>,
+    call_target: Rc<dyn Fn(Vec<Value>) -> Value>,
 }
 
 impl NativeFunction {
-    pub fn new(call_target: Rc<Fn(Vec<Value>) -> Value>) -> Self {
+    pub fn new(call_target: Rc<dyn Fn(Vec<Value>) -> Value>) -> Self {
         Self { call_target }
     }
 
@@ -51,11 +53,15 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn from_dynamic_function(loaded_function: LoadedFunction) -> Self {
+    pub fn from_dynamic_function(
+        loaded_function: LoadedFunction,
+        closure: Option<Closure>,
+    ) -> Self {
         let dynamic_function = DynamicFunction {
             call_target: CallTarget {
                 function: loaded_function,
             },
+            closure,
         };
         Value::DynamicFunction(dynamic_function)
     }

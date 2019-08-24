@@ -5,6 +5,7 @@ use std::process::exit;
 use std::{env, fs};
 
 mod ast;
+mod ast_to_ir;
 mod ir;
 mod parser;
 mod target;
@@ -27,7 +28,7 @@ fn main() {
         .print_module(module.clone())
         .expect("Unable to print AST");
 
-    let ir_module = ast::compiler::compile(&module);
+    let ir_module = ast_to_ir::compile(&module);
     println!("\nIR:");
     let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
     ir_printer

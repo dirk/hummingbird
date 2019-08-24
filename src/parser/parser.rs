@@ -454,7 +454,7 @@ mod tests {
     use super::super::lexer::{Token, TokenStream};
     use super::super::{Location, Span};
 
-    use super::{parse_block, parse_infix, parse_postfix, parse_module};
+    use super::{parse_block, parse_infix, parse_module, parse_postfix};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())

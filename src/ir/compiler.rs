@@ -174,6 +174,8 @@ impl Compiler {
             instructions,
             locals: function.locals.len() as u8,
             locals_names: function.locals.clone(),
+            bindings: function.bindings.clone(),
+            parent_bindings: function.parent_bindings,
         }
     }
 
@@ -195,17 +197,30 @@ impl Compiler {
 
         for (address, instruction) in basic_block.instructions.iter() {
             let bytecode_instruction = match instruction {
-                ir::Instruction::GetConstant(lval, name) => {
-                    bytecode::Instruction::GetConstant(allocate(lval), name.clone())
+                ir::Instruction::Get(lval, slot) => {
+                    let reg = allocate(lval);
+                    match slot.copy_inner() {
+                        ir::Slot::Local(_name, index) => {
+                            bytecode::Instruction::GetLocal(reg, index.expect("Un-indexed local"))
+                        }
+                        ir::Slot::Lexical(name) => {
+                            bytecode::Instruction::GetLocalLexical(reg, name)
+                        }
+                        ir::Slot::Static(name) => bytecode::Instruction::GetConstant(reg, name),
+                    }
                 }
-                ir::Instruction::GetLocal(lval, index) => {
-                    bytecode::Instruction::GetLocal(allocate(lval), *index)
-                }
-                ir::Instruction::GetLocalLexical(lval, name) => {
-                    bytecode::Instruction::GetLocalLexical(allocate(lval), name.clone())
-                }
-                ir::Instruction::SetLocal(index, rval) => {
-                    bytecode::Instruction::SetLocal(*index, read(rval, address))
+                ir::Instruction::Set(slot, rval) => {
+                    let reg = read(rval, address);
+                    match slot.copy_inner() {
+                        ir::Slot::Local(name, index) => bytecode::Instruction::SetLocal(
+                            index.expect(&format!("Un-indexed local: {}", name)),
+                            reg,
+                        ),
+                        ir::Slot::Lexical(name) => {
+                            bytecode::Instruction::SetLocalLexical(name, reg)
+                        }
+                        ir::Slot::Static(name) => unreachable!("Cannot set static yet ({})", name),
+                    }
                 }
                 ir::Instruction::MakeFunction(lval, function) => {
                     let id = function.borrow().id;

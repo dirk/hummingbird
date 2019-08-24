@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::ops::Deref;
@@ -7,6 +7,7 @@ use std::path::Path;
 use std::rc::{Rc, Weak};
 
 use super::super::ast;
+use super::super::ast_to_ir;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
@@ -40,16 +41,13 @@ impl Loader {
     }
 
     fn load_program(&mut self, program: ast::Module) -> Result<LoadedModule, Box<dyn Error>> {
-        let ir_unit = ast::compiler::compile(&program);
-        let bytecode_unit = ir::compiler::compile(&ir_unit);
+        let ir_module = ast_to_ir::compile(&program);
 
         let loaded_module = LoadedModule::empty();
-        let functions = ir::compiler::compile(&ir_unit)
+        let functions = ir::compiler::compile(&ir_module)
             .functions
             .into_iter()
-            .map(|function| {
-                LoadedFunction::new(Rc::downgrade(&loaded_module.0), function)
-            })
+            .map(|function| LoadedFunction::new(Rc::downgrade(&loaded_module.0), function))
             .collect::<Vec<LoadedFunction>>();
         loaded_module.0.borrow_mut().functions = functions;
 
@@ -110,7 +108,11 @@ impl LoadedModule {
 
     // Used by bootstrapping: see `prelude.rs`.
     pub fn add_named_export<N: Into<String>>(&self, name: N, value: Value) {
-        self.0.borrow_mut().exports.named_exports.insert(name.into(), Some(value));
+        self.0
+            .borrow_mut()
+            .exports
+            .named_exports
+            .insert(name.into(), Some(value));
     }
 
     pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
@@ -169,7 +171,6 @@ impl ModuleExports {
     }
 }
 
-// Handle to a loaded bytecode function and its unit. Used by `Frame`.
 #[derive(Clone)]
 struct InnerLoadedFunction {
     module: WeakLoadedModule,
@@ -177,6 +178,7 @@ struct InnerLoadedFunction {
     bytecode: BytecodeFunction,
 }
 
+/// Handle to a loaded function.
 #[derive(Clone)]
 pub struct LoadedFunction(Rc<InnerLoadedFunction>);
 
@@ -195,6 +197,21 @@ impl LoadedFunction {
 
     pub fn bytecode(&self) -> BytecodeFunction {
         self.0.bytecode.clone()
+    }
+
+    pub fn bindings(&self) -> HashSet<String> {
+        self.0.bytecode.bindings()
+    }
+
+    /// Returns whether or not this function binds/captures its environment
+    /// when it is created.
+    pub fn binds_on_create(&self) -> bool {
+        self.0.bytecode.parent_bindings()
+    }
+
+    /// Wehther or not the function should create bindings when it is called.
+    pub fn binds_on_call(&self) -> bool {
+        self.0.bytecode.has_bindings() || self.0.bytecode.parent_bindings()
     }
 
     pub fn module(&self) -> LoadedModule {
@@ -226,6 +243,18 @@ impl InnerBytecodeFunction {
     pub fn locals_names(&self) -> Vec<String> {
         self.function.locals_names.clone()
     }
+
+    pub fn has_bindings(&self) -> bool {
+        !self.function.bindings.is_empty()
+    }
+
+    pub fn bindings(&self) -> HashSet<String> {
+        self.function.bindings.clone()
+    }
+
+    pub fn parent_bindings(&self) -> bool {
+        self.function.parent_bindings
+    }
 }
 
 #[derive(Clone)]
@@ -233,9 +262,7 @@ pub struct BytecodeFunction(Rc<InnerBytecodeFunction>);
 
 impl BytecodeFunction {
     pub fn new(function: bytecode::layout::Function) -> Self {
-        Self(Rc::new(InnerBytecodeFunction {
-            function
-        }))
+        Self(Rc::new(InnerBytecodeFunction { function }))
     }
 }
 

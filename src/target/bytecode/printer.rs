@@ -25,6 +25,14 @@ impl<O: Write> Printer<O> {
             writeln!(self.output, "    {}", local)?;
         }
         writeln!(self.output, "  }}")?;
+        writeln!(self.output, "  bindings {{")?;
+        for local in function.bindings.iter() {
+            writeln!(self.output, "    {}", local)?;
+        }
+        writeln!(self.output, "  }}")?;
+        if function.parent_bindings {
+            writeln!(self.output, "  parent_bindings")?;
+        }
         writeln!(self.output, "  instructions {{")?;
         for (address, instruction) in function.instructions.iter().enumerate() {
             self.print_instruction(instruction, address)?;
@@ -43,6 +51,9 @@ impl<O: Write> Printer<O> {
                 format!("{} = GetLocalLexical({})", reg(lval), name)
             }
             Instruction::SetLocal(index, rval) => format!("SetLocal({}, {})", index, reg(rval)),
+            Instruction::SetLocalLexical(name, rval) => {
+                format!("SetLocalLexical({}, {})", name, reg(rval))
+            }
             Instruction::MakeFunction(lval, id) => format!("MakeFunction({}, {})", reg(lval), id),
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", reg(lval), value)

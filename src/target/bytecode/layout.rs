@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 pub type Reg = u8;
 
 #[derive(Clone, Debug)]
@@ -28,4 +30,6 @@ pub struct Function {
     pub instructions: Vec<Instruction>,
     pub locals: u8,
     pub locals_names: Vec<String>,
+    pub bindings: HashSet<String>,
+    pub parent_bindings: bool,
 }

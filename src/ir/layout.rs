@@ -1,7 +1,7 @@
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
-use std::ops::Deref;
 
 // We have to share a lot of things around, so use reference-counting to keep
 // track of them.
@@ -65,7 +65,7 @@ pub struct Value {
 }
 
 impl Value {
-    fn new(id: ValueId) -> Self {
+    pub fn new(id: ValueId) -> Self {
         Value {
             id,
             dependents: vec![],
@@ -84,7 +84,7 @@ impl Value {
     }
 
     // Call this to track that an instruction uses this value.
-    fn used_by(&mut self, address: Address) {
+    pub fn used_by(&mut self, address: Address) {
         // The null register can be used freely.
         if self.is_null() {
             return;
@@ -171,7 +171,7 @@ impl Function {
     //     }
     // }
 
-    fn next_address(&mut self) -> Address {
+    pub fn next_address(&mut self) -> Address {
         let address = self.instruction_counter;
         self.instruction_counter += 1;
         address
@@ -194,6 +194,119 @@ impl Function {
     }
 }
 
+/// Describes how a given variable slot was resolved.
+#[derive(Clone, PartialEq)]
+pub enum Slot {
+    /// Module-level static slot.
+    Static(String),
+    /// Local variable slot.
+    Local(String, Option<u8>),
+    /// Lexical scope through bindings (closures). This is the fallback if we
+    /// can't determine if it's local or static.
+    Lexical(String),
+}
+
+#[derive(Clone, PartialEq)]
+pub struct SharedSlot(Rc<RefCell<Slot>>);
+
+impl SharedSlot {
+    /// Return a new un-numbered local.
+    pub fn new_local(name: String) -> Self {
+        Self(Rc::new(RefCell::new(Slot::Local(name, None))))
+    }
+
+    pub fn new_lexical(name: String) -> Self {
+        Self(Rc::new(RefCell::new(Slot::Lexical(name))))
+    }
+
+    pub fn new_static(name: String) -> Self {
+        Self(Rc::new(RefCell::new(Slot::Static(name))))
+    }
+
+    // pub fn set(&self, value: Slot) {
+    //     match self.0.borrow().deref() {
+    //         Slot::Unknown(_) => (),
+    //         other @ _ => unreachable!("Trying to set an already-known name: {:?}", other),
+    //     }
+    //     *self.0.borrow_mut() = value;
+    // }
+
+    pub fn promote_from_local_to_lexical(&self, name: String) {
+        let existing_name = match &*self.0.borrow() {
+            Slot::Local(name, _) => name.clone(),
+            other @ _ => unreachable!("Cannot promote to lexical from non-local: {:?}", other),
+        };
+        assert_eq!(existing_name, name);
+        *self.0.borrow_mut() = Slot::Lexical(name);
+    }
+
+    // Sets the index of a local variable.
+    pub fn set_local_index(&self, index: u8) {
+        let (name, existing_index) = match &*self.0.borrow() {
+            Slot::Local(name, existing_index) => (name.clone(), existing_index.clone()),
+            other @ _ => unreachable!("Cannot set index on non-local: {:?}", other),
+        };
+        if let Some(existing_index) = existing_index {
+            panic!(
+                "Cannot set index as one is already set: existing={}, new={}",
+                existing_index, index
+            )
+        }
+        *self.0.borrow_mut() = Slot::Local(name.clone(), Some(index));
+    }
+
+    pub fn copy_inner(&self) -> Slot {
+        self.0.borrow().clone()
+    }
+}
+
+impl Debug for Slot {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        match self {
+            Slot::Local(name, index) => write!(f, "Local({}, {:?})", name, index)?,
+            Slot::Lexical(name) => write!(f, "Lexical({})", name)?,
+            Slot::Static(name) => write!(f, "Static({})", name)?,
+        };
+        Ok(())
+    }
+}
+
+impl Debug for SharedSlot {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        let slot = &*self.0.borrow();
+        write!(f, "{:?}", slot)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Instruction {
+    Get(SharedValue, SharedSlot),
+    Set(SharedSlot, SharedValue),
+    MakeFunction(SharedValue, SharedFunction),
+    MakeInteger(SharedValue, i64),
+    Branch(SharedBasicBlock),
+    Call(SharedValue, SharedValue, Vec<SharedValue>),
+    Return(SharedValue),
+    ReturnNull,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BasicBlock {
+    pub id: u16,
+    pub name: String,
+    pub instructions: Vec<(Address, Instruction)>,
+}
+
+impl BasicBlock {
+    fn new<V: Into<String>>(id: u16, name: V) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            instructions: vec![],
+        }
+    }
+}
+
 pub trait InstructionBuilder {
     // Build a new `Value`.
     fn new_value(&mut self) -> SharedValue;
@@ -204,42 +317,14 @@ pub trait InstructionBuilder {
     // Add an instruction address to the value's list of dependents.
     fn track(&mut self, rval: SharedValue, address: Address);
 
-    fn build_get(&mut self, name: SharedName) -> SharedValue {
+    fn build_get(&mut self, name: SharedSlot) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::Get(lval.clone(), name));
         lval
     }
 
-    fn build_get_constant(&mut self, name: String) -> SharedValue {
-        let lval = self.new_value();
-        self.push(Instruction::GetConstant(lval.clone(), name));
-        lval
-    }
-
-    fn build_get_local(&mut self, index: u8) -> SharedValue {
-        let lval = self.new_value();
-        self.push(Instruction::GetLocal(lval.clone(), index));
-        lval
-    }
-
-    fn build_get_local_lexical(&mut self, name: String) -> SharedValue {
-        let lval = self.new_value();
-        self.push(Instruction::GetLocalLexical(lval.clone(), name));
-        lval
-    }
-
-    fn build_set(&mut self, name: SharedName, rval: SharedValue) {
+    fn build_set(&mut self, name: SharedSlot, rval: SharedValue) {
         let address = self.push(Instruction::Set(name, rval.clone()));
-        self.track(rval, address);
-    }
-
-    fn build_set_local(&mut self, index: u8, rval: SharedValue) {
-        let address = self.push(Instruction::SetLocal(index, rval.clone()));
-        self.track(rval, address);
-    }
-
-    fn build_set_local_lexical(&mut self, name: String, rval: SharedValue) {
-        let address = self.push(Instruction::SetLocalLexical(name, rval.clone()));
         self.track(rval, address);
     }
 
@@ -302,64 +387,5 @@ impl InstructionBuilder for Function {
 
     fn track(&mut self, rval: SharedValue, address: Address) {
         rval.borrow_mut().used_by(address)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Name {
-    Unknown(String),
-    Constant(String),
-    Local(u8),
-    Lexical(String),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct SharedName(Rc<RefCell<Name>>);
-
-impl SharedName {
-    pub fn unknown(value: String) -> Self {
-        Self(Rc::new(RefCell::new(Name::Unknown(value))))
-    }
-
-    pub fn set(&self, value: Name) {
-        match self.0.borrow().deref() {
-            Name::Unknown(_) => (),
-            other @ _ => unreachable!("Trying to set an already-known name: {:?}", other),
-        }
-        *self.0.borrow_mut() = value;
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Instruction {
-    Get(SharedValue, SharedName),
-    Set(SharedName, SharedValue),
-    GetConstant(SharedValue, String),
-    GetLocal(SharedValue, u8),
-    GetLocalLexical(SharedValue, String),
-    SetLocal(u8, SharedValue),
-    SetLocalLexical(String, SharedValue),
-    MakeFunction(SharedValue, SharedFunction),
-    MakeInteger(SharedValue, i64),
-    Branch(SharedBasicBlock),
-    Call(SharedValue, SharedValue, Vec<SharedValue>),
-    Return(SharedValue),
-    ReturnNull,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct BasicBlock {
-    pub id: u16,
-    pub name: String,
-    pub instructions: Vec<(Address, Instruction)>,
-}
-
-impl BasicBlock {
-    fn new<V: Into<String>>(id: u16, name: V) -> Self {
-        Self {
-            id,
-            name: name.into(),
-            instructions: vec![],
-        }
     }
 }

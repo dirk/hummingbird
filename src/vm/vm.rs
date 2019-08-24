@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -9,6 +10,7 @@ use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
 use super::loader::Loader;
 use super::prelude::build_prelude;
 use super::value::{NativeFunction, Value};
+use crate::vm::frame::Closure;
 
 pub struct Vm {
     stack: Vec<Frame>,
@@ -33,7 +35,15 @@ impl Vm {
             }
         }
 
-        let frame = BytecodeFrame::new(module.main(), None);
+        let main = module.main();
+        let bindings = main.bindings();
+        let maybe_bindings = if !bindings.is_empty() {
+            Some(bindings)
+        } else {
+            None
+        };
+        let closure = Some(Closure::new(maybe_bindings, None));
+        let frame = BytecodeFrame::new(module.main(), closure);
 
         vm.stack.push(Frame::Bytecode(frame));
         vm.run();
@@ -42,7 +52,7 @@ impl Vm {
     fn run(&mut self) {
         loop {
             let action = {
-                let mut top = self.stack.last_mut().expect("Empty stack");
+                let top = self.stack.last_mut().expect("Empty stack");
                 top.run()
             };
 

@@ -1,6 +1,5 @@
 use std::cell::Ref;
 use std::io::{Result, Write};
-use std::ops::Deref;
 
 use super::layout::*;
 
@@ -20,7 +19,7 @@ impl<O: Write> Printer<O> {
         }
         writeln!(self.output, "}}")?;
         for function in unit.functions.iter() {
-            self.print_function(function.deref().borrow())?;
+            self.print_function(function.borrow())?;
         }
         Ok(())
     }
@@ -37,16 +36,19 @@ impl<O: Write> Printer<O> {
             writeln!(self.output, "    {}", binding)?;
         }
         writeln!(self.output, "  }}")?;
+        if function.parent_bindings {
+            writeln!(self.output, "  parent_bindings")?;
+        }
         writeln!(self.output, "  blocks {{")?;
         for basic_block in function.basic_blocks.iter() {
-            let basic_block = basic_block.deref().borrow();
+            let basic_block = basic_block.borrow();
             self.print_basic_block(basic_block)?;
         }
         writeln!(self.output, "  }}")?;
         writeln!(self.output, "  values {{")?;
         for value in function.values.iter() {
             let formatted_value = id(value);
-            let value = value.deref().borrow();
+            let value = value.borrow();
             let formatted_dependents = if value.dependents.len() > 0 {
                 format!(
                     " -> {}",
@@ -82,13 +84,8 @@ impl<O: Write> Printer<O> {
         let address = instruction.0;
         let instruction = &instruction.1;
         let formatted_instruction = match instruction {
-            Instruction::Get(lval, name) => format!("{} = Get({:?})", id(lval), name),
-            Instruction::GetConstant(lval, name) => format!("{} = GetConstant({})", id(lval), name),
-            Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", id(lval), index),
-            Instruction::GetLocalLexical(lval, name) => {
-                format!("{} = GetLocalLexical({})", id(lval), name)
-            }
-            Instruction::SetLocal(index, rval) => format!("SetLocal({}, {})", index, id(rval)),
+            Instruction::Get(lval, slot) => format!("{} = Get({:?})", id(lval), slot),
+            Instruction::Set(slot, rval) => format!("SetLocal({:?}, {})", slot, id(rval)),
             Instruction::MakeFunction(lval, function) => {
                 format!("MakeFunction({}, {})", id(lval), function.borrow().name)
             }
@@ -120,5 +117,5 @@ impl<O: Write> Printer<O> {
 
 // Format a `SharedValue` into a pretty string (eg. "$1").
 fn id(value: &SharedValue) -> String {
-    format!("${}", value.deref().borrow().id)
+    format!("${}", value.borrow().id)
 }
