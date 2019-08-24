@@ -3,7 +3,6 @@ use std::path::Path;
 use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
 use super::loader::Loader;
 use super::prelude::build_prelude;
-use crate::vm::frame::Closure;
 
 pub struct Vm {
     stack: Vec<Frame>,
@@ -28,15 +27,7 @@ impl Vm {
             }
         }
 
-        let main = module.main();
-        let bindings = main.bindings();
-        let maybe_bindings = if !bindings.is_empty() {
-            Some(bindings)
-        } else {
-            None
-        };
-        let closure = Some(Closure::new(maybe_bindings, None));
-        let frame = BytecodeFrame::new(module.main(), closure);
+        let frame = BytecodeFrame::new(module.main(), Some(module.static_closure()));
 
         vm.stack.push(Frame::Bytecode(frame));
         vm.run();

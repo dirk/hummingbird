@@ -11,6 +11,8 @@ use super::value::Value;
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
     parent: Option<Closure>,
+    /// If this closure is the static closure environment for a module.
+    is_static: bool,
 }
 
 #[derive(Clone)]
@@ -24,18 +26,19 @@ impl Closure {
                 locals.insert(binding.clone(), None);
             }
         };
-        Self(Rc::new(RefCell::new(InnerClosure { locals, parent })))
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals,
+            parent,
+            is_static: false,
+        })))
     }
 
-    pub fn has(&self, name: &String) -> bool {
-        let inner = &self.0.borrow();
-        if inner.locals.contains_key(name) {
-            return true;
-        }
-        if let Some(parent) = &inner.parent {
-            return parent.has(name);
-        }
-        false
+    pub fn new_static() -> Self {
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals: HashMap::new(),
+            parent: None,
+            is_static: true,
+        })))
     }
 
     fn get(&self, name: &String) -> Option<Value> {
@@ -52,21 +55,27 @@ impl Closure {
         unreachable!("ERROR: Couldn't find closure variable: {}", name)
     }
 
-    pub fn set(&self, name: String, value: Value) {
+    /// Returns true if it found a closure in which to set the variable,
+    /// false if not.
+    pub fn try_set(&self, name: String, value: Value) -> bool {
         let inner = &mut self.0.borrow_mut();
         if let Some(exists) = inner.locals.get_mut(&name) {
             *exists = Some(value);
-            return;
+            return true;
+        }
+        // If it's static then we can create new locals at will.
+        if inner.is_static {
+            inner.locals.insert(name, Some(value));
+            return true;
         }
         if let Some(parent) = &inner.parent {
             // If we found a parent with this name and were able to set the
             // value then all is good.
             if parent.set_as_parent(name.clone(), value) {
-                return;
+                return true;
             }
         }
-        // If we couldn't find the value to set in any parent then crash.
-        unreachable!("ERROR: Couldn't find closure variable: {}", name)
+        return false;
     }
 
     // Recursive call to set in parent closures. Returns true if it found
@@ -288,10 +297,7 @@ impl FrameApi for BytecodeFrame {
                                 } else {
                                     None
                                 };
-                                Some(Closure::new(
-                                    maybe_bindings,
-                                    parent_closure
-                                ))
+                                Some(Closure::new(maybe_bindings, parent_closure))
                             } else {
                                 None
                             };
@@ -331,8 +337,7 @@ impl FrameApi for BytecodeFrame {
 
     fn set_lexical(&mut self, name: &String, value: Value) {
         if let Some(closure) = &self.closure {
-            if closure.has(name) {
-                closure.set(name.clone(), value);
+            if closure.try_set(name.clone(), value.clone()) {
                 return;
             }
         }
@@ -371,8 +376,8 @@ impl Debug for Closure {
             .collect::<Vec<String>>();
         write!(
             f,
-            "Closure {{ locals: {:?}, parent: {:?} }}",
-            locals, inner.parent
+            "Closure {{ locals: {:?}, parent: {:?}, is_static: {:?} }}",
+            locals, inner.parent, inner.is_static
         )
     }
 }

@@ -11,6 +11,7 @@ use super::super::ast_to_ir;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
+use super::frame::Closure;
 use super::value::Value;
 
 // Manages loading IR units and compiling them into callable functions.
@@ -59,6 +60,11 @@ impl Loader {
 // TODO: Hold on to all stages of compilation.
 pub struct InnerLoadedModule {
     functions: Vec<LoadedFunction>,
+    /// The closure holding the static scope that holds:
+    ///   - Imports
+    ///   - Bound or exported variables
+    ///   - Bound or exported functions
+    static_closure: Closure,
     // A module loaded into memory is uninitialized. Only after it has been
     // evaluated (and imports and exports resolved) is it initialized.
     initialized: bool,
@@ -70,6 +76,7 @@ impl InnerLoadedModule {
     fn empty() -> Self {
         Self {
             functions: vec![],
+            static_closure: Closure::new_static(),
             initialized: false,
             imports: ModuleImports::new(),
             exports: ModuleExports::new(),
@@ -90,6 +97,10 @@ impl LoadedModule {
 
     pub fn main(&self) -> LoadedFunction {
         self.0.borrow().functions[0].clone()
+    }
+
+    pub fn static_closure(&self) -> Closure {
+        self.0.borrow().static_closure.clone()
     }
 
     pub fn function(&self, id: u16) -> LoadedFunction {
@@ -213,7 +224,7 @@ impl LoadedFunction {
     }
 
     pub fn module(&self) -> LoadedModule {
-        let module = self.0.module.upgrade().expect("Unit has been dropped");
+        let module = self.0.module.upgrade().expect("Module has been dropped");
         LoadedModule(module)
     }
 }
