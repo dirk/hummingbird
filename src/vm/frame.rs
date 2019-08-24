@@ -64,10 +64,10 @@ impl Closure {
             return true;
         }
         // If it's static then we can create new locals at will.
-        if inner.is_static {
-            inner.locals.insert(name, Some(value));
-            return true;
-        }
+        // if inner.is_static {
+        //     inner.locals.insert(name, Some(value));
+        //     return true;
+        // }
         if let Some(parent) = &inner.parent {
             // If we found a parent with this name and were able to set the
             // value then all is good.
