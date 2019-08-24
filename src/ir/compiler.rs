@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 
 use super::super::target::bytecode::layout as bytecode;
@@ -245,7 +245,6 @@ impl Compiler {
                 }
                 ir::Instruction::Return(rval) => bytecode::Instruction::Return(read(rval, address)),
                 ir::Instruction::ReturnNull => bytecode::Instruction::ReturnNull,
-                _ => panic!("Cannot compile instruction: {:?}", instruction),
             };
             instructions.push(bytecode_instruction)
         }

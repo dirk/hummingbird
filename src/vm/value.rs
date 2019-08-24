@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use gc::{Finalize, Gc, GcCell, Trace};
+// use gc::{Finalize, Gc, GcCell, Trace};
 
 use super::call_target::CallTarget;
 use super::frame::Closure;
@@ -29,24 +28,24 @@ impl NativeFunction {
     }
 }
 
-pub struct DynamicObject {
-    properties: HashMap<String, Value>,
-}
-
-impl Finalize for DynamicObject {}
-
-unsafe impl Trace for DynamicObject {
-    custom_trace!(this, {
-        for (_key, value) in this.properties.iter() {
-            mark(value);
-        }
-    });
-}
+// pub struct DynamicObject {
+//     properties: HashMap<String, Value>,
+// }
+//
+// impl Finalize for DynamicObject {}
+//
+// unsafe impl Trace for DynamicObject {
+//     custom_trace!(this, {
+//         for (_key, value) in this.properties.iter() {
+//             mark(value);
+//         }
+//     });
+// }
 
 #[derive(Clone)]
 pub enum Value {
     DynamicFunction(DynamicFunction),
-    DynamicObject(Gc<GcCell<DynamicObject>>),
+    // DynamicObject(Gc<GcCell<DynamicObject>>),
     Integer(i64),
     NativeFunction(NativeFunction),
     Null,
@@ -67,20 +66,18 @@ impl Value {
     }
 
     pub fn make_native_function<V: Fn(Vec<Value>) -> Value + 'static>(call_target: V) -> Self {
-        let native_function = NativeFunction {
-            call_target: Rc::new(call_target),
-        };
+        let native_function = NativeFunction::new(Rc::new(call_target));
         Value::NativeFunction(native_function)
     }
 }
 
-impl Finalize for Value {}
-
-unsafe impl Trace for Value {
-    custom_trace!(this, {
-        match this {
-            Value::DynamicObject(dynamic_object) => mark(dynamic_object),
-            _ => (),
-        }
-    });
-}
+// impl Finalize for Value {}
+//
+// unsafe impl Trace for Value {
+//     custom_trace!(this, {
+//         match this {
+//             Value::DynamicObject(dynamic_object) => mark(dynamic_object),
+//             _ => (),
+//         }
+//     });
+// }

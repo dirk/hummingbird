@@ -1,15 +1,8 @@
-use std::cell::RefCell;
-use std::collections::HashSet;
 use std::path::Path;
-use std::rc::Rc;
-
-use super::super::ir::layout as ir;
-use super::super::target::bytecode::layout::Instruction;
 
 use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
 use super::loader::Loader;
 use super::prelude::build_prelude;
-use super::value::{NativeFunction, Value};
 use crate::vm::frame::Closure;
 
 pub struct Vm {

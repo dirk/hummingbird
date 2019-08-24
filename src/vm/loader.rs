@@ -103,7 +103,7 @@ impl LoadedModule {
     }
 
     pub fn get_named_exports(&self) -> HashMap<String, Option<Value>> {
-        self.0.borrow().exports.named_exports.to_owned()
+        self.0.borrow().exports.exports.to_owned()
     }
 
     // Used by bootstrapping: see `prelude.rs`.
@@ -111,7 +111,7 @@ impl LoadedModule {
         self.0
             .borrow_mut()
             .exports
-            .named_exports
+            .exports
             .insert(name.into(), Some(value));
     }
 
@@ -158,15 +158,13 @@ impl ModuleImports {
 pub struct ModuleExports {
     // Exports will start out as `None`s and are then filled in once the module
     // is initialized.
-    pub named_exports: HashMap<String, Option<Value>>,
-    default_export: Option<Value>,
+    pub exports: HashMap<String, Option<Value>>,
 }
 
 impl ModuleExports {
     fn new() -> Self {
         Self {
-            named_exports: HashMap::new(),
-            default_export: None,
+            exports: HashMap::new(),
         }
     }
 }

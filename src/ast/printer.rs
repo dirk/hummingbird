@@ -1,6 +1,5 @@
 use std::fmt;
 use std::io::{Result, Write};
-use std::ops::Deref;
 
 use super::nodes::*;
 

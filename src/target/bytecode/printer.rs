@@ -71,7 +71,6 @@ impl<O: Write> Printer<O> {
             ),
             Instruction::Return(rval) => format!("Return({})", reg(rval)),
             Instruction::ReturnNull => "ReturnNull".to_string(),
-            _ => "Unknown".to_string(),
         };
         writeln!(
             self.output,

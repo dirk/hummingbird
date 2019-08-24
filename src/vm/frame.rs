@@ -315,7 +315,6 @@ impl FrameApi for BytecodeFrame {
                 Instruction::ReturnNull => {
                     return Action::Return(Value::Null);
                 }
-                _ => panic!("Cannot dispatch: {:?}", instruction),
             }
         }
     }
