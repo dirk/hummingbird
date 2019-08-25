@@ -231,6 +231,14 @@ impl SharedSlot {
     //     *self.0.borrow_mut() = value;
     // }
 
+    pub fn is_static(&self) -> bool {
+        let inner = &*self.0.borrow();
+        match inner {
+            &Slot::Static(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn promote_from_local_to_lexical(&self, name: String) {
         let existing_name = match &*self.0.borrow() {
             Slot::Local(name, _) => name.clone(),
