@@ -5,7 +5,10 @@ use std::process::exit;
 use std::{env, fs};
 
 mod ast;
+mod ast_to_ir;
+mod ir;
 mod parser;
+mod target;
 mod vm;
 
 fn main() {
@@ -17,14 +20,28 @@ fn main() {
     let filename = &args[1];
     let source = fs::read_to_string(filename).expect("Unable to read source file");
 
-    let program = parser::parse(source.clone());
+    let module = parser::parse(source);
 
     println!("AST:");
     let mut printer = ast::printer::Printer::new(std::io::stdout());
     printer
-        .print_module(program.clone())
+        .print_module(module.clone())
         .expect("Unable to print AST");
 
-    let mut vm = vm::Vm::new();
-    vm.load_module(filename);
+    let ir_module = ast_to_ir::compile(&module);
+    println!("\nIR:");
+    let mut ir_printer = ir::printer::Printer::new(std::io::stdout());
+    ir_printer
+        .print_module(&ir_module)
+        .expect("Unable to print IR");
+
+    let bytecode_module = ir::compiler::compile(&ir_module);
+    println!("\nBytecode:");
+    let mut bytecode_printer = target::bytecode::printer::Printer::new(std::io::stdout());
+    bytecode_printer
+        .print_unit(&bytecode_module)
+        .expect("Unable to print bytecode");
+
+    vm::Vm::run_file(filename);
+    // println!("Bytecode:\n{:?}", bytecode_unit);
 }

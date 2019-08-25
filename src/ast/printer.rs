@@ -26,28 +26,8 @@ impl<O: Write> Printer<O> {
         result
     }
 
-    pub fn print_module(&mut self, root: Module) -> Result<()> {
-        if let Some(bindings) = root.get_bindings() {
-            writeln!(self, "bindings [")?;
-            self.indented(|printer| {
-                for capture in bindings.iter() {
-                    writeln!(printer, "{}", capture)?;
-                }
-                Ok(())
-            })?;
-            writeln!(self, "]")?;
-        }
-        if let Some(parent_bindings) = root.get_parent_bindings() {
-            writeln!(self, "parent_bindings [")?;
-            self.indented(|printer| {
-                for capture in parent_bindings.iter() {
-                    writeln!(printer, "{}", capture)?;
-                }
-                Ok(())
-            })?;
-            writeln!(self, "]")?;
-        }
-        for node in root.nodes {
+    pub fn print_module(&mut self, module: Module) -> Result<()> {
+        for node in module.nodes {
             self.print_node(node)?
         }
         Ok(())
@@ -91,32 +71,8 @@ impl<O: Write> Printer<O> {
         writeln!(
             self,
             "Function({}",
-            function.name.clone().unwrap_or("".to_string()),
+            function.name.to_owned().unwrap_or("".to_string())
         )?;
-        if let Some(bindings) = function.get_bindings() {
-            self.indented(|printer| {
-                writeln!(printer, "bindings [")?;
-                printer.indented(|bindings_printer| {
-                    for capture in bindings.iter() {
-                        writeln!(bindings_printer, "{}", capture)?;
-                    }
-                    Ok(())
-                })?;
-                writeln!(printer, "]")
-            })?;
-        }
-        if let Some(parent_bindings) = function.get_parent_bindings() {
-            self.indented(|printer| {
-                writeln!(printer, "parent_bindings [")?;
-                printer.indented(|parent_bindings_printer| {
-                    for capture in parent_bindings.iter() {
-                        writeln!(parent_bindings_printer, "{}", capture)?;
-                    }
-                    Ok(())
-                })?;
-                writeln!(printer, "]")
-            })?;
-        }
         self.indented(|printer| printer.print_node(*function.body))?;
         writeln!(self, ")")
     }

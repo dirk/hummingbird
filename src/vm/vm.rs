@@ -1,320 +1,96 @@
-use std::cell::RefCell;
+use std::error::Error;
+use std::path::{Path, PathBuf};
+
+use super::frame::{Action, Frame, FrameApi, ModuleFrame};
+use super::loader::{self, LoadedModule};
+use super::prelude::build_prelude;
 use std::collections::HashMap;
-use std::fmt::{Debug, Error, Formatter};
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use std::rc::Rc;
-
-use super::super::ast::{Function as AstFunction, Module as AstModule, Node};
-use super::super::parser;
-use super::builtins::build as build_builtins;
-use super::frame::{Closure, Frame};
-use super::value::Value;
-
-struct InnerBuiltinFunction {
-    name: String,
-    call_target: fn(Vec<Value>) -> Value,
-}
-
-#[derive(Clone)]
-pub struct BuiltinFunction(Rc<InnerBuiltinFunction>);
-
-impl BuiltinFunction {
-    pub fn new(name: String, call_target: fn(Vec<Value>) -> Value) -> Self {
-        Self(Rc::new(InnerBuiltinFunction { name, call_target }))
-    }
-
-    pub fn call(&self, arguments: Vec<Value>) -> Value {
-        let call_target = &self.0.call_target;
-        call_target(arguments)
-    }
-
-    pub fn name(&self) -> String {
-        self.0.name.clone()
-    }
-}
-
-impl Debug for BuiltinFunction {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        f.write_str(&self.name())
-    }
-}
-
-#[derive(Clone)]
-pub struct Function {
-    /// The closure in which this function was defined.
-    closure: Option<Closure>,
-    /// The AST node defining this function.
-    node: AstFunction,
-}
-
-impl Function {
-    fn new(closure: Option<Closure>, root: AstFunction) -> Self {
-        Self {
-            closure,
-            node: root,
-        }
-    }
-
-    pub fn build_closure(&self) -> Option<Closure> {
-        // If the function has its own bindings (used by child function(s)) or
-        // if it uses bindings from its parent then we need to set up a closure
-        // for it.
-        let needs_closure = self.node.has_bindings() || self.node.has_parent_bindings();
-        if needs_closure {
-            let bindings = self.node.get_bindings();
-            let parent = self.closure.clone();
-            Some(Closure::new(bindings, parent))
-        } else {
-            None
-        }
-    }
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        f.write_str("function")
-    }
-}
-
-/// Canonicalized/fully-resolved path to a module.
-#[derive(Eq, Debug, Hash, PartialEq)]
-struct ModuleLocator(PathBuf);
-
-impl From<PathBuf> for ModuleLocator {
-    fn from(path: PathBuf) -> Self {
-        let canonicalized = path.canonicalize().expect("Couldn't canonicalize path");
-        Self(canonicalized)
-    }
-}
-
-struct InnerModule {
-    locator: Option<ModuleLocator>,
-    source: String,
-    node: AstModule,
-    closure: Closure,
-}
-
-#[derive(Clone)]
-pub struct Module(Rc<RefCell<InnerModule>>);
-
-impl Module {
-    fn new_from_file<P: Into<PathBuf>>(path: P, builtins: Option<Closure>) -> Self {
-        let path = path.into();
-        let mut source = String::new();
-        let mut file = File::open(&path).expect("Couldn't open file");
-        file.read_to_string(&mut source)
-            .expect("Couldn't read file");
-
-        let node = parser::parse(&source);
-        Self::new(Some(path.into()), source, node, builtins)
-    }
-
-    fn new_from_source(source: String, builtins: Option<Closure>) -> Self {
-        let node = parser::parse(&source);
-        Self::new(None, source, node, builtins)
-    }
-
-    fn new(
-        locator: Option<ModuleLocator>,
-        source: String,
-        node: AstModule,
-        builtins: Option<Closure>,
-    ) -> Self {
-        // NOTE: Parent bindings should only be imports or builtins. Anything
-        //   else is probably use of undefined variables.
-        if let Some(parent_bindings) = node.get_parent_bindings() {
-            for binding in parent_bindings.iter() {
-                if !builtins
-                    .as_ref()
-                    .map(|closure| closure.has(binding.clone()))
-                    .unwrap_or(false)
-                {
-                    panic!("Dangling root parent binding: {}", binding);
-                }
-            }
-        }
-        let closure = Closure::new(node.get_bindings(), builtins);
-
-        Self(Rc::new(RefCell::new(InnerModule {
-            locator,
-            source,
-            node,
-            closure,
-        })))
-    }
-
-    pub fn get_closure(&self) -> Closure {
-        let inner = &self.0.borrow();
-        inner.closure.clone()
-    }
-}
-
-#[derive(Debug)]
-enum Action {
-    // Regular implicit return of evaluating a statement or expression.
-    Value(Value),
-    // "Interrupt" to return a value from a function.
-    Return(Option<Value>),
-}
-
-trait Eval {
-    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action;
-}
-
-impl Eval for Module {
-    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
-        let inner = &self.0.borrow();
-        for node in inner.node.nodes.iter() {
-            node.eval(frame, vm);
-        }
-        Action::Value(Value::Null)
-    }
-}
-
-impl Eval for Node {
-    fn eval(&self, frame: &mut Frame, vm: &mut Vm) -> Action {
-        // Utility macro to get the value or early-return if it's a
-        // `Return` action.
-        macro_rules! value {
-            ($x:expr) => {{
-                match $x {
-                    Action::Value(val) => val,
-                    ret @ Action::Return(_) => return ret,
-                }
-            }};
-        }
-
-        let value: Value = match self {
-            Node::Assignment(assignment) => {
-                let rhs = value!(assignment.rhs.eval(frame, vm));
-                match assignment.lhs.as_ref() {
-                    Node::Identifier(identifier) => {
-                        frame.set(identifier.value.clone(), rhs.clone());
-                    }
-                    other @ _ => unreachable!("Cannot assign to: {}", other),
-                }
-                rhs
-            }
-            Node::Block(block) => {
-                if let Some((last_node, nodes)) = block.nodes.split_last() {
-                    for node in nodes {
-                        value!(node.eval(frame, vm));
-                    }
-                    value!(last_node.eval(frame, vm))
-                } else {
-                    Value::Null
-                }
-            }
-            Node::Function(ast_function) => {
-                let function = Function::new(frame.get_closure(), ast_function.clone());
-                let value = Value::Function(function);
-                if let Some(name) = &ast_function.name {
-                    frame.set(name.clone(), value.clone())
-                }
-                value
-            }
-            Node::Identifier(identifier) => {
-                let name = identifier.value.clone();
-                frame
-                    .get(name.clone())
-                    .expect(&format!("Not found: {}", name))
-            }
-            Node::Import(import) => {
-                let path = import.path();
-                vm.load_module(path);
-                Value::Null
-            }
-            Node::Integer(integer) => Value::Integer(integer.value),
-            Node::Let(let_) => {
-                let rhs = match &let_.rhs {
-                    Some(rhs) => value!(rhs.eval(frame, vm)),
-                    None => Value::Null,
-                };
-                let lhs: String = let_.lhs.value.clone();
-                frame.set(lhs, rhs);
-                Value::Null
-            }
-            Node::PostfixCall(call) => {
-                let target = value!(call.target.eval(frame, vm));
-                let mut arguments = Vec::<Value>::with_capacity(call.arguments.len());
-                for argument in call.arguments.iter() {
-                    let value = value!(argument.eval(frame, vm));
-                    arguments.push(value)
-                }
-                assert_eq!(arguments.len(), call.arguments.len(),);
-                eval_function(target, arguments, vm)
-            }
-            Node::Return(ret) => {
-                if let Some(rhs) = &ret.rhs {
-                    let value = value!(rhs.eval(frame, vm));
-                    return Action::Return(Some(value));
-                } else {
-                    return Action::Return(None);
-                }
-            }
-            Node::String(string) => Value::String(string.value.clone()),
-            Node::Var(var) => {
-                let rhs = match &var.rhs {
-                    Some(rhs) => value!(rhs.eval(frame, vm)),
-                    None => Value::Null,
-                };
-                let lhs: String = var.lhs.value.clone();
-                frame.set(lhs, rhs);
-                Value::Null
-            }
-            other @ _ => unreachable!("Cannot eval: {}", other),
-        };
-        Action::Value(value)
-    }
-}
-
-fn eval_function(target: Value, arguments: Vec<Value>, vm: &mut Vm) -> Value {
-    match target {
-        Value::BuiltinFunction(builtin_function) => builtin_function.call(arguments),
-        Value::Function(function) => {
-            let mut frame = Frame::new_for_function(&function);
-            match function.node.body.eval(&mut frame, vm) {
-                // Implicit return.
-                Action::Value(value) => value,
-                // Explicit return.
-                Action::Return(value) => value.unwrap_or(Value::Null),
-            }
-        }
-        other @ _ => unreachable!("Cannot call: {:?}", other),
-    }
-}
 
 pub struct Vm {
-    builtins: Option<Closure>,
-    loaded_modules: HashMap<ModuleLocator, Module>,
+    stack: Vec<Frame>,
+    loaded_modules: HashMap<PathBuf, LoadedModule>,
 }
 
 impl Vm {
     pub fn new() -> Self {
         Self {
-            builtins: Some(build_builtins()),
+            stack: vec![],
             loaded_modules: HashMap::new(),
         }
     }
 
-    pub fn load_module<P: Into<PathBuf>>(&mut self, path: P) -> Module {
-        let path = path.into();
-        let locator: ModuleLocator = path.clone().into();
-        if self.loaded_modules.contains_key(&locator) {
-            return self.loaded_modules.get(&locator).unwrap().clone()
+    pub fn load_file<P: AsRef<Path>>(&mut self, path: P) -> Result<LoadedModule, Box<dyn Error>> {
+        let canonicalized = path
+            .as_ref()
+            .canonicalize()
+            .expect("Could not canonicalize path");
+
+        if self.loaded_modules.contains_key(&canonicalized) {
+            panic!("Module already loaded: {:?}", canonicalized);
         }
-        let module = Module::new_from_file(path, self.builtins.clone());
-        let mut frame = Frame::new_for_module(&module);
-        module.eval(&mut frame, self);
-        assert!(self.loaded_modules.insert(locator, module.clone()).is_none(), "Module was already loaded");
-        module
+
+        let loaded_module = loader::load_file(path)?;
+        self.loaded_modules
+            .insert(canonicalized, loaded_module.clone());
+        Ok(loaded_module)
     }
 
-    pub fn eval_source(&mut self, source: String) {
-        let module = Module::new_from_source(source, self.builtins.clone());
-        let mut frame = Frame::new_for_module(&module);
-        module.eval(&mut frame, self);
+    pub fn run_file<P: AsRef<Path>>(path: P) {
+        let mut vm = Self::new();
+
+        let prelude = build_prelude();
+        let module = vm.load_file(path).expect("Unable to read file");
+
+        // FIXME: Actually do imports on request instead of just copying the
+        //   whole prelude.
+        for (name, export) in prelude.get_named_exports().iter() {
+            if let Some(export) = export {
+                module
+                    .static_closure()
+                    .set_directly(name.to_owned(), export.clone())
+            }
+        }
+
+        vm.stack.push(Frame::Module(ModuleFrame::new(module)));
+        vm.run();
+    }
+
+    fn run(&mut self) {
+        loop {
+            let action = {
+                let top = self.stack.last_mut().expect("Empty stack");
+                top.run()
+            };
+
+            match action {
+                Action::Call(frame) => self.stack.push(frame),
+                Action::Return(return_value) => {
+                    self.stack.pop().expect("Empty stack");
+                    match self.stack.last_mut() {
+                        Option::Some(new_top) => {
+                            new_top.receive_return(return_value);
+                        }
+                        Option::None => return,
+                    }
+                }
+                Action::Error(error) => {
+                    println!("{}", error);
+                    self.print_stack();
+                    return;
+                }
+            }
+        }
+    }
+
+    fn print_stack(&self) {
+        let mut index = 0;
+        for frame in self.stack.iter() {
+            if frame.is_module() {
+                continue;
+            }
+            print!("  {}: {}", index, frame.stack_description());
+            print!("\n");
+            index += 1;
+        }
     }
 }

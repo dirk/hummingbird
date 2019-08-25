@@ -5,4 +5,4 @@ authors = ["Dirk Gadsden <dirk@esherido.com>"]
 edition = "2018"
 
 [dependencies]
-gc = "0.3.2"
+gc = "0.3.3"
