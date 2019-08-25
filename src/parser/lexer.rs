@@ -81,6 +81,7 @@ pub enum Token {
     Identifier(String, Span),
     Import,
     Integer(i64),
+    LeftAngle,
     Let(Location),
     Minus,
     ParenthesesLeft,
@@ -91,6 +92,7 @@ pub enum Token {
     String(String),
     Terminal(char),
     Var(Location),
+    While(Location),
 }
 
 impl Token {
@@ -189,6 +191,7 @@ impl TokenStream {
                     ',' => return Token::Comma,
                     '.' => return Token::Dot,
                     '=' => return Token::Equals,
+                    '<' => return Token::LeftAngle,
                     '+' => return Token::Plus,
                     '*' => return Token::Star,
                     ';' => return Token::Terminal(character),
@@ -219,6 +222,7 @@ impl TokenStream {
             "import" => Token::Import,
             "return" => Token::Return,
             "var" => Token::Var(start),
+            "while" => Token::While(start),
             _ => Token::Identifier(identifier_string, Span::new(start, self.input.location())),
         }
     }
