@@ -1,10 +1,12 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Error, Formatter};
+use std::error;
+use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
+use super::errors::UndefinedNameError;
 use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::value::Value;
 
@@ -41,18 +43,18 @@ impl Closure {
         })))
     }
 
-    fn get(&self, name: &String) -> Option<Value> {
+    fn get(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
         let inner = &self.0.borrow();
         if let Some(value) = inner.locals.get(name) {
             return match value {
-                initialized @ Some(_) => initialized.clone(),
+                Some(initialized) => Ok(initialized.clone()),
                 None => unreachable!("ERROR: Uninitialized closure variable: {}", name),
             };
         }
         if let Some(parent) = &inner.parent {
             return parent.get(name);
         }
-        unreachable!("ERROR: Couldn't find closure variable: {}", name)
+        Err(Box::new(UndefinedNameError::new(name.to_owned())))
     }
 
     /// Returns true if it found a closure in which to set the variable,
@@ -105,6 +107,7 @@ impl Closure {
 pub enum Action {
     Call(Frame),
     Return(Value),
+    Error(Box<dyn error::Error>),
 }
 
 pub enum Frame {
@@ -218,38 +221,38 @@ impl BytecodeFrame {
         self.locals[index as usize] = value;
     }
 
-    fn get_lexical(&self, name: &String) -> Value {
+    fn get_lexical(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
         if let Some(index) = self.get_index_of_local(name) {
-            return self.locals[index].clone();
+            return Ok(self.locals[index].clone());
         }
         if let Some(closure) = &self.closure {
-            return closure.get(name).expect(&format!("Not found: {}", name));
+            return closure.get(name);
         }
-        panic!("Not found: {}", name)
+        Err(Box::new(UndefinedNameError::new(name.clone())))
     }
 
-    fn set_lexical(&mut self, name: &String, value: Value) {
+    fn set_lexical(&mut self, name: &String, value: Value) -> Result<(), Box<dyn error::Error>> {
         if let Some(closure) = &self.closure {
             if closure.try_set(name.clone(), value.clone()) {
-                return;
+                return Ok(());
             }
         }
         if let Some(index) = self.get_index_of_local(name) {
             self.locals[index] = value;
-        } else {
-            panic!("Not found: {}\nFrame: {:?}", name, self)
+            return Ok(());
         }
+        Err(Box::new(UndefinedNameError::new(name.clone())))
     }
 
-    pub fn get_static(&self, name: &String) -> Value {
-        self.static_closure
-            .get(name)
-            .expect(&format!("Static not found: {}", name))
+    pub fn get_static(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
+        self.static_closure.get(name)
     }
 
-    pub fn set_static(&self, name: &String, value: Value) {
-        if !self.static_closure.try_set(name.to_owned(), value) {
-            panic!("Static not found: {}", name)
+    pub fn set_static(&self, name: &String, value: Value) -> Result<(), Box<dyn error::Error>> {
+        if self.static_closure.try_set(name.to_owned(), value) {
+            Ok(())
+        } else {
+            Err(Box::new(UndefinedNameError::new(name.clone())))
         }
     }
 
@@ -259,10 +262,10 @@ impl BytecodeFrame {
             .iter()
             .position(|local| local == name)
     }
-}
 
-impl FrameApi for BytecodeFrame {
-    fn run(&mut self) -> Action {
+    /// Using an inner function so that we can use the `?` operator.
+    #[inline]
+    fn run_inner(&mut self) -> Result<Action, Box<dyn error::Error>> {
         loop {
             let instruction = self.current();
 
@@ -272,11 +275,11 @@ impl FrameApi for BytecodeFrame {
                     self.advance();
                 }
                 Instruction::GetLexical(lval, name) => {
-                    self.write_register(*lval, self.get_lexical(name));
+                    self.write_register(*lval, self.get_lexical(name)?);
                     self.advance();
                 }
                 Instruction::GetStatic(lval, name) => {
-                    self.write_register(*lval, self.get_static(name));
+                    self.write_register(*lval, self.get_static(name)?);
                     self.advance();
                 }
                 Instruction::SetLocal(index, rval) => {
@@ -284,11 +287,11 @@ impl FrameApi for BytecodeFrame {
                     self.advance();
                 }
                 Instruction::SetLexical(name, rval) => {
-                    self.set_lexical(name, self.read_register(*rval));
+                    self.set_lexical(name, self.read_register(*rval))?;
                     self.advance();
                 }
                 Instruction::SetStatic(name, rval) => {
-                    self.set_static(name, self.read_register(*rval));
+                    self.set_static(name, self.read_register(*rval))?;
                     self.advance();
                 }
                 Instruction::MakeFunction(lval, id) => {
@@ -326,7 +329,7 @@ impl FrameApi for BytecodeFrame {
                             let frame = Frame::Bytecode(BytecodeFrame::new(function, closure));
                             // Be at the next instruction when control flow returns to us.
                             self.advance();
-                            return Action::Call(frame);
+                            return Ok(Action::Call(frame));
                         }
                         Value::NativeFunction(native_function) => {
                             let result = native_function.call(arguments);
@@ -338,12 +341,21 @@ impl FrameApi for BytecodeFrame {
                 }
                 Instruction::Return(rval) => {
                     let value = self.read_register(*rval);
-                    return Action::Return(value);
+                    return Ok(Action::Return(value));
                 }
                 Instruction::ReturnNull => {
-                    return Action::Return(Value::Null);
+                    return Ok(Action::Return(Value::Null));
                 }
             }
+        }
+    }
+}
+
+impl FrameApi for BytecodeFrame {
+    fn run(&mut self) -> Action {
+        match self.run_inner() {
+            Ok(action) => action,
+            Err(error) => Action::Error(error),
         }
     }
 
@@ -355,7 +367,7 @@ impl FrameApi for BytecodeFrame {
 }
 
 impl Debug for BytecodeFrame {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         write!(
             f,
             "BytecodeFrame {{ locals: {:?}, closure: {:?} }}",
@@ -366,7 +378,7 @@ impl Debug for BytecodeFrame {
 }
 
 impl Debug for Closure {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         let inner = &*self.0.borrow();
         let locals = inner
             .locals

@@ -73,6 +73,10 @@ impl Vm {
                         Option::None => return,
                     }
                 }
+                Action::Error(error) => {
+                    println!("{}", error);
+                    return;
+                }
             }
         }
     }
