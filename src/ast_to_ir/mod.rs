@@ -212,10 +212,7 @@ impl Compiler {
         let mut function_scope = FunctionScope::new(scope, self.current.clone());
         let body = &*function.body;
         let lval = self.compile_node(body, &mut function_scope);
-        match body {
-            Node::Block(_) => self.build_return_null(),
-            _ => self.build_return(lval),
-        };
+        self.build_return(lval);
         // Save the bindings so that we know how to build the closure.
         Compiler::finalize_function(new_function.clone(), &function_scope);
 
