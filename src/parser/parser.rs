@@ -2,11 +2,11 @@ use std::fmt::Debug;
 
 use super::super::ast::nodes::{
     Assignment, Block, Function, Identifier, Infix, Integer, Let, Module, Node, PostfixCall,
-    PostfixProperty, Return, Var,
+    PostfixProperty, Return, Var, While,
 };
 
+use super::super::ast::{Import, ImportBindings, StringLiteral};
 use super::lexer::{Token, TokenStream};
-use crate::ast::{Import, ImportBindings, StringLiteral};
 
 pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
@@ -72,6 +72,7 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
             Token::Let(_) => parse_let_and_var(input),
             Token::Return => parse_return(input, terminator.clone()),
             Token::Var(_) => parse_let_and_var(input),
+            Token::While(_) => parse_while(input),
             _ => parse_expression(input),
         }
     };
@@ -159,6 +160,19 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     }
 }
 
+fn parse_while(input: &mut TokenStream) -> Node {
+    match input.read() {
+        Token::While(_) => (),
+        other @ _ => {
+            panic_unexpected_names(other, "While");
+            unreachable!()
+        }
+    }
+    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
+    let block = expect_to_parse_block(input);
+    Node::While(While::new(condition, block))
+}
+
 fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
     expect_to_read(input, Token::Return);
     let mut rhs = None;
@@ -236,6 +250,7 @@ fn parse_infix(input: &mut TokenStream) -> Node {
     // reductions have higher associativity than later ones.
     reduce_subnodes(&mut subnodes, Token::Star);
     reduce_subnodes(&mut subnodes, Token::Plus);
+    reduce_subnodes(&mut subnodes, Token::LeftAngle);
     // It better have fully reduced!
     assert_eq!(subnodes.len(), 1);
     subnodes.remove(0).into()
@@ -243,20 +258,24 @@ fn parse_infix(input: &mut TokenStream) -> Node {
 
 fn infix(token: Token) -> bool {
     match token {
-        Token::Minus | Token::Plus | Token::Star => true,
+        Token::LeftAngle | Token::Minus | Token::Plus | Token::Star => true,
         _ => false,
     }
 }
 
 fn parse_block(input: &mut TokenStream) -> Node {
     if let Token::BraceLeft = input.peek() {
-        input.read(); // Opening brace
-        let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block);
-        expect_to_read(input, Token::BraceRight); // Closing brace
-        Node::Block(Block { nodes })
+        Node::Block(expect_to_parse_block(input))
     } else {
         parse_anonymous_function(input)
     }
+}
+
+fn expect_to_parse_block(input: &mut TokenStream) -> Block {
+    expect_to_read(input, Token::BraceLeft); // Opening brace
+    let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block);
+    expect_to_read(input, Token::BraceRight); // Closing brace
+    Block { nodes }
 }
 
 fn parse_anonymous_function(input: &mut TokenStream) -> Node {

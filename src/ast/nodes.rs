@@ -19,6 +19,7 @@ pub enum Node {
     Return(Return),
     String(StringLiteral),
     Var(Var),
+    While(While),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -149,6 +150,7 @@ pub struct StringLiteral {
 #[derive(Clone, Debug, PartialEq)]
 pub enum InfixOp {
     Add,
+    LessThan,
     Multiply,
     Subtract,
 }
@@ -163,10 +165,11 @@ pub struct Infix {
 impl Infix {
     pub fn new(lhs: Node, token: Token, rhs: Node) -> Self {
         let op = match token {
+            Token::LeftAngle => InfixOp::LessThan,
             Token::Minus => InfixOp::Subtract,
             Token::Plus => InfixOp::Add,
             Token::Star => InfixOp::Multiply,
-            _ => unreachable!(),
+            _ => unreachable!("No operator for {:?}", token),
         };
         Self {
             lhs: Box::new(lhs),
@@ -249,6 +252,21 @@ impl Return {
     pub fn new(rhs: Option<Node>) -> Self {
         Self {
             rhs: rhs.map(|node| Box::new(node)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct While {
+    pub condition: Box<Node>,
+    pub block: Block,
+}
+
+impl While {
+    pub fn new(condition: Node, block: Block) -> Self {
+        Self {
+            condition: Box::new(condition),
+            block,
         }
     }
 }
