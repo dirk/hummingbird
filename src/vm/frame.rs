@@ -115,6 +115,24 @@ pub enum Frame {
     Module(ModuleFrame),
 }
 
+impl Frame {
+    pub fn is_module(&self) -> bool {
+        match self {
+            Frame::Module(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns a description of the frame suitable for printing in a
+    /// stack trace.
+    pub fn stack_description(&self) -> String {
+        match self {
+            Frame::Bytecode(frame) => frame.stack_description(),
+            Frame::Module(_) => unreachable!("Cannot get a stack description for a module"),
+        }
+    }
+}
+
 impl FrameApi for Frame {
     fn run(&mut self) -> Action {
         match self {
@@ -183,7 +201,11 @@ impl BytecodeFrame {
         }
     }
 
-    pub fn unit(&self) -> LoadedModule {
+    pub fn stack_description(&self) -> String {
+        format!("{} ({})", self.bytecode.name(), self.module().name())
+    }
+
+    pub fn module(&self) -> LoadedModule {
         self.function.module()
     }
 
@@ -295,7 +317,7 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::MakeFunction(lval, id) => {
-                    let function = self.unit().function(*id);
+                    let function = self.module().function(*id);
                     let closure = if function.binds_on_create() {
                         self.closure.clone()
                     } else {

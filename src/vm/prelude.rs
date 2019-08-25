@@ -2,7 +2,7 @@ use super::loader::LoadedModule;
 use super::value::Value;
 
 pub fn build_prelude() -> LoadedModule {
-    let module = LoadedModule::empty();
+    let module = LoadedModule::empty("(prelude)".to_owned());
     module.add_named_export("println", Value::make_native_function(prelude_println));
     module
 }

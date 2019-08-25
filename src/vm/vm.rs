@@ -75,9 +75,22 @@ impl Vm {
                 }
                 Action::Error(error) => {
                     println!("{}", error);
+                    self.print_stack();
                     return;
                 }
             }
+        }
+    }
+
+    fn print_stack(&self) {
+        let mut index = 0;
+        for frame in self.stack.iter() {
+            if frame.is_module() {
+                continue;
+            }
+            print!("  {}: {}", index, frame.stack_description());
+            print!("\n");
+            index += 1;
         }
     }
 }

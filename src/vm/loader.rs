@@ -19,10 +19,13 @@ fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn E
     Ok(parser::parse(source))
 }
 
-fn compile_ast_into_module(ast_module: &ast::Module) -> Result<LoadedModule, Box<dyn Error>> {
+fn compile_ast_into_module(
+    ast_module: &ast::Module,
+    name: String,
+) -> Result<LoadedModule, Box<dyn Error>> {
     let ir_module = ast_to_ir::compile(ast_module);
 
-    let loaded_module = LoadedModule::empty();
+    let loaded_module = LoadedModule::empty(name);
     let functions = ir::compiler::compile(&ir_module)
         .functions
         .into_iter()
@@ -37,11 +40,19 @@ fn compile_ast_into_module(ast_module: &ast::Module) -> Result<LoadedModule, Box
 }
 
 pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>> {
-    let ast_module = read_and_parse_file(path)?;
-    compile_ast_into_module(&ast_module)
+    let ast_module = read_and_parse_file(path.as_ref())?;
+    let name = path
+        .as_ref()
+        .to_str()
+        .expect("Couldn't convert path to string")
+        .to_owned();
+    compile_ast_into_module(&ast_module, name)
 }
 
 pub struct InnerLoadedModule {
+    /// The name of the module. This should almost always be the canonicalized
+    /// path to the source file.
+    name: String,
     functions: Vec<LoadedFunction>,
     /// The closure holding the static scope that holds:
     ///   - Imports
@@ -56,8 +67,9 @@ pub struct InnerLoadedModule {
 }
 
 impl InnerLoadedModule {
-    fn empty() -> Self {
+    fn empty(name: String) -> Self {
         Self {
+            name,
             functions: vec![],
             static_closure: Closure::new_static(),
             initialized: false,
@@ -74,8 +86,12 @@ pub struct LoadedModule(Rc<RefCell<InnerLoadedModule>>);
 type WeakLoadedModule = Weak<RefCell<InnerLoadedModule>>;
 
 impl LoadedModule {
-    pub fn empty() -> Self {
-        Self(Rc::new(RefCell::new(InnerLoadedModule::empty())))
+    pub fn empty(name: String) -> Self {
+        Self(Rc::new(RefCell::new(InnerLoadedModule::empty(name))))
+    }
+
+    pub fn name(&self) -> String {
+        self.0.borrow().name.clone()
     }
 
     pub fn main(&self) -> LoadedFunction {
@@ -225,6 +241,10 @@ pub struct InnerBytecodeFunction {
 }
 
 impl InnerBytecodeFunction {
+    pub fn name(&self) -> &str {
+        &self.function.name
+    }
+
     #[inline]
     pub fn registers(&self) -> u8 {
         self.function.registers
