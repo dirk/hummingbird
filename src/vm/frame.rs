@@ -339,8 +339,23 @@ impl BytecodeFrame {
                     self.write_register(*lval, value);
                     self.advance();
                 }
+                Instruction::OpLessThan(lval, lhs, rhs) => {
+                    let lhs = self.read_register(*lhs);
+                    let rhs = self.read_register(*rhs);
+                    let value = operators::op_less_than(lhs, rhs)?;
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
                 Instruction::Branch(destination) => {
                     self.current_address = *destination as usize;
+                }
+                Instruction::BranchIf(destination, condition) => {
+                    let condition = self.read_register(*condition);
+                    if operators::is_truthy(condition)? {
+                        self.current_address = *destination as usize;
+                    } else {
+                        self.advance();
+                    }
                 }
                 Instruction::Call(lval, target, arguments) => {
                     let target = self.read_register(*target);

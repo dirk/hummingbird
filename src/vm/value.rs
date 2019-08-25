@@ -47,6 +47,7 @@ impl NativeFunction {
 pub enum Value {
     DynamicFunction(DynamicFunction),
     // DynamicObject(Gc<GcCell<DynamicObject>>),
+    Boolean(bool),
     Integer(i64),
     NativeFunction(NativeFunction),
     Null,
@@ -77,6 +78,7 @@ impl Debug for Value {
         use Value::*;
         match self {
             DynamicFunction(_) => write!(f, "DynamicFunction"),
+            Boolean(value) => write!(f, "{:?}", value),
             Integer(value) => write!(f, "{}", value),
             NativeFunction(_) => write!(f, "NativeFunction"),
             Null => write!(f, "Null"),

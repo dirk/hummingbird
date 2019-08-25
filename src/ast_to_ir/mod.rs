@@ -158,6 +158,7 @@ impl Compiler {
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
             &Node::Return(ref ret) => self.compile_return(ret, scope),
             &Node::Var(ref var) => self.compile_var(var, scope),
+            &Node::While(ref while_) => self.compile_while(while_, scope),
             _ => panic!("Cannot compile node: {:?}", node),
         }
     }
@@ -267,7 +268,11 @@ impl Compiler {
     fn compile_infix(&mut self, infix: &Infix, scope: &mut dyn Scope) -> SharedValue {
         let lhs = self.compile_node(&infix.lhs, scope);
         let rhs = self.compile_node(&infix.rhs, scope);
-        self.build_op_add(lhs, rhs)
+        match &infix.op {
+            &InfixOp::Add => self.build_op_add(lhs, rhs),
+            &InfixOp::LessThan => self.build_op_less_than(lhs, rhs),
+            other @ _ => panic!("Cannot compile infix op: {:?}", other)
+        }
     }
 
     fn compile_integer(&mut self, integer: &Integer, _scope: &mut dyn Scope) -> SharedValue {
@@ -299,6 +304,31 @@ impl Compiler {
             let rval = self.compile_node(rhs, scope);
             self.build_set(slot, rval);
         }
+        self.null_value()
+    }
+
+    fn compile_while(&mut self, while_: &While, scope: &mut dyn Scope) -> SharedValue {
+        // Make a block for the condition and branch to it.
+        let condition_block = self.current.borrow_mut().push_basic_block(true);
+        // The block for the loop to run in.
+        let loop_block = self.current.borrow_mut().push_basic_block(false);
+        // The block after the while.
+        let successor_block = self.current.borrow_mut().push_basic_block(false);
+
+        self.current.borrow_mut().set_current_basic_block(condition_block.clone());
+        let condition_value = self.compile_node(&while_.condition, scope);
+        // If it's true branch to the loop block, else branch to the after block.
+        self.build_branch_if(loop_block.clone(), condition_value);
+        self.build_branch(successor_block.clone());
+
+        self.current.borrow_mut().set_current_basic_block(loop_block.clone());
+        for node in while_.block.nodes.iter() {
+            self.compile_node(node, scope);
+        }
+        // After executing the block go back to the condition.
+        self.build_branch(condition_block.clone());
+
+        self.current.borrow_mut().set_current_basic_block(successor_block.clone());
         self.null_value()
     }
 

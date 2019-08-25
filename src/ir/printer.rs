@@ -95,7 +95,11 @@ impl<O: Write> Printer<O> {
             Instruction::OpAdd(lval, lhs, rhs) => {
                 format!("{} = OpAdd({}, {})", id(lval), id(lhs), id(rhs))
             }
-            Instruction::Branch(block) => format!("Branch({})", block.borrow().name),
+            Instruction::OpLessThan(lval, lhs, rhs) => {
+                format!("{} = OpLessThan({}, {})", id(lval), id(lhs), id(rhs))
+            }
+            Instruction::Branch(destination) => format!("Branch({})", destination.borrow().name),
+            Instruction::BranchIf(destination, condition) => format!("BranchIf({}, {})", destination.borrow().name, id(condition)),
             Instruction::Call(lval, target, arguments) => format!(
                 "{} = Call({}, [{}])",
                 id(lval),

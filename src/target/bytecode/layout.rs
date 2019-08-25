@@ -13,7 +13,9 @@ pub enum Instruction {
     MakeFunction(Reg, u16),
     MakeInteger(Reg, i64),
     OpAdd(Reg, Reg, Reg), // $1 = $2 + $3
+    OpLessThan(Reg, Reg, Reg), // $1 = $2 < $3
     Branch(u8),
+    BranchIf(u8, Reg),
     Call(Reg, Reg, Vec<Reg>), // $1 = $2($3[])
     Return(Reg),
     ReturnNull,

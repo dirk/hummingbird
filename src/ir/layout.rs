@@ -192,6 +192,10 @@ impl Function {
         self.current = basic_block.clone();
         basic_block
     }
+
+    pub fn set_current_basic_block(&mut self, basic_block: SharedBasicBlock) {
+        self.current = basic_block;
+    }
 }
 
 /// Describes how a given variable slot was resolved.
@@ -293,13 +297,15 @@ pub enum Instruction {
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
+    OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
     Branch(SharedBasicBlock),
+    BranchIf(SharedBasicBlock, SharedValue),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct BasicBlock {
     pub id: u16,
     pub name: String,
@@ -313,6 +319,12 @@ impl BasicBlock {
             name: name.into(),
             instructions: vec![],
         }
+    }
+}
+
+impl PartialEq for BasicBlock {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 
@@ -357,8 +369,21 @@ pub trait InstructionBuilder {
         lval
     }
 
+    fn build_op_less_than(&mut self, lhs: SharedValue, rhs: SharedValue) -> SharedValue {
+        let lval = self.new_value();
+        let address = self.push(Instruction::OpLessThan(lval.clone(), lhs.clone(), rhs.clone()));
+        self.track(lhs, address);
+        self.track(rhs, address);
+        lval
+    }
+
     fn build_branch(&mut self, destination: SharedBasicBlock) {
         self.push(Instruction::Branch(destination));
+    }
+
+    fn build_branch_if(&mut self, destination: SharedBasicBlock, condition: SharedValue) {
+        let address = self.push(Instruction::BranchIf(destination, condition.clone()));
+        self.track(condition, address);
     }
 
     fn build_call(&mut self, target: SharedValue, arguments: Vec<SharedValue>) -> SharedValue {

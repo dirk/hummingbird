@@ -155,11 +155,14 @@ impl Compiler {
 
         // Set all the branch destinations now that we know where the blocks lie.
         for (address, id) in basic_block_tracker.branches {
-            let block_address = *basic_block_tracker.starts.get(&id).unwrap();
+            let block_address = (*basic_block_tracker.starts.get(&id).unwrap()) as u8;
             let instruction = instructions.get_mut(address).unwrap();
             match instruction {
                 bytecode::Instruction::Branch(ref mut destination) => {
-                    *destination = block_address as u8;
+                    *destination = block_address;
+                }
+                bytecode::Instruction::BranchIf(ref mut destination, _) => {
+                    *destination = block_address;
                 }
                 _ => panic!("Unexpected instruction: {:?}", instruction),
             }
@@ -228,10 +231,18 @@ impl Compiler {
                 ir::Instruction::OpAdd(lval, lhs, rhs) => {
                     bytecode::Instruction::OpAdd(allocate(lval), read(lhs, address), read(rhs, address))
                 }
-                ir::Instruction::Branch(branch) => {
+                ir::Instruction::OpLessThan(lval, lhs, rhs) => {
+                    bytecode::Instruction::OpLessThan(allocate(lval), read(lhs, address), read(rhs, address))
+                }
+                ir::Instruction::Branch(destination) => {
                     let bytecode_address = instructions.len();
-                    basic_block_tracker.track_branch(bytecode_address, &branch.borrow());
+                    basic_block_tracker.track_branch(bytecode_address, &destination.borrow());
                     bytecode::Instruction::Branch(0)
+                }
+                ir::Instruction::BranchIf(destination, condition) => {
+                    let bytecode_address = instructions.len();
+                    basic_block_tracker.track_branch(bytecode_address, &destination.borrow());
+                    bytecode::Instruction::BranchIf(0, read(condition, address))
                 }
                 ir::Instruction::Call(lval, target, arguments) => {
                     let lval = allocate(lval);
