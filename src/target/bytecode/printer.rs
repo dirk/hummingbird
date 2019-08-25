@@ -53,6 +53,9 @@ impl<O: Write> Printer<O> {
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", reg(lval), value)
             }
+            Instruction::OpAdd(lval, lhs, rhs) => {
+                format!("{} = OpAdd({}, {})", reg(lval), reg(lhs), reg(rhs))
+            }
             Instruction::Branch(destination) => format!("Branch({:04})", destination),
             Instruction::Call(lval, target, arguments) => format!(
                 "{} = Call({}, [{}])",

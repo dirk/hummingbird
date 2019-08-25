@@ -284,6 +284,7 @@ pub enum Instruction {
     Set(SharedSlot, SharedValue),
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
+    OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     Branch(SharedBasicBlock),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
@@ -328,15 +329,23 @@ pub trait InstructionBuilder {
         self.track(rval, address);
     }
 
+    fn build_make_function(&mut self, function: SharedFunction) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::MakeFunction(lval.clone(), function));
+        lval
+    }
+
     fn build_make_integer(&mut self, value: i64) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::MakeInteger(lval.clone(), value));
         lval
     }
 
-    fn build_make_function(&mut self, function: SharedFunction) -> SharedValue {
+    fn build_op_add(&mut self, lhs: SharedValue, rhs: SharedValue) -> SharedValue {
         let lval = self.new_value();
-        self.push(Instruction::MakeFunction(lval.clone(), function));
+        let address = self.push(Instruction::OpAdd(lval.clone(), lhs.clone(), rhs.clone()));
+        self.track(lhs, address);
+        self.track(rhs, address);
         lval
     }
 

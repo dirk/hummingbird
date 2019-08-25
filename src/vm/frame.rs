@@ -8,6 +8,7 @@ use super::super::target::bytecode::layout::{Instruction, Reg};
 
 use super::errors::UndefinedNameError;
 use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
+use super::operators;
 use super::value::Value;
 
 struct InnerClosure {
@@ -329,6 +330,13 @@ impl BytecodeFrame {
                 }
                 Instruction::MakeInteger(lval, value) => {
                     self.write_register(*lval, Value::Integer(*value));
+                    self.advance();
+                }
+                Instruction::OpAdd(lval, lhs, rhs) => {
+                    let lhs = self.read_register(*lhs);
+                    let rhs = self.read_register(*rhs);
+                    let value = operators::op_add(lhs, rhs)?;
+                    self.write_register(*lval, value);
                     self.advance();
                 }
                 Instruction::Branch(destination) => {

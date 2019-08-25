@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Error, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -68,6 +69,18 @@ impl Value {
     pub fn make_native_function<V: Fn(Vec<Value>) -> Value + 'static>(call_target: V) -> Self {
         let native_function = NativeFunction::new(Rc::new(call_target));
         Value::NativeFunction(native_function)
+    }
+}
+
+impl Debug for Value {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        use Value::*;
+        match self {
+            DynamicFunction(_) => write!(f, "DynamicFunction"),
+            Integer(value) => write!(f, "{}", value),
+            NativeFunction(_) => write!(f, "NativeFunction"),
+            Null => write!(f, "Null"),
+        }
     }
 }
 

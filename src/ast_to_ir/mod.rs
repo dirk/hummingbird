@@ -149,6 +149,7 @@ impl Compiler {
             &Node::Block(ref block) => self.compile_anonymous_block(block, scope),
             &Node::Function(ref function) => self.compile_function(function, scope),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier, scope),
+            &Node::Infix(ref infix) => self.compile_infix(infix, scope),
             &Node::Integer(ref integer) => self.compile_integer(integer, scope),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
             &Node::Return(ref ret) => self.compile_return(ret, scope),
@@ -251,6 +252,12 @@ impl Compiler {
     ) -> SharedValue {
         let local = &identifier.value;
         self.build_get(scope.resolve(local))
+    }
+
+    fn compile_infix(&mut self, infix: &Infix, scope: &mut dyn Scope) -> SharedValue {
+        let lhs = self.compile_node(&infix.lhs, scope);
+        let rhs = self.compile_node(&infix.rhs, scope);
+        self.build_op_add(lhs, rhs)
     }
 
     fn compile_integer(&mut self, integer: &Integer, _scope: &mut dyn Scope) -> SharedValue {

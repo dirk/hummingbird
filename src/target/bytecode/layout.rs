@@ -12,6 +12,7 @@ pub enum Instruction {
     SetStatic(String, Reg),
     MakeFunction(Reg, u16),
     MakeInteger(Reg, i64),
+    OpAdd(Reg, Reg, Reg), // $1 = $2 + $3
     Branch(u8),
     Call(Reg, Reg, Vec<Reg>), // $1 = $2($3[])
     Return(Reg),

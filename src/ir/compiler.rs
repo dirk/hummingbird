@@ -225,6 +225,9 @@ impl Compiler {
                 ir::Instruction::MakeInteger(lval, value) => {
                     bytecode::Instruction::MakeInteger(allocate(lval), *value)
                 }
+                ir::Instruction::OpAdd(lval, lhs, rhs) => {
+                    bytecode::Instruction::OpAdd(allocate(lval), read(lhs, address), read(rhs, address))
+                }
                 ir::Instruction::Branch(branch) => {
                     let bytecode_address = instructions.len();
                     basic_block_tracker.track_branch(bytecode_address, &branch.borrow());
