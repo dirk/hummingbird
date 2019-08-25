@@ -11,7 +11,7 @@ impl<O: Write> Printer<O> {
         Self { output }
     }
 
-    pub fn print_unit(&mut self, unit: &Module) -> Result<()> {
+    pub fn print_module(&mut self, unit: &Module) -> Result<()> {
         for function in unit.functions.iter() {
             self.print_function(function)?;
         }
@@ -60,7 +60,9 @@ impl<O: Write> Printer<O> {
                 format!("{} = OpLessThan({}, {})", reg(lval), reg(lhs), reg(rhs))
             }
             Instruction::Branch(destination) => format!("Branch({:04})", destination),
-            Instruction::BranchIf(destination, condition) => format!("BranchIf({:04}, {})", destination, reg(condition)),
+            Instruction::BranchIf(destination, condition) => {
+                format!("BranchIf({:04}, {})", destination, reg(condition))
+            }
             Instruction::Call(lval, target, arguments) => format!(
                 "{} = Call({}, [{}])",
                 reg(lval),

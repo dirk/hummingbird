@@ -275,7 +275,10 @@ impl SharedSlot {
 impl Debug for Slot {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
-            Slot::Local(name, index) => write!(f, "Local({}, {:?})", name, index)?,
+            Slot::Local(name, index) => match index {
+                Some(index) => write!(f, "Local({}@{})", name, index)?,
+                None => write!(f, "Local({}?)", name)?,
+            },
             Slot::Lexical(name) => write!(f, "Lexical({})", name)?,
             Slot::Static(name) => write!(f, "Static({})", name)?,
         };
@@ -371,7 +374,11 @@ pub trait InstructionBuilder {
 
     fn build_op_less_than(&mut self, lhs: SharedValue, rhs: SharedValue) -> SharedValue {
         let lval = self.new_value();
-        let address = self.push(Instruction::OpLessThan(lval.clone(), lhs.clone(), rhs.clone()));
+        let address = self.push(Instruction::OpLessThan(
+            lval.clone(),
+            lhs.clone(),
+            rhs.clone(),
+        ));
         self.track(lhs, address);
         self.track(rhs, address);
         lval

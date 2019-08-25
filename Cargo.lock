@@ -10,7 +10,14 @@ name = "hummingbird"
 version = "0.1.0"
 dependencies = [
  "gc 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
 "checksum gc 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "75656800ec248b3d0c33b685e442a67e7308009ae59b1f8eb60c4f09ebebb512"
+"checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
