@@ -20,11 +20,12 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Erro
     }
 }
 
+/// Only `null` and `false` are falsy. Everything else is truthy.
 #[inline]
 pub fn is_truthy(value: Value) -> Result<bool, Box<dyn error::Error>> {
     match &value {
+        Value::Null => Ok(false),
         Value::Boolean(value) => Ok(*value),
-        Value::Integer(value) => Ok(*value != 0),
         _ => Ok(true),
     }
 }
