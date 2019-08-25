@@ -271,7 +271,7 @@ impl Compiler {
         match &infix.op {
             &InfixOp::Add => self.build_op_add(lhs, rhs),
             &InfixOp::LessThan => self.build_op_less_than(lhs, rhs),
-            other @ _ => panic!("Cannot compile infix op: {:?}", other)
+            other @ _ => panic!("Cannot compile infix op: {:?}", other),
         }
     }
 
@@ -315,20 +315,26 @@ impl Compiler {
         // The block after the while.
         let successor_block = self.current.borrow_mut().push_basic_block(false);
 
-        self.current.borrow_mut().set_current_basic_block(condition_block.clone());
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(condition_block.clone());
         let condition_value = self.compile_node(&while_.condition, scope);
         // If it's true branch to the loop block, else branch to the after block.
         self.build_branch_if(loop_block.clone(), condition_value);
         self.build_branch(successor_block.clone());
 
-        self.current.borrow_mut().set_current_basic_block(loop_block.clone());
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(loop_block.clone());
         for node in while_.block.nodes.iter() {
             self.compile_node(node, scope);
         }
         // After executing the block go back to the condition.
         self.build_branch(condition_block.clone());
 
-        self.current.borrow_mut().set_current_basic_block(successor_block.clone());
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(successor_block.clone());
         self.null_value()
     }
 

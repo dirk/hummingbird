@@ -5,10 +5,8 @@ use super::value::Value;
 #[inline]
 pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
     match (&lhs, &rhs) {
-        (Value::Integer(lhs), Value::Integer(rhs)) => {
-            Ok(Value::Integer(*lhs + *rhs))
-        },
-        _ => panic!("Cannot add {:?} and {:?}", lhs, rhs)
+        (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Integer(*lhs + *rhs)),
+        _ => panic!("Cannot add {:?} and {:?}", lhs, rhs),
     }
 }
 
@@ -16,7 +14,7 @@ pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
 pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
     match (&lhs, &rhs) {
         (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Boolean(*lhs < *rhs)),
-        _ => panic!("Cannot less-than {:?} and {:?}", lhs, rhs)
+        _ => panic!("Cannot less-than {:?} and {:?}", lhs, rhs),
     }
 }
 
