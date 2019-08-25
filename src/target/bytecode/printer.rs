@@ -43,17 +43,12 @@ impl<O: Write> Printer<O> {
 
     fn print_instruction(&mut self, instruction: &Instruction, address: usize) -> Result<()> {
         let formatted_instruction = match instruction {
-            Instruction::GetConstant(lval, name) => {
-                format!("{} = GetConstant({})", reg(lval), name)
-            }
             Instruction::GetLocal(lval, index) => format!("{} = GetLocal({})", reg(lval), index),
-            Instruction::GetLocalLexical(lval, name) => {
-                format!("{} = GetLocalLexical({})", reg(lval), name)
-            }
+            Instruction::GetLexical(lval, name) => format!("{} = GetLexical({})", reg(lval), name),
+            Instruction::GetStatic(lval, name) => format!("{} = GetStatic({})", reg(lval), name),
             Instruction::SetLocal(index, rval) => format!("SetLocal({}, {})", index, reg(rval)),
-            Instruction::SetLocalLexical(name, rval) => {
-                format!("SetLocalLexical({}, {})", name, reg(rval))
-            }
+            Instruction::SetLexical(name, rval) => format!("SetLexical({}, {})", name, reg(rval)),
+            Instruction::SetStatic(name, rval) => format!("SetStatic({}, {})", name, reg(rval)),
             Instruction::MakeFunction(lval, id) => format!("MakeFunction({}, {})", reg(lval), id),
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", reg(lval), value)

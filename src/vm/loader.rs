@@ -191,19 +191,27 @@ impl LoadedFunction {
         self.0.bytecode.clone()
     }
 
-    pub fn bindings(&self) -> HashSet<String> {
-        self.0.bytecode.bindings()
-    }
-
     /// Returns whether or not this function binds/captures its environment
     /// when it is created.
     pub fn binds_on_create(&self) -> bool {
         self.0.bytecode.parent_bindings()
     }
 
-    /// Wehther or not the function should create bindings when it is called.
-    pub fn binds_on_call(&self) -> bool {
-        self.0.bytecode.has_bindings() || self.0.bytecode.parent_bindings()
+    /// Returns a closure suitable for calling the function.
+    pub fn build_closure_for_call(&self, parent: Option<Closure>) -> Option<Closure> {
+        let bindings = self.0.bytecode.bindings();
+        // Whether or not it needs to create bindings (a closure) when called.
+        let binds_on_call = !bindings.is_empty() || self.0.bytecode.parent_bindings();
+        if binds_on_call {
+            let bindings = if bindings.is_empty() {
+                None
+            } else {
+                Some(bindings)
+            };
+            Some(Closure::new(bindings, parent))
+        } else {
+            None
+        }
     }
 
     pub fn module(&self) -> LoadedModule {

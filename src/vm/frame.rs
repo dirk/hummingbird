@@ -78,6 +78,13 @@ impl Closure {
         return false;
     }
 
+    /// Set a local directly into this exact closure. This should only be used
+    /// by the VM when initializing a module's closure with imports.
+    pub fn set_directly(&self, name: String, value: Value) {
+        let inner = &mut self.0.borrow_mut();
+        inner.locals.insert(name, Some(value));
+    }
+
     // Recursive call to set in parent closures. Returns true if it found
     // a local and set, false if not.
     fn set_as_parent(&self, name: String, value: Value) -> bool {
@@ -102,30 +109,21 @@ pub enum Action {
 
 pub enum Frame {
     Bytecode(BytecodeFrame),
+    Module(ModuleFrame),
 }
 
 impl FrameApi for Frame {
     fn run(&mut self) -> Action {
         match self {
             Frame::Bytecode(frame) => frame.run(),
-        }
-    }
-
-    fn get_lexical(&self, name: &String) -> Value {
-        match self {
-            Frame::Bytecode(frame) => frame.get_lexical(name),
-        }
-    }
-
-    fn set_lexical(&mut self, name: &String, value: Value) {
-        match self {
-            Frame::Bytecode(frame) => frame.set_lexical(name, value),
+            Frame::Module(frame) => frame.run(),
         }
     }
 
     fn receive_return(&mut self, value: Value) {
         match self {
             Frame::Bytecode(frame) => frame.receive_return(value),
+            Frame::Module(frame) => frame.receive_return(value),
         }
     }
 }
@@ -134,10 +132,6 @@ pub trait FrameApi {
     // Run the frame's fetch-execute loop. Will be different depending on if
     // it's a bytecode or native frame.
     fn run(&mut self) -> Action;
-
-    fn get_lexical(&self, name: &String) -> Value;
-
-    fn set_lexical(&mut self, name: &String, value: Value);
 
     /// Called before the frame resumes execution after the higher frame has
     /// returned a value.
@@ -161,6 +155,8 @@ pub struct BytecodeFrame {
     /// The slots for the local variables (not bound to a closure).
     locals: Vec<Value>,
     closure: Option<Closure>,
+    /// The static closure of the module that this function belongs to.
+    static_closure: Closure,
     /// The register for the returned value to be stored in.
     return_register: Option<Reg>,
     registers: Vec<Value>,
@@ -173,10 +169,11 @@ impl BytecodeFrame {
         let registers = bytecode.registers();
         let locals = bytecode.locals();
         Self {
-            function,
+            function: function.clone(),
             bytecode,
             locals: vec![Value::Null; locals as usize],
             closure,
+            static_closure: function.module().static_closure(),
             return_register: None,
             registers: vec![Value::Null; registers as usize],
             current_address: 0,
@@ -213,16 +210,47 @@ impl BytecodeFrame {
         self.registers[BytecodeFrame::offset_register(index)] = value;
     }
 
-    pub fn get_constant<N: AsRef<str>>(&self, name: N) -> Value {
-        self.function.module().get_constant(name.as_ref())
-    }
-
     pub fn get_local(&self, index: u8) -> Value {
         self.locals[index as usize].clone()
     }
 
     pub fn set_local(&mut self, index: u8, value: Value) {
         self.locals[index as usize] = value;
+    }
+
+    fn get_lexical(&self, name: &String) -> Value {
+        if let Some(index) = self.get_index_of_local(name) {
+            return self.locals[index].clone();
+        }
+        if let Some(closure) = &self.closure {
+            return closure.get(name).expect(&format!("Not found: {}", name));
+        }
+        panic!("Not found: {}", name)
+    }
+
+    fn set_lexical(&mut self, name: &String, value: Value) {
+        if let Some(closure) = &self.closure {
+            if closure.try_set(name.clone(), value.clone()) {
+                return;
+            }
+        }
+        if let Some(index) = self.get_index_of_local(name) {
+            self.locals[index] = value;
+        } else {
+            panic!("Not found: {}\nFrame: {:?}", name, self)
+        }
+    }
+
+    pub fn get_static(&self, name: &String) -> Value {
+        self.static_closure
+            .get(name)
+            .expect(&format!("Static not found: {}", name))
+    }
+
+    pub fn set_static(&self, name: &String, value: Value) {
+        if !self.static_closure.try_set(name.to_owned(), value) {
+            panic!("Static not found: {}", name)
+        }
     }
 
     fn get_index_of_local(&self, name: &String) -> Option<usize> {
@@ -239,24 +267,28 @@ impl FrameApi for BytecodeFrame {
             let instruction = self.current();
 
             match &instruction {
-                Instruction::GetConstant(lval, name) => {
-                    self.write_register(*lval, self.get_constant(name));
-                    self.advance();
-                }
                 Instruction::GetLocal(lval, index) => {
                     self.write_register(*lval, self.get_local(*index));
                     self.advance();
                 }
-                Instruction::GetLocalLexical(lval, name) => {
+                Instruction::GetLexical(lval, name) => {
                     self.write_register(*lval, self.get_lexical(name));
+                    self.advance();
+                }
+                Instruction::GetStatic(lval, name) => {
+                    self.write_register(*lval, self.get_static(name));
                     self.advance();
                 }
                 Instruction::SetLocal(index, rval) => {
                     self.set_local(*index, self.read_register(*rval));
                     self.advance();
                 }
-                Instruction::SetLocalLexical(name, rval) => {
+                Instruction::SetLexical(name, rval) => {
                     self.set_lexical(name, self.read_register(*rval));
+                    self.advance();
+                }
+                Instruction::SetStatic(name, rval) => {
+                    self.set_static(name, self.read_register(*rval));
                     self.advance();
                 }
                 Instruction::MakeFunction(lval, id) => {
@@ -290,17 +322,7 @@ impl FrameApi for BytecodeFrame {
                             // TODO: Make `CallTarget` able to do specialization.
                             let function = dynamic_function.call_target.function;
                             let parent_closure = dynamic_function.closure;
-                            let closure = if function.binds_on_call() {
-                                let bindings = function.bindings();
-                                let maybe_bindings = if !bindings.is_empty() {
-                                    Some(bindings)
-                                } else {
-                                    None
-                                };
-                                Some(Closure::new(maybe_bindings, parent_closure))
-                            } else {
-                                None
-                            };
+                            let closure = function.build_closure_for_call(parent_closure);
                             let frame = Frame::Bytecode(BytecodeFrame::new(function, closure));
                             // Be at the next instruction when control flow returns to us.
                             self.advance();
@@ -322,29 +344,6 @@ impl FrameApi for BytecodeFrame {
                     return Action::Return(Value::Null);
                 }
             }
-        }
-    }
-
-    fn get_lexical(&self, name: &String) -> Value {
-        if let Some(index) = self.get_index_of_local(name) {
-            return self.locals[index].clone();
-        }
-        if let Some(closure) = &self.closure {
-            return closure.get(name).expect(&format!("Not found: {}", name));
-        }
-        panic!("Not found: {}", name)
-    }
-
-    fn set_lexical(&mut self, name: &String, value: Value) {
-        if let Some(closure) = &self.closure {
-            if closure.try_set(name.clone(), value.clone()) {
-                return;
-            }
-        }
-        if let Some(index) = self.get_index_of_local(name) {
-            self.locals[index] = value;
-        } else {
-            panic!("Not found: {}\nFrame: {:?}", name, self)
         }
     }
 
@@ -379,5 +378,60 @@ impl Debug for Closure {
             "Closure {{ locals: {:?}, parent: {:?}, is_static: {:?} }}",
             locals, inner.parent, inner.is_static
         )
+    }
+}
+
+enum ModuleFrameState {
+    Entering,
+    Leaving,
+    Reentering,
+}
+
+pub struct ModuleFrame {
+    module: LoadedModule,
+    state: ModuleFrameState,
+}
+
+impl ModuleFrame {
+    pub fn new(module: LoadedModule) -> Self {
+        Self {
+            module,
+            state: ModuleFrameState::Entering,
+        }
+    }
+}
+
+impl FrameApi for ModuleFrame {
+    fn run(&mut self) -> Action {
+        use ModuleFrameState::*;
+        match self.state {
+            // When the VM first runs us we call our main function and set our
+            // state to leaving for the next execution (when the main
+            // function returns).
+            Entering => {
+                self.state = Leaving;
+
+                let main = self.module.main();
+                let closure = main.build_closure_for_call(Some(self.module.static_closure()));
+                let frame = BytecodeFrame::new(main, closure);
+                self.state = Leaving;
+                Action::Call(Frame::Bytecode(frame))
+            }
+            // The second time we're executed should be when control returns to
+            // us from the main function.
+            Leaving => {
+                // FIXME: Return the module as a value suitable for
+                //   `import` statements.
+                self.state = Reentering;
+                Action::Return(Value::Null)
+            }
+            Reentering => {
+                panic!("Cannot reenter a module frame which has been entered and left");
+            }
+        }
+    }
+
+    fn receive_return(&mut self, _value: Value) {
+        // No-op. Our return will always be the module as a value.
     }
 }

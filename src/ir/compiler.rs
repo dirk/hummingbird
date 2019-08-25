@@ -203,10 +203,8 @@ impl Compiler {
                         ir::Slot::Local(_name, index) => {
                             bytecode::Instruction::GetLocal(reg, index.expect("Un-indexed local"))
                         }
-                        ir::Slot::Lexical(name) => {
-                            bytecode::Instruction::GetLocalLexical(reg, name)
-                        }
-                        ir::Slot::Static(name) => bytecode::Instruction::GetConstant(reg, name),
+                        ir::Slot::Lexical(name) => bytecode::Instruction::GetLexical(reg, name),
+                        ir::Slot::Static(name) => bytecode::Instruction::GetStatic(reg, name),
                     }
                 }
                 ir::Instruction::Set(slot, rval) => {
@@ -216,10 +214,8 @@ impl Compiler {
                             index.expect(&format!("Un-indexed local: {}", name)),
                             reg,
                         ),
-                        ir::Slot::Lexical(name) => {
-                            bytecode::Instruction::SetLocalLexical(name, reg)
-                        }
-                        ir::Slot::Static(name) => unreachable!("Cannot set static yet ({})", name),
+                        ir::Slot::Lexical(name) => bytecode::Instruction::SetLexical(name, reg),
+                        ir::Slot::Static(name) => bytecode::Instruction::SetStatic(name, reg),
                     }
                 }
                 ir::Instruction::MakeFunction(lval, function) => {

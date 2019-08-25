@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use super::frame::{Action, BytecodeFrame, Frame, FrameApi};
+use super::frame::{Action, Frame, FrameApi, ModuleFrame};
 use super::loader::{self, LoadedModule};
 use super::prelude::build_prelude;
 use std::collections::HashMap;
@@ -45,13 +45,13 @@ impl Vm {
         //   whole prelude.
         for (name, export) in prelude.get_named_exports().iter() {
             if let Some(export) = export {
-                module.set_import(name.to_owned(), export.clone());
+                module
+                    .static_closure()
+                    .set_directly(name.to_owned(), export.clone())
             }
         }
 
-        let frame = BytecodeFrame::new(module.main(), Some(module.static_closure()));
-
-        vm.stack.push(Frame::Bytecode(frame));
+        vm.stack.push(Frame::Module(ModuleFrame::new(module)));
         vm.run();
     }
 
