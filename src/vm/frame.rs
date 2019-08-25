@@ -197,7 +197,9 @@ impl BytecodeFrame {
             closure,
             static_closure: function.module().static_closure(),
             return_register: None,
-            registers: vec![Value::Null; registers as usize],
+            // Sacrifice a bit of memory space so that we don't have to do an
+            // offset every time we read a register.
+            registers: vec![Value::Null; (registers + 1) as usize],
             current_address: 0,
         }
     }
@@ -220,20 +222,15 @@ impl BytecodeFrame {
         self.current_address += 1;
     }
 
-    #[inline]
-    fn offset_register(index: Reg) -> usize {
-        (index as usize) - 1
-    }
-
     pub fn read_register(&self, index: Reg) -> Value {
-        self.registers[BytecodeFrame::offset_register(index)].clone()
+        self.registers[index as usize].clone()
     }
 
     fn write_register(&mut self, index: Reg, value: Value) {
         if index == 0 {
             return;
         }
-        self.registers[BytecodeFrame::offset_register(index)] = value;
+        self.registers[index as usize] = value;
     }
 
     pub fn get_local(&self, index: u8) -> Value {
