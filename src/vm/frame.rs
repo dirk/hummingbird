@@ -83,11 +83,7 @@ impl Closure {
             return true;
         }
         if let Some(parent) = &inner.parent {
-            // If we found a parent with this name and were able to set the
-            // value then all is good.
-            if parent.set_as_parent(name.clone(), value) {
-                return true;
-            }
+            return parent.try_set(name.clone(), value);
         }
         return false;
     }
@@ -97,21 +93,6 @@ impl Closure {
     pub fn set_directly(&self, name: String, value: Value) {
         let inner = &mut self.0.borrow_mut();
         inner.locals.insert(name, Some(value));
-    }
-
-    // Recursive call to set in parent closures. Returns true if it found
-    // a local and set, false if not.
-    fn set_as_parent(&self, name: String, value: Value) -> bool {
-        let inner = &mut self.0.borrow_mut();
-        if inner.locals.contains_key(&name) {
-            inner.locals.insert(name.clone(), Some(value));
-            return true;
-        }
-        if let Some(parent) = &inner.parent {
-            parent.set_as_parent(name, value)
-        } else {
-            false
-        }
     }
 }
 
@@ -549,7 +530,6 @@ impl FrameApi for ReplFrame {
     fn run(&mut self) -> Action {
         if let Some(result) = &self.last_result {
             println!("{:?}", result);
-            println!("  {:?}", &self.static_closure);
             self.last_result = None;
         }
 
