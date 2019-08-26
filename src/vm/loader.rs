@@ -235,6 +235,18 @@ impl LoadedFunction {
         self.0.id
     }
 
+    /// Returns a string indicating the base-name of the module it was defined
+    /// in and its own name.
+    pub fn qualified_name(&self) -> String {
+        let module_basename = Path::new(&self.module().name())
+            .file_name()
+            .and_then(|os_str| os_str.to_str())
+            .unwrap_or("(unknown)")
+            .to_owned();
+        let own_name = self.0.bytecode.name();
+        format!("{}:{}", module_basename, own_name)
+    }
+
     pub fn bytecode(&self) -> BytecodeFunction {
         self.0.bytecode.clone()
     }
