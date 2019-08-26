@@ -15,10 +15,18 @@ mod vm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 || args.len() > 2 {
-        println!("Usage: hummingbird [file]");
+    if args.len() < 1 || args.len() > 2 {
+        println!("Usage: hummingbird [file]?");
         exit(-1);
     }
-    let filename = &args[1];
-    vm::Vm::run_file(filename);
+    match args.len() {
+        1 => {
+            vm::Vm::run_repl();
+        }
+        2 => {
+            let filename = &args[1];
+            vm::Vm::run_file(filename);
+        }
+        _ => unreachable!(),
+    }
 }

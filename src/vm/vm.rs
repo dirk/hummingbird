@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use super::frame::{Action, Frame, FrameApi, ModuleFrame};
+use super::frame::{Action, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::loader::{self, LoadedModule};
 use super::prelude::build_prelude;
-use std::collections::HashMap;
 
 pub struct Vm {
     stack: Vec<Frame>,
@@ -55,6 +55,23 @@ impl Vm {
         vm.run();
     }
 
+    pub fn run_repl() {
+        let frame = ReplFrame::new();
+
+        let prelude = build_prelude();
+        for (name, export) in prelude.get_named_exports().iter() {
+            if let Some(export) = export {
+                frame
+                    .closure()
+                    .set_directly(name.to_owned(), export.clone())
+            }
+        }
+
+        let mut vm = Self::new();
+        vm.stack.push(Frame::Repl(frame));
+        vm.run();
+    }
+
     fn run(&mut self) {
         loop {
             let action = {
@@ -84,7 +101,7 @@ impl Vm {
 
     fn print_stack(&self) {
         let mut index = 0;
-        for frame in self.stack.iter() {
+        for frame in self.stack.iter().rev() {
             if frame.is_module() {
                 continue;
             }

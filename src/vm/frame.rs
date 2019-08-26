@@ -2,20 +2,23 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
+use std::io::Write;
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
+use super::super::parser;
 use super::errors::UndefinedNameError;
-use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
+use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
 use super::operators;
 use super::value::Value;
 
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
     parent: Option<Closure>,
-    /// If this closure is the static closure environment for a module.
-    is_static: bool,
+    /// If this closure is for a REPL. It allows us to set new variables at
+    /// will.
+    repl: bool,
 }
 
 #[derive(Clone)]
@@ -32,7 +35,7 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals,
             parent,
-            is_static: false,
+            repl: false,
         })))
     }
 
@@ -40,7 +43,15 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
             parent: None,
-            is_static: true,
+            repl: false,
+        })))
+    }
+
+    pub fn new_repl() -> Self {
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals: HashMap::new(),
+            parent: None,
+            repl: true,
         })))
     }
 
@@ -66,11 +77,11 @@ impl Closure {
             *exists = Some(value);
             return true;
         }
-        // If it's static then we can create new locals at will.
-        // if inner.is_static {
-        //     inner.locals.insert(name, Some(value));
-        //     return true;
-        // }
+        // If it's for a REPL then we can create new locals at will.
+        if inner.repl {
+            inner.locals.insert(name, Some(value));
+            return true;
+        }
         if let Some(parent) = &inner.parent {
             // If we found a parent with this name and were able to set the
             // value then all is good.
@@ -114,6 +125,7 @@ pub enum Action {
 pub enum Frame {
     Bytecode(BytecodeFrame),
     Module(ModuleFrame),
+    Repl(ReplFrame),
 }
 
 impl Frame {
@@ -130,6 +142,7 @@ impl Frame {
         match self {
             Frame::Bytecode(frame) => frame.stack_description(),
             Frame::Module(_) => unreachable!("Cannot get a stack description for a module"),
+            Frame::Repl(_) => "(repl)".to_owned(),
         }
     }
 }
@@ -139,6 +152,7 @@ impl FrameApi for Frame {
         match self {
             Frame::Bytecode(frame) => frame.run(),
             Frame::Module(frame) => frame.run(),
+            Frame::Repl(frame) => frame.run(),
         }
     }
 
@@ -146,6 +160,7 @@ impl FrameApi for Frame {
         match self {
             Frame::Bytecode(frame) => frame.receive_return(value),
             Frame::Module(frame) => frame.receive_return(value),
+            Frame::Repl(frame) => frame.receive_return(value),
         }
     }
 }
@@ -429,8 +444,8 @@ impl Debug for Closure {
             .collect::<Vec<String>>();
         write!(
             f,
-            "Closure {{ locals: {:?}, parent: {:?}, is_static: {:?} }}",
-            locals, inner.parent, inner.is_static
+            "Closure {{ locals: {:?}, parent: {:?}, repl: {:?} }}",
+            locals, inner.parent, inner.repl
         )
     }
 }
@@ -487,5 +502,78 @@ impl FrameApi for ModuleFrame {
 
     fn receive_return(&mut self, _value: Value) {
         // No-op. Our return will always be the module as a value.
+    }
+}
+
+pub struct ReplFrame {
+    // FIXME: Set up a shared loader to hold loaded modules in memory.
+    //   Eventually they should be part of the GC graph so that they're freed
+    //   when there are no longer live references to them.
+    loaded_modules: Vec<LoadedModule>,
+    counter: u16,
+    static_closure: Closure,
+    // The result of the last expression's evaluation.
+    last_result: Option<Value>,
+}
+
+impl ReplFrame {
+    pub fn new() -> Self {
+        Self {
+            loaded_modules: vec![],
+            counter: 0,
+            static_closure: Closure::new_repl(),
+            last_result: None,
+        }
+    }
+
+    pub fn closure(&self) -> Closure {
+        self.static_closure.clone()
+    }
+
+    fn compile_line(&mut self, line: String, counter: u16) -> LoadedFunction {
+        let name = format!("repl.{}", counter);
+
+        let ast_module = parser::parse(line);
+        let loaded_module =
+            loader::compile_ast_into_module(&ast_module, name).expect("Couldn't compile line");
+        // Hold it in ourselves to that it doesn't get dropped.
+        self.loaded_modules.push(loaded_module.clone());
+        // Make all the loaded modules share the same static closure so that
+        // they see all the same defined variables.
+        loaded_module.override_static_closure(self.static_closure.clone());
+        loaded_module.main()
+    }
+}
+
+impl FrameApi for ReplFrame {
+    fn run(&mut self) -> Action {
+        if let Some(result) = &self.last_result {
+            println!("{:?}", result);
+            println!("  {:?}", &self.static_closure);
+            self.last_result = None;
+        }
+
+        let counter = self.counter;
+        self.counter += 1;
+
+        print!("{}> ", counter);
+        std::io::stdout().flush().unwrap();
+
+        let mut buffer = String::new();
+        std::io::stdin()
+            .read_line(&mut buffer)
+            .expect("Couldn't read line");
+
+        let function = self.compile_line(buffer, counter);
+        let static_closure = self.static_closure.clone();
+        let closure = function.build_closure_for_call(Some(static_closure.clone()));
+        return Action::Call(Frame::Bytecode(BytecodeFrame::new(
+            function,
+            closure,
+        )));
+    }
+
+    fn receive_return(&mut self, value: Value) {
+        self.last_result = Some(value);
     }
 }

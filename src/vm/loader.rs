@@ -27,7 +27,7 @@ fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn E
     Ok(parser::parse(source))
 }
 
-fn compile_ast_into_module(
+pub fn compile_ast_into_module(
     ast_module: &ast::Module,
     name: String,
 ) -> Result<LoadedModule, Box<dyn Error>> {
@@ -126,6 +126,11 @@ impl LoadedModule {
 
     pub fn static_closure(&self) -> Closure {
         self.0.borrow().static_closure.clone()
+    }
+
+    /// Should only be called by the REPL!
+    pub fn override_static_closure(&self, static_closure: Closure) {
+        self.0.borrow_mut().static_closure = static_closure;
     }
 
     pub fn function(&self, id: u16) -> LoadedFunction {
