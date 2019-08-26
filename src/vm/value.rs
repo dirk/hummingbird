@@ -84,7 +84,7 @@ impl Debug for Value {
             Boolean(value) => write!(f, "{:?}", value),
             Integer(value) => write!(f, "{}", value),
             NativeFunction(_) => write!(f, "NativeFunction"),
-            Null => write!(f, "Null"),
+            Null => write!(f, "null"),
         }
     }
 }
