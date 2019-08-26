@@ -77,7 +77,10 @@ impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         use Value::*;
         match self {
-            DynamicFunction(_) => write!(f, "DynamicFunction"),
+            DynamicFunction(function) => {
+                let name = function.call_target.function.qualified_name();
+                write!(f, "Function({})", name)
+            }
             Boolean(value) => write!(f, "{:?}", value),
             Integer(value) => write!(f, "{}", value),
             NativeFunction(_) => write!(f, "NativeFunction"),

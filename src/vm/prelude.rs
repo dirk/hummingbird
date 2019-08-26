@@ -17,7 +17,10 @@ pub fn is_in_prelude<N: AsRef<str>>(name: N) -> bool {
 fn prelude_println(arguments: Vec<Value>) -> Value {
     if let Some(argument) = arguments.first() {
         match argument {
+            Value::Boolean(value) => println!("{:?}", value),
+            Value::DynamicFunction(_) => println!("Function"),
             Value::Integer(value) => println!("{}", value),
+            Value::Null => println!("null"),
             _ => unreachable!(),
         }
     };
