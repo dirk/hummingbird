@@ -145,6 +145,22 @@ impl FrameApi for Frame {
             Frame::Repl(frame) => frame.receive_return(value),
         }
     }
+
+    fn can_catch_error(&mut self, error: &Box<dyn error::Error>) -> bool {
+        match self {
+            Frame::Bytecode(frame) => frame.can_catch_error(error),
+            Frame::Module(frame) => frame.can_catch_error(error),
+            Frame::Repl(frame) => frame.can_catch_error(error),
+        }
+    }
+
+    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+        match self {
+            Frame::Bytecode(frame) => frame.catch_error(error),
+            Frame::Module(frame) => frame.catch_error(error),
+            Frame::Repl(frame) => frame.catch_error(error),
+        }
+    }
 }
 
 pub trait FrameApi {
@@ -160,6 +176,20 @@ pub trait FrameApi {
     /// [0].receive_return(value)
     /// [0].run() -> ...
     fn receive_return(&mut self, value: Value);
+
+    /// When an error is raised the VM will call this on each frame of the
+    /// stack. If the frame returns false it will be unwound off the stack.
+    /// It it returns true then it must be able to immediately receive a call
+    /// to `receive_error`.
+    fn can_catch_error(&mut self, _error: &Box<dyn error::Error>) -> bool {
+        false
+    }
+
+    /// This method should not do any evaluation. Instead it should merely
+    /// prepare for evaluation to resume in this frame.
+    fn catch_error(&mut self, _error: Box<dyn error::Error>) {
+        unreachable!()
+    }
 }
 
 // Frame evaluating a bytecode function.
@@ -496,6 +526,7 @@ pub struct ReplFrame {
     static_closure: Closure,
     // The result of the last expression's evaluation.
     last_result: Option<Value>,
+    last_error: Option<Box<dyn error::Error>>,
 }
 
 impl ReplFrame {
@@ -505,6 +536,7 @@ impl ReplFrame {
             counter: 0,
             static_closure: Closure::new_repl(),
             last_result: None,
+            last_error: None,
         }
     }
 
@@ -535,26 +567,52 @@ impl FrameApi for ReplFrame {
             self.last_result = None;
         }
 
-        let counter = self.counter;
-        self.counter += 1;
+        loop {
+            let counter = self.counter;
+            self.counter += 1;
 
-        print!("[{}]> ", counter);
-        std::io::stdout().flush().unwrap();
+            print!("[{}]> ", counter);
+            std::io::stdout().flush().unwrap();
 
-        let mut buffer = String::new();
-        std::io::stdin()
-            .read_line(&mut buffer)
-            .expect("Couldn't read line");
+            let mut buffer = String::new();
+            std::io::stdin()
+                .read_line(&mut buffer)
+                .expect("Couldn't read line");
 
-        let module = self.compile_line(buffer, counter);
-        // TODO: Extract and process the module's imports; that way one can do
-        //   `import` in the REPL.
-        let function = module.main();
-        let closure = function.build_closure_for_call(Some(self.static_closure.clone()));
-        return Action::Call(Frame::Bytecode(BytecodeFrame::new(function, closure)));
+            match buffer.as_str().trim() {
+                "wtf?" => {
+                    if let Some(error) = &self.last_error {
+                        println!("{}", error);
+                    } else {
+                        println!("No recent error.")
+                    }
+                    continue;
+                }
+                _ => {
+                    let module = self.compile_line(buffer, counter);
+                    // TODO: Extract and process the module's imports; that way one can do
+                    //   `import` in the REPL.
+                    let function = module.main();
+                    let closure =
+                        function.build_closure_for_call(Some(self.static_closure.clone()));
+                    return Action::Call(Frame::Bytecode(BytecodeFrame::new(function, closure)));
+                }
+            }
+        }
     }
 
     fn receive_return(&mut self, value: Value) {
         self.last_result = Some(value);
+    }
+
+    /// The top-level REPL frame can always catch any errors that bubble up.
+    fn can_catch_error(&mut self, _error: &Box<dyn error::Error>) -> bool {
+        true
+    }
+
+    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+        println!("{}", error);
+        self.last_result = None;
+        self.last_error = Some(error);
     }
 }

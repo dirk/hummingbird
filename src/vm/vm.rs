@@ -1,10 +1,13 @@
 use std::collections::HashMap;
-use std::error::Error;
+use std::error;
 use std::path::{Path, PathBuf};
 
+use super::errors::AnnotatedError;
 use super::frame::{Action, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::loader::{self, LoadedModule};
 use super::prelude::build_prelude;
+
+pub type StackSnapshot = Vec<(u16, String)>;
 
 pub struct Vm {
     stack: Vec<Frame>,
@@ -19,7 +22,10 @@ impl Vm {
         }
     }
 
-    pub fn load_file<P: AsRef<Path>>(&mut self, path: P) -> Result<LoadedModule, Box<dyn Error>> {
+    pub fn load_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<LoadedModule, Box<dyn error::Error>> {
         let canonicalized = path
             .as_ref()
             .canonicalize()
@@ -91,23 +97,57 @@ impl Vm {
                     }
                 }
                 Action::Error(error) => {
-                    println!("{}", error);
-                    self.print_stack();
-                    return;
+                    let annotated = AnnotatedError::new(error, self.snapshot_stack());
+                    // Get a formatted string for the error before it's
+                    // consumed by the call to `error_unwind`.
+                    let formatted = format!("{}", annotated);
+                    if !self.error_unwind(Box::new(annotated)) {
+                        // If we weren't able to catch the error then print
+                        // what went wrong and exit.
+                        println!("{}", formatted);
+                        return;
+                    }
                 }
             }
         }
     }
 
-    fn print_stack(&self) {
-        let mut index = 0;
+    // Returns true if it found a frame to catch the error, false if not.
+    fn error_unwind(&mut self, error: Box<dyn error::Error>) -> bool {
+        loop {
+            let can_catch_error = {
+                let top = match self.stack.last_mut() {
+                    Some(frame) => frame,
+                    None => {
+                        // Out of stack frames to unwind from.
+                        return false;
+                    }
+                };
+                top.can_catch_error(&error)
+            };
+
+            if can_catch_error {
+                let top = self.stack.last_mut().unwrap();
+                top.catch_error(error);
+                return true;
+            } else {
+                // If this frame didn't catch the error then keep on
+                // unwinding.
+                self.stack.pop();
+            }
+        }
+    }
+
+    fn snapshot_stack(&self) -> StackSnapshot {
+        let mut index = 0u16;
+        let mut captured: StackSnapshot = vec![];
         for frame in self.stack.iter().rev() {
             if frame.is_module() {
                 continue;
             }
-            print!("  {}: {}", index, frame.stack_description());
-            print!("\n");
+            captured.push((index, frame.stack_description()));
             index += 1;
         }
+        captured
     }
 }
