@@ -116,7 +116,7 @@ impl Vm {
     fn error_unwind(&mut self, error: Box<dyn error::Error>) -> bool {
         loop {
             let can_catch_error = {
-                let top = match self.stack.last_mut() {
+                let top = match self.stack.last() {
                     Some(frame) => frame,
                     None => {
                         // Out of stack frames to unwind from.

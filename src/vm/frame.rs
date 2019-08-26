@@ -146,7 +146,7 @@ impl FrameApi for Frame {
         }
     }
 
-    fn can_catch_error(&mut self, error: &Box<dyn error::Error>) -> bool {
+    fn can_catch_error(&self, error: &Box<dyn error::Error>) -> bool {
         match self {
             Frame::Bytecode(frame) => frame.can_catch_error(error),
             Frame::Module(frame) => frame.can_catch_error(error),
@@ -180,8 +180,17 @@ pub trait FrameApi {
     /// When an error is raised the VM will call this on each frame of the
     /// stack. If the frame returns false it will be unwound off the stack.
     /// It it returns true then it must be able to immediately receive a call
-    /// to `receive_error`.
-    fn can_catch_error(&mut self, _error: &Box<dyn error::Error>) -> bool {
+    /// to `catch_error`. In pseudocode the VM's execution looks like:
+    ///
+    ///   loop {
+    ///     if stack.top.can_catch_error(error) {
+    ///       stack.catch_error(error)
+    ///       break
+    ///     }
+    ///     stack.pop()
+    ///   }
+    ///
+    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
         false
     }
 
@@ -606,7 +615,7 @@ impl FrameApi for ReplFrame {
     }
 
     /// The top-level REPL frame can always catch any errors that bubble up.
-    fn can_catch_error(&mut self, _error: &Box<dyn error::Error>) -> bool {
+    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
         true
     }
 
