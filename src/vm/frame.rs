@@ -2,20 +2,24 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
+use std::io::Write;
 use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
+use super::super::ast_to_ir;
+use super::super::parser;
 use super::errors::UndefinedNameError;
-use super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
+use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
 use super::operators;
 use super::value::Value;
 
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
     parent: Option<Closure>,
-    /// If this closure is the static closure environment for a module.
-    is_static: bool,
+    /// If this closure is for a REPL. It allows us to set new variables at
+    /// will.
+    repl: bool,
 }
 
 #[derive(Clone)]
@@ -32,7 +36,7 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals,
             parent,
-            is_static: false,
+            repl: false,
         })))
     }
 
@@ -40,7 +44,15 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
             parent: None,
-            is_static: true,
+            repl: false,
+        })))
+    }
+
+    pub fn new_repl() -> Self {
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals: HashMap::new(),
+            parent: None,
+            repl: true,
         })))
     }
 
@@ -66,17 +78,13 @@ impl Closure {
             *exists = Some(value);
             return true;
         }
-        // If it's static then we can create new locals at will.
-        // if inner.is_static {
-        //     inner.locals.insert(name, Some(value));
-        //     return true;
-        // }
+        // If it's for a REPL then we can create new locals at will.
+        if inner.repl {
+            inner.locals.insert(name, Some(value));
+            return true;
+        }
         if let Some(parent) = &inner.parent {
-            // If we found a parent with this name and were able to set the
-            // value then all is good.
-            if parent.set_as_parent(name.clone(), value) {
-                return true;
-            }
+            return parent.try_set(name.clone(), value);
         }
         return false;
     }
@@ -86,21 +94,6 @@ impl Closure {
     pub fn set_directly(&self, name: String, value: Value) {
         let inner = &mut self.0.borrow_mut();
         inner.locals.insert(name, Some(value));
-    }
-
-    // Recursive call to set in parent closures. Returns true if it found
-    // a local and set, false if not.
-    fn set_as_parent(&self, name: String, value: Value) -> bool {
-        let inner = &mut self.0.borrow_mut();
-        if inner.locals.contains_key(&name) {
-            inner.locals.insert(name.clone(), Some(value));
-            return true;
-        }
-        if let Some(parent) = &inner.parent {
-            parent.set_as_parent(name, value)
-        } else {
-            false
-        }
     }
 }
 
@@ -114,6 +107,7 @@ pub enum Action {
 pub enum Frame {
     Bytecode(BytecodeFrame),
     Module(ModuleFrame),
+    Repl(ReplFrame),
 }
 
 impl Frame {
@@ -130,6 +124,7 @@ impl Frame {
         match self {
             Frame::Bytecode(frame) => frame.stack_description(),
             Frame::Module(_) => unreachable!("Cannot get a stack description for a module"),
+            Frame::Repl(_) => "(repl)".to_owned(),
         }
     }
 }
@@ -139,6 +134,7 @@ impl FrameApi for Frame {
         match self {
             Frame::Bytecode(frame) => frame.run(),
             Frame::Module(frame) => frame.run(),
+            Frame::Repl(frame) => frame.run(),
         }
     }
 
@@ -146,6 +142,23 @@ impl FrameApi for Frame {
         match self {
             Frame::Bytecode(frame) => frame.receive_return(value),
             Frame::Module(frame) => frame.receive_return(value),
+            Frame::Repl(frame) => frame.receive_return(value),
+        }
+    }
+
+    fn can_catch_error(&self, error: &Box<dyn error::Error>) -> bool {
+        match self {
+            Frame::Bytecode(frame) => frame.can_catch_error(error),
+            Frame::Module(frame) => frame.can_catch_error(error),
+            Frame::Repl(frame) => frame.can_catch_error(error),
+        }
+    }
+
+    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+        match self {
+            Frame::Bytecode(frame) => frame.catch_error(error),
+            Frame::Module(frame) => frame.catch_error(error),
+            Frame::Repl(frame) => frame.catch_error(error),
         }
     }
 }
@@ -163,6 +176,29 @@ pub trait FrameApi {
     /// [0].receive_return(value)
     /// [0].run() -> ...
     fn receive_return(&mut self, value: Value);
+
+    /// When an error is raised the VM will call this on each frame of the
+    /// stack. If the frame returns false it will be unwound off the stack.
+    /// It it returns true then it must be able to immediately receive a call
+    /// to `catch_error`. In pseudocode the VM's execution looks like:
+    ///
+    ///   loop {
+    ///     if stack.top.can_catch_error(error) {
+    ///       stack.catch_error(error)
+    ///       break
+    ///     }
+    ///     stack.pop()
+    ///   }
+    ///
+    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
+        false
+    }
+
+    /// This method should not do any evaluation. Instead it should merely
+    /// prepare for evaluation to resume in this frame.
+    fn catch_error(&mut self, _error: Box<dyn error::Error>) {
+        unreachable!()
+    }
 }
 
 // Frame evaluating a bytecode function.
@@ -429,8 +465,8 @@ impl Debug for Closure {
             .collect::<Vec<String>>();
         write!(
             f,
-            "Closure {{ locals: {:?}, parent: {:?}, is_static: {:?} }}",
-            locals, inner.parent, inner.is_static
+            "Closure {{ locals: {:?}, parent: {:?}, repl: {:?} }}",
+            locals, inner.parent, inner.repl
         )
     }
 }
@@ -487,5 +523,105 @@ impl FrameApi for ModuleFrame {
 
     fn receive_return(&mut self, _value: Value) {
         // No-op. Our return will always be the module as a value.
+    }
+}
+
+pub struct ReplFrame {
+    // FIXME: Set up a shared loader to hold loaded modules in memory.
+    //   Eventually they should be part of the GC graph so that they're freed
+    //   when there are no longer live references to them.
+    loaded_modules: Vec<LoadedModule>,
+    counter: u16,
+    static_closure: Closure,
+    // The result of the last expression's evaluation.
+    last_result: Option<Value>,
+    last_error: Option<Box<dyn error::Error>>,
+}
+
+impl ReplFrame {
+    pub fn new() -> Self {
+        Self {
+            loaded_modules: vec![],
+            counter: 0,
+            static_closure: Closure::new_repl(),
+            last_result: None,
+            last_error: None,
+        }
+    }
+
+    pub fn closure(&self) -> Closure {
+        self.static_closure.clone()
+    }
+
+    fn compile_line(&mut self, line: String, counter: u16) -> LoadedModule {
+        let name = format!("repl[{}]", counter);
+
+        let ast_module = parser::parse(line);
+        let loaded_module =
+            loader::compile_ast_into_module(&ast_module, name, ast_to_ir::CompilationFlags::Repl)
+                .expect("Couldn't compile line");
+        // Hold it in ourselves so that it doesn't get dropped.
+        self.loaded_modules.push(loaded_module.clone());
+        // Make all the loaded modules share the same static closure so that
+        // they see all the same defined variables.
+        loaded_module.override_static_closure(self.static_closure.clone());
+        loaded_module
+    }
+}
+
+impl FrameApi for ReplFrame {
+    fn run(&mut self) -> Action {
+        if let Some(result) = &self.last_result {
+            println!("{:?}", result);
+            self.last_result = None;
+        }
+
+        loop {
+            let counter = self.counter;
+            self.counter += 1;
+
+            print!("[{}]> ", counter);
+            std::io::stdout().flush().unwrap();
+
+            let mut buffer = String::new();
+            std::io::stdin()
+                .read_line(&mut buffer)
+                .expect("Couldn't read line");
+
+            match buffer.as_str().trim() {
+                "wtf?" => {
+                    if let Some(error) = &self.last_error {
+                        println!("{}", error);
+                    } else {
+                        println!("No recent error.")
+                    }
+                    continue;
+                }
+                _ => {
+                    let module = self.compile_line(buffer, counter);
+                    // TODO: Extract and process the module's imports; that way one can do
+                    //   `import` in the REPL.
+                    let function = module.main();
+                    let closure =
+                        function.build_closure_for_call(Some(self.static_closure.clone()));
+                    return Action::Call(Frame::Bytecode(BytecodeFrame::new(function, closure)));
+                }
+            }
+        }
+    }
+
+    fn receive_return(&mut self, value: Value) {
+        self.last_result = Some(value);
+    }
+
+    /// The top-level REPL frame can always catch any errors that bubble up.
+    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
+        true
+    }
+
+    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+        println!("{}", error);
+        self.last_result = None;
+        self.last_error = Some(error);
     }
 }

@@ -9,6 +9,24 @@ use super::ir::layout::{
 };
 use super::vm::prelude::is_in_prelude;
 
+#[derive(PartialEq)]
+enum ScopeFlags {
+    /// Evaluate scoping rules normally.
+    None,
+    /// Evaluate scoping rules for use in a REPL (ie. promote all locals
+    /// to statics).
+    Repl,
+}
+
+impl Into<ScopeFlags> for CompilationFlags {
+    fn into(self) -> ScopeFlags {
+        match self {
+            CompilationFlags::None => ScopeFlags::None,
+            CompilationFlags::Repl => ScopeFlags::Repl,
+        }
+    }
+}
+
 trait Scope {
     fn add_local(&mut self, name: &String) -> SharedSlot;
 
@@ -122,7 +140,7 @@ impl Compiler {
         Self { module, current }
     }
 
-    fn compile_module(&mut self, module: &Module) {
+    fn compile_module(&mut self, module: &Module, flags: CompilationFlags) {
         let mut module_scope = ModuleScope {
             module: self.module.clone(),
             bindings: HashMap::new(),
@@ -133,14 +151,24 @@ impl Compiler {
         assert_eq!(self.current, self.module.borrow().main_function());
 
         let mut scope = FunctionScope::new(&mut module_scope, self.current.clone());
+        let mut implicit_return = self.null_value();
         for node in module.nodes.iter() {
-            self.compile_node(node, &mut scope);
+            implicit_return = self.compile_node(node, &mut scope);
             // We should always end up back in the main function.
             assert_eq!(self.current, self.module.borrow().main_function());
         }
-        // Insert a return at the end to make sure empty modules don't crash.
-        self.build_return_null();
-        Compiler::finalize_function(self.current.clone(), &scope);
+        match flags {
+            CompilationFlags::Repl => {
+                // If compiling for a REPL then we want to implicit return the
+                // last statement.
+                self.build_return(implicit_return);
+            }
+            _ => {
+                // Insert a return at the end to make sure empty modules don't crash.
+                self.build_return_null();
+            }
+        };
+        Compiler::finalize_function(self.current.clone(), &scope, flags.into());
 
         // Now that we've visited the whole program we can write out the
         // imports we've found.
@@ -215,7 +243,7 @@ impl Compiler {
         let lval = self.compile_node(body, &mut function_scope);
         self.build_return(lval);
         // Save the bindings so that we know how to build the closure.
-        Compiler::finalize_function(new_function.clone(), &function_scope);
+        Compiler::finalize_function(new_function.clone(), &function_scope, ScopeFlags::None);
 
         self.current = enclosing_function;
         let lval = self.build_make_function(new_function);
@@ -225,8 +253,20 @@ impl Compiler {
         lval
     }
 
-    fn finalize_function(function: SharedFunction, scope: &FunctionScope) {
+    fn finalize_function(function: SharedFunction, scope: &FunctionScope, flags: ScopeFlags) {
         let mut function = function.borrow_mut();
+
+        // If we're in a REPL then promote everything to lexical and always
+        // capture our parent bindings.
+        if flags == ScopeFlags::Repl {
+            for (name, slot) in scope.locals.iter() {
+                slot.promote_from_local_to_lexical(name.clone());
+            }
+            function.locals = vec![];
+            function.bindings = scope.bindings.clone();
+            function.parent_bindings = true;
+            return;
+        }
 
         let mut all_locals = scope.locals.clone();
         // The bindings will have been filled in by nested functions within
@@ -361,9 +401,20 @@ impl InstructionBuilder for Compiler {
     }
 }
 
-pub fn compile(module: &Module) -> IrModule {
+pub enum CompilationFlags {
+    None,
+    Repl,
+}
+
+impl Default for CompilationFlags {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+pub fn compile(module: &Module, flags: CompilationFlags) -> IrModule {
     let mut compiler = Compiler::new();
-    compiler.compile_module(module);
+    compiler.compile_module(module, flags);
     // The reference count should be 1 at this point.
     let module_cell = Rc::try_unwrap(compiler.module).unwrap();
     module_cell.into_inner()

@@ -27,11 +27,12 @@ fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn E
     Ok(parser::parse(source))
 }
 
-fn compile_ast_into_module(
+pub fn compile_ast_into_module(
     ast_module: &ast::Module,
     name: String,
+    ast_flags: ast_to_ir::CompilationFlags,
 ) -> Result<LoadedModule, Box<dyn Error>> {
-    let ir_module = ast_to_ir::compile(ast_module);
+    let ir_module = ast_to_ir::compile(ast_module, ast_flags);
     if *DEBUG_IR {
         println!("IR({}):", name);
         ir::printer::Printer::new(std::io::stdout()).print_module(&ir_module)?;
@@ -72,7 +73,7 @@ pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>
         println!();
     }
 
-    compile_ast_into_module(&ast_module, name)
+    compile_ast_into_module(&ast_module, name, Default::default())
 }
 
 pub struct InnerLoadedModule {
@@ -126,6 +127,11 @@ impl LoadedModule {
 
     pub fn static_closure(&self) -> Closure {
         self.0.borrow().static_closure.clone()
+    }
+
+    /// Should only be called by the REPL!
+    pub fn override_static_closure(&self, static_closure: Closure) {
+        self.0.borrow_mut().static_closure = static_closure;
     }
 
     pub fn function(&self, id: u16) -> LoadedFunction {
@@ -227,6 +233,18 @@ impl LoadedFunction {
 
     pub fn id(&self) -> u16 {
         self.0.id
+    }
+
+    /// Returns a string indicating the base-name of the module it was defined
+    /// in and its own name.
+    pub fn qualified_name(&self) -> String {
+        let module_basename = Path::new(&self.module().name())
+            .file_name()
+            .and_then(|os_str| os_str.to_str())
+            .unwrap_or("(unknown)")
+            .to_owned();
+        let own_name = self.0.bytecode.name();
+        format!("{}:{}", module_basename, own_name)
     }
 
     pub fn bytecode(&self) -> BytecodeFunction {
