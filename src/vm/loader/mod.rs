@@ -8,13 +8,14 @@ use super::super::ast_to_ir;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
+use super::frame::Closure;
 
 mod loaded_function;
 mod loaded_module;
 
+pub use loaded_function::{BytecodeFunction, LoadedFunction};
 pub use loaded_module::LoadedModule;
 use loaded_module::WeakLoadedModule;
-pub use loaded_function::{BytecodeFunction, LoadedFunction};
 
 lazy_static! {
     static ref DEBUG_ALL: bool = env::var("DEBUG_ALL").is_ok();
@@ -32,6 +33,8 @@ pub fn compile_ast_into_module(
     ast_module: &ast::Module,
     name: String,
     ast_flags: ast_to_ir::CompilationFlags,
+    // The highest closure in the system; normally should hold all the builtins.
+    builtins_closure: Option<Closure>,
 ) -> Result<LoadedModule, Box<dyn Error>> {
     let ir_module = ast_to_ir::compile(ast_module, ast_flags);
     if *DEBUG_IR {
@@ -46,11 +49,14 @@ pub fn compile_ast_into_module(
         bytecode::printer::Printer::new(std::io::stdout()).print_module(&bytecode_module)?;
     }
 
-    let loaded_module = LoadedModule::from_bytecode(bytecode_module, name);
+    let loaded_module = LoadedModule::from_bytecode(bytecode_module, name, builtins_closure);
     Ok(loaded_module)
 }
 
-pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>> {
+pub fn load_file<P: AsRef<Path>>(
+    path: P,
+    builtins_closure: Option<Closure>,
+) -> Result<LoadedModule, Box<dyn Error>> {
     let name = path
         .as_ref()
         .to_str()
@@ -64,6 +70,5 @@ pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>
         println!();
     }
 
-    compile_ast_into_module(&ast_module, name, Default::default())
+    compile_ast_into_module(&ast_module, name, Default::default(), builtins_closure)
 }
-

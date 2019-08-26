@@ -3,22 +3,24 @@ use std::error;
 use std::path::{Path, PathBuf};
 
 use super::errors::AnnotatedError;
-use super::frame::{Action, Frame, FrameApi, ModuleFrame, ReplFrame};
+use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::loader::{self, LoadedModule};
-use super::prelude::build_prelude;
+use super::prelude;
 
 pub type StackSnapshot = Vec<(u16, String)>;
 
 pub struct Vm {
-    stack: Vec<Frame>,
     loaded_modules: HashMap<PathBuf, LoadedModule>,
+    builtins_closure: Closure,
+    stack: Vec<Frame>,
 }
 
 impl Vm {
     pub fn new() -> Self {
         Self {
-            stack: vec![],
             loaded_modules: HashMap::new(),
+            builtins_closure: prelude::build_prelude(),
+            stack: vec![],
         }
     }
 
@@ -35,7 +37,7 @@ impl Vm {
             panic!("Module already loaded: {:?}", canonicalized);
         }
 
-        let loaded_module = loader::load_file(path)?;
+        let loaded_module = loader::load_file(path, Some(self.builtins_closure.clone()))?;
         self.loaded_modules
             .insert(canonicalized, loaded_module.clone());
         Ok(loaded_module)
@@ -43,37 +45,14 @@ impl Vm {
 
     pub fn run_file<P: AsRef<Path>>(path: P) {
         let mut vm = Self::new();
-
-        let prelude = build_prelude();
         let module = vm.load_file(path).expect("Unable to read file");
-
-        // FIXME: Actually do imports on request instead of just copying the
-        //   whole prelude.
-        for (name, export) in prelude.get_named_exports().iter() {
-            if let Some(export) = export {
-                module
-                    .static_closure()
-                    .set_directly(name.to_owned(), export.clone())
-            }
-        }
-
         vm.stack.push(Frame::Module(ModuleFrame::new(module)));
         vm.run();
     }
 
     pub fn run_repl() {
-        let frame = ReplFrame::new();
-
-        let prelude = build_prelude();
-        for (name, export) in prelude.get_named_exports().iter() {
-            if let Some(export) = export {
-                frame
-                    .closure()
-                    .set_directly(name.to_owned(), export.clone())
-            }
-        }
-
         let mut vm = Self::new();
+        let frame = ReplFrame::new(vm.builtins_closure.clone());
         vm.stack.push(Frame::Repl(frame));
         vm.run();
     }

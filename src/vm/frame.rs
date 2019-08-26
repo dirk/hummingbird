@@ -40,18 +40,18 @@ impl Closure {
         })))
     }
 
-    pub fn new_static() -> Self {
+    pub fn new_static(builtins_closure: Option<Closure>) -> Self {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
-            parent: None,
+            parent: builtins_closure,
             repl: false,
         })))
     }
 
-    pub fn new_repl() -> Self {
+    pub fn new_repl(builtins_closure: Closure) -> Self {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
-            parent: None,
+            parent: Some(builtins_closure),
             repl: true,
         })))
     }
@@ -539,11 +539,11 @@ pub struct ReplFrame {
 }
 
 impl ReplFrame {
-    pub fn new() -> Self {
+    pub fn new(builtins_closure: Closure) -> Self {
         Self {
             loaded_modules: vec![],
             counter: 0,
-            static_closure: Closure::new_repl(),
+            static_closure: Closure::new_repl(builtins_closure),
             last_result: None,
             last_error: None,
         }
@@ -557,9 +557,13 @@ impl ReplFrame {
         let name = format!("repl[{}]", counter);
 
         let ast_module = parser::parse(line);
-        let loaded_module =
-            loader::compile_ast_into_module(&ast_module, name, ast_to_ir::CompilationFlags::Repl)
-                .expect("Couldn't compile line");
+        let loaded_module = loader::compile_ast_into_module(
+            &ast_module,
+            name,
+            ast_to_ir::CompilationFlags::Repl,
+            None,
+        )
+        .expect("Couldn't compile line");
         // Hold it in ourselves so that it doesn't get dropped.
         self.loaded_modules.push(loaded_module.clone());
         // Make all the loaded modules share the same static closure so that
