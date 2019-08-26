@@ -2,7 +2,7 @@ use super::frame::Closure;
 use super::value::Value;
 
 pub fn build_prelude() -> Closure {
-    let closure = Closure::new_static(None);
+    let closure = Closure::new_builtins();
 
     let functions = vec![("println".to_owned(), prelude_println)];
 

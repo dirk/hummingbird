@@ -17,8 +17,10 @@ use super::value::Value;
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
     parent: Option<Closure>,
+    /// The builtins closure cannot be written to after it's created.
+    builtins: bool,
     /// If this closure is for a REPL. It allows us to set new variables at
-    /// will.
+    /// will rather than being restricted to the established bindings.
     repl: bool,
 }
 
@@ -36,14 +38,16 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals,
             parent,
+            builtins: false,
             repl: false,
         })))
     }
 
-    pub fn new_static(builtins_closure: Option<Closure>) -> Self {
+    pub fn new_builtins() -> Self {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
-            parent: builtins_closure,
+            parent: None,
+            builtins: true,
             repl: false,
         })))
     }
@@ -52,7 +56,17 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
             parent: Some(builtins_closure),
+            builtins: false,
             repl: true,
+        })))
+    }
+
+    pub fn new_static(builtins_closure: Option<Closure>) -> Self {
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals: HashMap::new(),
+            parent: builtins_closure,
+            builtins: false,
+            repl: false,
         })))
     }
 
@@ -74,6 +88,10 @@ impl Closure {
     /// false if not.
     pub fn try_set(&self, name: String, value: Value) -> bool {
         let inner = &mut self.0.borrow_mut();
+        // If the builtins flag is set then it cannot be mutated.
+        if inner.builtins {
+            return false;
+        }
         if let Some(exists) = inner.locals.get_mut(&name) {
             *exists = Some(value);
             return true;
@@ -90,7 +108,9 @@ impl Closure {
     }
 
     /// Set a local directly into this exact closure. This should only be used
-    /// by the VM when initializing a module's closure with imports.
+    /// by the VM when:
+    ///   - Setting imports into a module's static closure.
+    ///   - Setting up the builtins closure.
     pub fn set_directly(&self, name: String, value: Value) {
         let inner = &mut self.0.borrow_mut();
         inner.locals.insert(name, Some(value));
