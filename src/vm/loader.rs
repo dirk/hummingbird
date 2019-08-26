@@ -30,8 +30,9 @@ fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn E
 pub fn compile_ast_into_module(
     ast_module: &ast::Module,
     name: String,
+    ast_flags: ast_to_ir::CompilationFlags,
 ) -> Result<LoadedModule, Box<dyn Error>> {
-    let ir_module = ast_to_ir::compile(ast_module);
+    let ir_module = ast_to_ir::compile(ast_module, ast_flags);
     if *DEBUG_IR {
         println!("IR({}):", name);
         ir::printer::Printer::new(std::io::stdout()).print_module(&ir_module)?;
@@ -72,7 +73,7 @@ pub fn load_file<P: AsRef<Path>>(path: P) -> Result<LoadedModule, Box<dyn Error>
         println!();
     }
 
-    compile_ast_into_module(&ast_module, name)
+    compile_ast_into_module(&ast_module, name, Default::default())
 }
 
 pub struct InnerLoadedModule {

@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use super::super::target::bytecode::layout::{Instruction, Reg};
 
+use super::super::ast_to_ir;
 use super::super::parser;
 use super::errors::UndefinedNameError;
 use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
@@ -511,18 +512,19 @@ impl ReplFrame {
         self.static_closure.clone()
     }
 
-    fn compile_line(&mut self, line: String, counter: u16) -> LoadedFunction {
-        let name = format!("repl.{}", counter);
+    fn compile_line(&mut self, line: String, counter: u16) -> LoadedModule {
+        let name = format!("repl[{}]", counter);
 
         let ast_module = parser::parse(line);
         let loaded_module =
-            loader::compile_ast_into_module(&ast_module, name).expect("Couldn't compile line");
-        // Hold it in ourselves to that it doesn't get dropped.
+            loader::compile_ast_into_module(&ast_module, name, ast_to_ir::CompilationFlags::Repl)
+                .expect("Couldn't compile line");
+        // Hold it in ourselves so that it doesn't get dropped.
         self.loaded_modules.push(loaded_module.clone());
         // Make all the loaded modules share the same static closure so that
         // they see all the same defined variables.
         loaded_module.override_static_closure(self.static_closure.clone());
-        loaded_module.main()
+        loaded_module
     }
 }
 
@@ -536,7 +538,7 @@ impl FrameApi for ReplFrame {
         let counter = self.counter;
         self.counter += 1;
 
-        print!("{}> ", counter);
+        print!("[{}]> ", counter);
         std::io::stdout().flush().unwrap();
 
         let mut buffer = String::new();
@@ -544,13 +546,12 @@ impl FrameApi for ReplFrame {
             .read_line(&mut buffer)
             .expect("Couldn't read line");
 
-        let function = self.compile_line(buffer, counter);
-        let static_closure = self.static_closure.clone();
-        let closure = function.build_closure_for_call(Some(static_closure.clone()));
-        return Action::Call(Frame::Bytecode(BytecodeFrame::new(
-            function,
-            closure,
-        )));
+        let module = self.compile_line(buffer, counter);
+        // TODO: Extract and process the module's imports; that way one can do
+        //   `import` in the REPL.
+        let function = module.main();
+        let closure = function.build_closure_for_call(Some(self.static_closure.clone()));
+        return Action::Call(Frame::Bytecode(BytecodeFrame::new(function, closure)));
     }
 
     fn receive_return(&mut self, value: Value) {
