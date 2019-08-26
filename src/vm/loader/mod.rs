@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::super::ast;
 use super::super::ast_to_ir;
@@ -22,6 +23,45 @@ lazy_static! {
     static ref DEBUG_AST: bool = (*DEBUG_ALL || env::var("DEBUG_AST").is_ok());
     static ref DEBUG_IR: bool = (*DEBUG_ALL || env::var("DEBUG_IR").is_ok());
     static ref DEBUG_BYTECODE: bool = (*DEBUG_ALL || env::var("DEBUG_BYTECODE").is_ok());
+}
+
+pub struct Loader {
+    load_path: Vec<PathBuf>,
+    loaded_modules: HashMap<PathBuf, LoadedModule>,
+    builtins_closure: Closure,
+}
+
+impl Loader {
+    pub fn new(builtins_closure: Closure) -> Self {
+        Self {
+            load_path: vec![],
+            loaded_modules: HashMap::new(),
+            builtins_closure,
+        }
+    }
+
+    pub fn load_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<LoadedModule, Box<dyn Error>> {
+        let canonicalized = path
+            .as_ref()
+            .canonicalize()
+            .expect("Could not canonicalize path");
+
+        if let Some(existing) = self.loaded_modules.get(&canonicalized) {
+            if existing.initialized() {
+                return Ok(existing.clone())
+            } else {
+                panic!("Circular dependency detected: {:?}", canonicalized)
+            }
+        }
+
+        let new = load_file(path, Some(self.builtins_closure.clone()))?;
+        self.loaded_modules
+            .insert(canonicalized, new.clone());
+        Ok(new)
+    }
 }
 
 fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn Error>> {

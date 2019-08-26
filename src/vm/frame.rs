@@ -119,6 +119,7 @@ impl Closure {
 
 // An action for the VM to do.
 pub enum Action {
+    Import(String),
     Call(Frame),
     Return(Value),
     Error(Box<dyn error::Error>),
@@ -135,6 +136,14 @@ impl Frame {
         match self {
             Frame::Module(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns the module being initialized by this frame.
+    pub fn initializing_module(&self) -> Option<LoadedModule> {
+        match self {
+            Frame::Module(frame) => Some(frame.module.clone()),
+            _ => None,
         }
     }
 
@@ -196,6 +205,12 @@ pub trait FrameApi {
     /// [0].receive_return(value)
     /// [0].run() -> ...
     fn receive_return(&mut self, value: Value);
+
+    /// Called when the VM has finished initializing a module imported by this
+    /// frame's module.
+    fn receive_import(&mut self, _module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        unimplemented!()
+    }
 
     /// When an error is raised the VM will call this on each frame of the
     /// stack. If the frame returns false it will be unwound off the stack.

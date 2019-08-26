@@ -77,6 +77,13 @@ impl LoadedModule {
         self.0.borrow().static_closure.clone()
     }
 
+    pub fn initialized(&self) -> bool { self.0.borrow().initialized }
+
+    pub fn set_initialized(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.initialized = true;
+    }
+
     /// Should only be called by the REPL!
     pub fn override_static_closure(&self, static_closure: Closure) {
         self.0.borrow_mut().static_closure = static_closure;
