@@ -17,8 +17,12 @@ fn prelude_println(arguments: Vec<Value>) -> Value {
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),
-            Value::Function(_) => println!("Function"),
+            Value::Function(function) => println!(
+                "Function({})",
+                function.call_target.function.qualified_name()
+            ),
             Value::Integer(value) => println!("{}", value),
+            Value::Module(module) => println!("Module({})", module.name()),
             Value::Null => println!("null"),
             _ => unreachable!(),
         }
