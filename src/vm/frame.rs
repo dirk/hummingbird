@@ -422,6 +422,12 @@ impl BytecodeFrame {
                     self.write_register(*lval, value);
                     self.advance();
                 }
+                Instruction::OpProperty(lval, target, value) => {
+                    let target = self.read_register(*target);
+                    let value = operators::op_property(target, value.clone())?;
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
                 Instruction::Branch(destination) => {
                     self.current_address = *destination as usize;
                 }

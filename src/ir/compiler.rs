@@ -238,6 +238,13 @@ impl Compiler {
                     read(lhs, address),
                     read(rhs, address),
                 ),
+                ir::Instruction::OpProperty(lval, target, value) => {
+                    bytecode::Instruction::OpProperty(
+                        allocate(lval),
+                        read(target, address),
+                        value.clone(),
+                    )
+                }
                 ir::Instruction::Branch(destination) => {
                     let bytecode_address = instructions.len();
                     basic_block_tracker.track_branch(bytecode_address, &destination.borrow());

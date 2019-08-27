@@ -172,6 +172,7 @@ impl Compiler {
             &Node::Infix(ref infix) => self.compile_infix(infix, scope),
             &Node::Integer(ref integer) => self.compile_integer(integer, scope),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
+            &Node::PostfixProperty(ref property) => self.compile_postfix_property(property, scope),
             &Node::Return(ref ret) => self.compile_return(ret, scope),
             &Node::Var(ref var) => self.compile_var(var, scope),
             &Node::While(ref while_) => self.compile_while(while_, scope),
@@ -339,6 +340,15 @@ impl Compiler {
             arguments.push(self.compile_node(argument, scope));
         }
         self.build_call(target, arguments)
+    }
+
+    fn compile_postfix_property(
+        &mut self,
+        property: &PostfixProperty,
+        scope: &mut dyn Scope,
+    ) -> SharedValue {
+        let target = self.compile_node(&property.target, scope);
+        self.build_op_property(target, property.value.clone())
     }
 
     fn compile_return(&mut self, ret: &Return, scope: &mut dyn Scope) -> SharedValue {

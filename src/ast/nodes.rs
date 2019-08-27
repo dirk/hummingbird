@@ -225,8 +225,8 @@ impl PostfixCall {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PostfixProperty {
-    target: Box<Node>,
-    value: String,
+    pub target: Box<Node>,
+    pub value: String,
 }
 
 impl PostfixProperty {

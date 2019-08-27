@@ -291,6 +291,7 @@ pub enum Instruction {
     MakeInteger(SharedValue, i64),
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
+    OpProperty(SharedValue, SharedValue, String), // $1 = $2.$3
     Branch(SharedBasicBlock),
     BranchIf(SharedBasicBlock, SharedValue),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
@@ -298,10 +299,10 @@ pub enum Instruction {
     ReturnNull,
     Export(String, SharedValue),
     Import(String, String), // static($1) = import($2)
-    // If the option is present it should only bind those names, if it's not
-    // present then all exports should be bound.
-    // ImportNamed(String, Option<Vec<String>>),
 }
+// If the option is present it should only bind those names, if it's not
+// present then all exports should be bound.
+// ImportNamed(String, Option<Vec<String>>),
 
 #[derive(Debug)]
 pub struct BasicBlock {
@@ -376,6 +377,13 @@ pub trait InstructionBuilder {
         ));
         self.track(lhs, address);
         self.track(rhs, address);
+        lval
+    }
+
+    fn build_op_property(&mut self, target: SharedValue, value: String) -> SharedValue {
+        let lval = self.new_value();
+        let address = self.push(Instruction::OpProperty(lval.clone(), target.clone(), value));
+        self.track(target, address);
         lval
     }
 
