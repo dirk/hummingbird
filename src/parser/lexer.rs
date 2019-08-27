@@ -500,11 +500,23 @@ mod tests {
     fn it_parses_strings() {
         assert_eq!(
             parse("\"\""),
-            vec![Token::String("".to_string()), Token::EOF]
+            vec![
+                Token::String(
+                    "".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(2, 1, 3),)
+                ),
+                Token::EOF
+            ]
         );
         assert_eq!(
             parse("\"abc123\""),
-            vec![Token::String("abc123".to_string()), Token::EOF]
+            vec![
+                Token::String(
+                    "abc123".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(8, 1, 9),)
+                ),
+                Token::EOF
+            ]
         );
     }
 

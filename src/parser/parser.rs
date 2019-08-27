@@ -624,6 +624,7 @@ mod tests {
             vec![Node::Import(Import::new(
                 "foo".to_string(),
                 ImportBindings::AllExports,
+                Span::unknown(),
             ))],
         );
     }
@@ -844,6 +845,7 @@ mod tests {
             Node::PostfixProperty(PostfixProperty::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 "bar".to_string(),
+                Span::unknown(),
             ))
         );
     }
