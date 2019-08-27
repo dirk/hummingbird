@@ -141,7 +141,7 @@ fn expect_export(input: &mut TokenStream) -> Node {
 
 fn expect_import(input: &mut TokenStream) -> Node {
     let start = match input.read() {
-        Token::Import(span) => span.start,
+        Token::Import(location) => location,
         other @ _ => {
             panic_unexpected_names(other, "Import");
             unreachable!()

@@ -80,7 +80,7 @@ pub enum Token {
     Equals,
     Export,
     Identifier(String, Span),
-    Import(Span),
+    Import(Location),
     Integer(i64),
     LeftAngle,
     Let(Location),
@@ -217,16 +217,18 @@ impl TokenStream {
                 break;
             }
         }
-        let span = Span::new(start.clone(), self.input.location());
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
             "export" => Token::Export,
             "let" => Token::Let(start),
-            "import" => Token::Import(span),
+            "import" => Token::Import(start),
             "return" => Token::Return,
             "var" => Token::Var(start),
             "while" => Token::While(start),
-            _ => Token::Identifier(identifier_string, span),
+            _ => Token::Identifier(
+                identifier_string,
+                Span::new(start.clone(), self.input.location()),
+            ),
         }
     }
 
