@@ -114,20 +114,22 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
 
 fn parse_import(input: &mut TokenStream) -> Node {
     expect_to_read(input, Token::Import);
-    let bindings = if input.peek() == Token::Star {
-        input.read();
-        ImportBindings::All
-    } else {
-        unreachable!("Cannot yet parse in import: {:?}", input.peek())
+    let bindings = match input.peek() {
+        Token::Star => {
+            input.read();
+            ImportBindings::AllExports
+        }
+        Token::String(_) => ImportBindings::Module,
+        other @ _ => unreachable!("Cannot yet parse in import: {:?}", other),
     };
-    let source = match input.read() {
+    let name = match input.read() {
         Token::String(value) => value,
         other @ _ => {
             panic_unexpected_names(other, "String");
             unreachable!()
         }
     };
-    Node::Import(Import::new(source, bindings))
+    Node::Import(Import::new(name, bindings))
 }
 
 fn parse_let_and_var(input: &mut TokenStream) -> Node {
@@ -530,7 +532,7 @@ mod tests {
             nodes,
             vec![Node::Import(Import::new(
                 "foo".to_string(),
-                ImportBindings::All,
+                ImportBindings::AllExports,
             ))],
         );
     }

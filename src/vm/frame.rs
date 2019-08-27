@@ -3,12 +3,12 @@ use std::collections::{HashMap, HashSet};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Write;
+use std::path::PathBuf;
 use std::rc::Rc;
-
-use super::super::target::bytecode::layout::{Instruction, Reg};
 
 use super::super::ast_to_ir;
 use super::super::parser;
+use super::super::target::bytecode::layout::{Instruction, Reg};
 use super::errors::UndefinedNameError;
 use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
 use super::operators;
@@ -17,8 +17,10 @@ use super::value::Value;
 struct InnerClosure {
     locals: HashMap<String, Option<Value>>,
     parent: Option<Closure>,
+    /// The builtins closure cannot be written to after it's created.
+    builtins: bool,
     /// If this closure is for a REPL. It allows us to set new variables at
-    /// will.
+    /// will rather than being restricted to the established bindings.
     repl: bool,
 }
 
@@ -36,23 +38,35 @@ impl Closure {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals,
             parent,
+            builtins: false,
             repl: false,
         })))
     }
 
-    pub fn new_static() -> Self {
+    pub fn new_builtins() -> Self {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
             parent: None,
+            builtins: true,
             repl: false,
         })))
     }
 
-    pub fn new_repl() -> Self {
+    pub fn new_repl(builtins_closure: Closure) -> Self {
         Self(Rc::new(RefCell::new(InnerClosure {
             locals: HashMap::new(),
-            parent: None,
+            parent: Some(builtins_closure),
+            builtins: false,
             repl: true,
+        })))
+    }
+
+    pub fn new_static(builtins_closure: Option<Closure>) -> Self {
+        Self(Rc::new(RefCell::new(InnerClosure {
+            locals: HashMap::new(),
+            parent: builtins_closure,
+            builtins: false,
+            repl: false,
         })))
     }
 
@@ -74,6 +88,10 @@ impl Closure {
     /// false if not.
     pub fn try_set(&self, name: String, value: Value) -> bool {
         let inner = &mut self.0.borrow_mut();
+        // If the builtins flag is set then it cannot be mutated.
+        if inner.builtins {
+            return false;
+        }
         if let Some(exists) = inner.locals.get_mut(&name) {
             *exists = Some(value);
             return true;
@@ -90,7 +108,9 @@ impl Closure {
     }
 
     /// Set a local directly into this exact closure. This should only be used
-    /// by the VM when initializing a module's closure with imports.
+    /// by the VM when:
+    ///   - Setting imports into a module's static closure.
+    ///   - Setting up the builtins closure.
     pub fn set_directly(&self, name: String, value: Value) {
         let inner = &mut self.0.borrow_mut();
         inner.locals.insert(name, Some(value));
@@ -99,6 +119,7 @@ impl Closure {
 
 // An action for the VM to do.
 pub enum Action {
+    Import(String, Option<PathBuf>), // (name, relative_import_path)
     Call(Frame),
     Return(Value),
     Error(Box<dyn error::Error>),
@@ -115,6 +136,14 @@ impl Frame {
         match self {
             Frame::Module(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns the module being initialized by this frame.
+    pub fn initializing_module(&self) -> Option<LoadedModule> {
+        match self {
+            Frame::Module(frame) => Some(frame.module.clone()),
+            _ => None,
         }
     }
 
@@ -143,6 +172,14 @@ impl FrameApi for Frame {
             Frame::Bytecode(frame) => frame.receive_return(value),
             Frame::Module(frame) => frame.receive_return(value),
             Frame::Repl(frame) => frame.receive_return(value),
+        }
+    }
+
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        match self {
+            Frame::Bytecode(frame) => frame.receive_import(module),
+            Frame::Module(frame) => frame.receive_import(module),
+            Frame::Repl(frame) => frame.receive_import(module),
         }
     }
 
@@ -176,6 +213,12 @@ pub trait FrameApi {
     /// [0].receive_return(value)
     /// [0].run() -> ...
     fn receive_return(&mut self, value: Value);
+
+    /// Called when the VM has finished initializing a module imported by this
+    /// frame's module.
+    fn receive_import(&mut self, _module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        unimplemented!()
+    }
 
     /// When an error is raised the VM will call this on each frame of the
     /// stack. If the frame returns false it will be unwound off the stack.
@@ -397,7 +440,7 @@ impl BytecodeFrame {
                         .map(|argument| self.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::DynamicFunction(dynamic_function) => {
+                        Value::Function(dynamic_function) => {
                             // Save the return register for when the VM calls `receive_return`.
                             self.return_register = Some(*lval);
                             // TODO: Make `CallTarget` able to do specialization.
@@ -409,7 +452,7 @@ impl BytecodeFrame {
                             self.advance();
                             return Ok(Action::Call(frame));
                         }
-                        Value::NativeFunction(native_function) => {
+                        Value::BuiltinFunction(native_function) => {
                             let result = native_function.call(arguments);
                             self.write_register(*lval, result);
                             self.advance();
@@ -423,6 +466,12 @@ impl BytecodeFrame {
                 }
                 Instruction::ReturnNull => {
                     return Ok(Action::Return(Value::Null));
+                }
+                Instruction::Import(name, _alias) => {
+                    return Ok(Action::Import(
+                        name.clone(),
+                        self.module().relative_import_path(),
+                    ))
                 }
             }
         }
@@ -441,6 +490,25 @@ impl FrameApi for BytecodeFrame {
         let return_register = self.return_register.expect("Return register not set");
         self.write_register(return_register, value);
         self.return_register = None;
+    }
+
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        let instruction = self.current();
+        self.advance();
+
+        let static_closure = self.module().static_closure();
+        match instruction {
+            Instruction::Import(_name, alias) => {
+                static_closure.set_directly(alias, Value::Module(module));
+            }
+            other @ _ => {
+                panic!(
+                    "Cannot receive import to non-import instruction: {:?}",
+                    other
+                );
+            }
+        }
+        Ok(())
     }
 }
 
@@ -539,11 +607,11 @@ pub struct ReplFrame {
 }
 
 impl ReplFrame {
-    pub fn new() -> Self {
+    pub fn new(builtins_closure: Closure) -> Self {
         Self {
             loaded_modules: vec![],
             counter: 0,
-            static_closure: Closure::new_repl(),
+            static_closure: Closure::new_repl(builtins_closure),
             last_result: None,
             last_error: None,
         }
@@ -557,9 +625,13 @@ impl ReplFrame {
         let name = format!("repl[{}]", counter);
 
         let ast_module = parser::parse(line);
-        let loaded_module =
-            loader::compile_ast_into_module(&ast_module, name, ast_to_ir::CompilationFlags::Repl)
-                .expect("Couldn't compile line");
+        let loaded_module = loader::compile_ast_into_module(
+            &ast_module,
+            name,
+            ast_to_ir::CompilationFlags::Repl,
+            None,
+        )
+        .expect("Couldn't compile line");
         // Hold it in ourselves so that it doesn't get dropped.
         self.loaded_modules.push(loaded_module.clone());
         // Make all the loaded modules share the same static closure so that

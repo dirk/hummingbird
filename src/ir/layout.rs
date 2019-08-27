@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
@@ -10,18 +10,9 @@ pub type SharedFunction = Rc<RefCell<Function>>;
 pub type SharedValue = Rc<RefCell<Value>>;
 
 #[derive(Debug)]
-pub enum Import {
-    // Just the source.
-    Default(String),
-    // Source and the name.
-    Named(String, String),
-}
-
-#[derive(Debug)]
 pub struct Module {
     pub locals: Vec<String>,
     pub functions: Vec<SharedFunction>,
-    pub imports: HashMap<String, Import>,
 }
 
 impl Module {
@@ -29,7 +20,6 @@ impl Module {
         Self {
             locals: vec![],
             functions: vec![Rc::new(RefCell::new(Function::new(0, "main")))],
-            imports: HashMap::new(),
         }
     }
 
@@ -306,6 +296,10 @@ pub enum Instruction {
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,
+    Import(String, String),
+    // If the option is present it should only bind those names, if it's not
+    // present then all exports should be bound.
+    // ImportNamed(String, Option<Vec<String>>),
 }
 
 #[derive(Debug)]
@@ -414,6 +408,10 @@ pub trait InstructionBuilder {
 
     fn build_return_null(&mut self) {
         self.push(Instruction::ReturnNull);
+    }
+
+    fn build_import(&mut self, name: String, alias: String) {
+        self.push(Instruction::Import(name, alias));
     }
 }
 

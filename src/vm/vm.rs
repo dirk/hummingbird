@@ -1,79 +1,39 @@
-use std::collections::HashMap;
 use std::error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::errors::AnnotatedError;
-use super::frame::{Action, Frame, FrameApi, ModuleFrame, ReplFrame};
-use super::loader::{self, LoadedModule};
-use super::prelude::build_prelude;
+use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
+use super::loader::Loader;
+use super::prelude;
 
 pub type StackSnapshot = Vec<(u16, String)>;
 
 pub struct Vm {
+    loader: Loader,
+    builtins_closure: Closure,
     stack: Vec<Frame>,
-    loaded_modules: HashMap<PathBuf, LoadedModule>,
 }
 
 impl Vm {
     pub fn new() -> Self {
+        let builtins_closure = prelude::build_prelude();
         Self {
+            loader: Loader::new(builtins_closure.clone()),
+            builtins_closure,
             stack: vec![],
-            loaded_modules: HashMap::new(),
         }
-    }
-
-    pub fn load_file<P: AsRef<Path>>(
-        &mut self,
-        path: P,
-    ) -> Result<LoadedModule, Box<dyn error::Error>> {
-        let canonicalized = path
-            .as_ref()
-            .canonicalize()
-            .expect("Could not canonicalize path");
-
-        if self.loaded_modules.contains_key(&canonicalized) {
-            panic!("Module already loaded: {:?}", canonicalized);
-        }
-
-        let loaded_module = loader::load_file(path)?;
-        self.loaded_modules
-            .insert(canonicalized, loaded_module.clone());
-        Ok(loaded_module)
     }
 
     pub fn run_file<P: AsRef<Path>>(path: P) {
         let mut vm = Self::new();
-
-        let prelude = build_prelude();
-        let module = vm.load_file(path).expect("Unable to read file");
-
-        // FIXME: Actually do imports on request instead of just copying the
-        //   whole prelude.
-        for (name, export) in prelude.get_named_exports().iter() {
-            if let Some(export) = export {
-                module
-                    .static_closure()
-                    .set_directly(name.to_owned(), export.clone())
-            }
-        }
-
+        let (module, _already_loaded) = vm.loader.load_file(path).expect("Unable to read file");
         vm.stack.push(Frame::Module(ModuleFrame::new(module)));
         vm.run();
     }
 
     pub fn run_repl() {
-        let frame = ReplFrame::new();
-
-        let prelude = build_prelude();
-        for (name, export) in prelude.get_named_exports().iter() {
-            if let Some(export) = export {
-                frame
-                    .closure()
-                    .set_directly(name.to_owned(), export.clone())
-            }
-        }
-
         let mut vm = Self::new();
+        let frame = ReplFrame::new(vm.builtins_closure.clone());
         vm.stack.push(Frame::Repl(frame));
         vm.run();
     }
@@ -81,34 +41,67 @@ impl Vm {
     fn run(&mut self) {
         loop {
             let action = {
-                let top = self.stack.last_mut().expect("Empty stack");
-                top.run()
+                if let Some(top) = self.stack.last_mut() {
+                    top.run()
+                } else {
+                    // If the stack's empty then we have nothing more to do!
+                    return;
+                }
             };
 
-            match action {
-                Action::Call(frame) => self.stack.push(frame),
-                Action::Return(return_value) => {
-                    self.stack.pop().expect("Empty stack");
-                    match self.stack.last_mut() {
-                        Option::Some(new_top) => {
-                            new_top.receive_return(return_value);
-                        }
-                        Option::None => return,
-                    }
-                }
-                Action::Error(error) => {
-                    let annotated = AnnotatedError::new(error, self.snapshot_stack());
-                    // Get a formatted string for the error before it's
-                    // consumed by the call to `error_unwind`.
-                    let formatted = format!("{}", annotated);
-                    if !self.error_unwind(Box::new(annotated)) {
-                        // If we weren't able to catch the error then print
-                        // what went wrong and exit.
-                        println!("{}", formatted);
-                        return;
-                    }
+            let result = self.process_action(action);
+
+            // If we had a problem processing the action then start unwinding.
+            if let Err(error) = result {
+                let annotated = AnnotatedError::new(error, self.snapshot_stack());
+                // Get a formatted string for the error before it's
+                // consumed by the call to `error_unwind`.
+                let formatted = format!("{}", annotated);
+                if !self.error_unwind(Box::new(annotated)) {
+                    // If we weren't able to catch the error then print
+                    // what went wrong and exit.
+                    println!("{}", formatted);
+                    return;
                 }
             }
+        }
+    }
+
+    fn process_action(&mut self, action: Action) -> Result<(), Box<dyn error::Error>> {
+        match action {
+            Action::Import(name, relative_import_path) => {
+                let (module, already_loaded) =
+                    self.loader.load_file_by_name(name, relative_import_path)?;
+                if already_loaded {
+                    let top = self.stack.last_mut().unwrap();
+                    top.receive_import(module)?;
+                } else {
+                    self.stack.push(Frame::Module(ModuleFrame::new(module)));
+                }
+                Ok(())
+            }
+            Action::Call(frame) => {
+                self.stack.push(frame);
+                Ok(())
+            }
+            Action::Return(return_value) => {
+                let returning_from = self.stack.pop().expect("Empty stack");
+                if let Some(returning_to) = self.stack.last_mut() {
+                    // Processing imports happens through a dedicated path
+                    // rather than through regular returns. Maybe in the future
+                    // it can be handled like a normal call and return.
+                    if let Some(module) = returning_from.initializing_module() {
+                        // If we just popped a module frame then we need to
+                        // mark that module as initialized.
+                        module.set_initialized();
+                        returning_to.receive_import(module)?;
+                    } else {
+                        returning_to.receive_return(return_value);
+                    }
+                }
+                Ok(())
+            }
+            Action::Error(error) => Err(error),
         }
     }
 
@@ -133,7 +126,15 @@ impl Vm {
             } else {
                 // If this frame didn't catch the error then keep on
                 // unwinding.
-                self.stack.pop();
+                let popped = self.stack.pop();
+                if let Some(module) = popped.and_then(|frame| frame.initializing_module()) {
+                    if !self.loader.unload(&module) {
+                        println!(
+                            "WARNING: Unable to unload module while unwinding: {:?}",
+                            module.name()
+                        );
+                    }
+                }
             }
         }
     }

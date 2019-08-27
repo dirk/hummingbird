@@ -1,13 +1,13 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::rc::Rc;
 
 use super::ast::nodes::*;
 use super::ir::layout::{
-    Address, Import, Instruction, InstructionBuilder, Module as IrModule, SharedFunction,
-    SharedSlot, SharedValue,
+    Address, Instruction, InstructionBuilder, Module as IrModule, SharedFunction, SharedSlot,
+    SharedValue,
 };
-use super::vm::prelude::is_in_prelude;
 
 #[derive(PartialEq)]
 enum ScopeFlags {
@@ -95,8 +95,6 @@ impl<'a> Scope for FunctionScope<'a> {
 struct ModuleScope {
     module: Rc<RefCell<IrModule>>,
     bindings: HashMap<String, SharedSlot>,
-    // Map an import name to its source.
-    imports: HashMap<String, Import>,
 }
 
 impl Scope for ModuleScope {
@@ -107,13 +105,6 @@ impl Scope for ModuleScope {
     }
 
     fn resolve(&mut self, name: &String) -> SharedSlot {
-        if is_in_prelude(name) {
-            self.imports.insert(
-                name.to_owned(),
-                Import::Named("prelude".to_owned(), name.to_owned()),
-            );
-            return SharedSlot::new_static(name.clone());
-        }
         if let Some(slot) = self.bindings.get(name) {
             slot.clone()
         } else {
@@ -144,7 +135,6 @@ impl Compiler {
         let mut module_scope = ModuleScope {
             module: self.module.clone(),
             bindings: HashMap::new(),
-            imports: HashMap::new(),
         };
 
         // We should start in the main function.
@@ -169,10 +159,6 @@ impl Compiler {
             }
         };
         Compiler::finalize_function(self.current.clone(), &scope, flags.into());
-
-        // Now that we've visited the whole program we can write out the
-        // imports we've found.
-        self.module.borrow_mut().imports = module_scope.imports;
     }
 
     fn compile_node(&mut self, node: &Node, scope: &mut dyn Scope) -> SharedValue {
@@ -181,6 +167,7 @@ impl Compiler {
             &Node::Block(ref block) => self.compile_anonymous_block(block, scope),
             &Node::Function(ref function) => self.compile_function(function, scope),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier, scope),
+            &Node::Import(ref import) => self.compile_import(import, scope),
             &Node::Infix(ref infix) => self.compile_infix(infix, scope),
             &Node::Integer(ref integer) => self.compile_integer(integer, scope),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
@@ -303,6 +290,22 @@ impl Compiler {
     ) -> SharedValue {
         let local = &identifier.value;
         self.build_get(scope.resolve(local))
+    }
+
+    fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
+        match &import.bindings {
+            ImportBindings::Module => {
+                let name = import
+                    .path()
+                    .file_name()
+                    .and_then(OsStr::to_str)
+                    .expect("Couldn't get file name of import")
+                    .to_owned();
+                self.build_import(import.name.clone(), name);
+            }
+            other @ _ => println!("Cannot compile import binding: {:?}", other),
+        };
+        self.null_value()
     }
 
     fn compile_infix(&mut self, infix: &Infix, scope: &mut dyn Scope) -> SharedValue {

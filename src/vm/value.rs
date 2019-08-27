@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use super::call_target::CallTarget;
 use super::frame::Closure;
-use super::loader::LoadedFunction;
+use super::loader::{LoadedFunction, LoadedModule};
 
 #[derive(Clone)]
 pub struct DynamicFunction {
@@ -45,12 +45,13 @@ impl NativeFunction {
 
 #[derive(Clone)]
 pub enum Value {
-    DynamicFunction(DynamicFunction),
-    // DynamicObject(Gc<GcCell<DynamicObject>>),
-    Boolean(bool),
-    Integer(i64),
-    NativeFunction(NativeFunction),
     Null,
+    Boolean(bool),
+    // DynamicObject(Gc<GcCell<DynamicObject>>),
+    Integer(i64),
+    Function(DynamicFunction),
+    Module(LoadedModule),
+    BuiltinFunction(NativeFunction),
 }
 
 impl Value {
@@ -64,12 +65,12 @@ impl Value {
             },
             closure,
         };
-        Value::DynamicFunction(dynamic_function)
+        Value::Function(dynamic_function)
     }
 
     pub fn make_native_function<V: Fn(Vec<Value>) -> Value + 'static>(call_target: V) -> Self {
         let native_function = NativeFunction::new(Rc::new(call_target));
-        Value::NativeFunction(native_function)
+        Value::BuiltinFunction(native_function)
     }
 }
 
@@ -77,14 +78,15 @@ impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         use Value::*;
         match self {
-            DynamicFunction(function) => {
+            Function(function) => {
                 let name = function.call_target.function.qualified_name();
                 write!(f, "Function({})", name)
             }
             Boolean(value) => write!(f, "{:?}", value),
             Integer(value) => write!(f, "{}", value),
-            NativeFunction(_) => write!(f, "NativeFunction"),
-            Null => write!(f, "Null"),
+            Module(module) => write!(f, "Module({})", module.name()),
+            BuiltinFunction(_) => write!(f, "NativeFunction"),
+            Null => write!(f, "null"),
         }
     }
 }

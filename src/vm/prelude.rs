@@ -1,24 +1,23 @@
-use super::loader::LoadedModule;
+use super::frame::Closure;
 use super::value::Value;
 
-pub fn build_prelude() -> LoadedModule {
-    let module = LoadedModule::empty("(prelude)".to_owned());
-    module.add_named_export("println", Value::make_native_function(prelude_println));
-    module
-}
+pub fn build_prelude() -> Closure {
+    let closure = Closure::new_builtins();
 
-pub fn is_in_prelude<N: AsRef<str>>(name: N) -> bool {
-    match name.as_ref() {
-        "println" => true,
-        _ => false,
+    let functions = vec![("println".to_owned(), prelude_println)];
+
+    for (name, function) in functions.into_iter() {
+        closure.set_directly(name, Value::make_native_function(function));
     }
+
+    closure
 }
 
 fn prelude_println(arguments: Vec<Value>) -> Value {
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),
-            Value::DynamicFunction(_) => println!("Function"),
+            Value::Function(_) => println!("Function"),
             Value::Integer(value) => println!("{}", value),
             Value::Null => println!("null"),
             _ => unreachable!(),
