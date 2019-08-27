@@ -12,13 +12,8 @@ impl<O: Write> Printer<O> {
         Self { output }
     }
 
-    pub fn print_module(&mut self, unit: &Module) -> Result<()> {
-        writeln!(self.output, "imports {{")?;
-        for (name, import) in unit.imports.iter() {
-            writeln!(self.output, "  {} <- {:?}", name, import)?;
-        }
-        writeln!(self.output, "}}")?;
-        for function in unit.functions.iter() {
+    pub fn print_module(&mut self, module: &Module) -> Result<()> {
+        for function in module.functions.iter() {
             self.print_function(function.borrow())?;
         }
         Ok(())
@@ -112,8 +107,9 @@ impl<O: Write> Printer<O> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Instruction::Return(rval) => format!("Return({})", id(rval),),
+            Instruction::Return(rval) => format!("Return({})", id(rval)),
             Instruction::ReturnNull => "ReturnNull".to_string(),
+            Instruction::Import(name, alias) => format!("{} = Import({:?})", alias, name),
         };
         writeln!(
             self.output,

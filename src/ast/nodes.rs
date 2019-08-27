@@ -90,27 +90,44 @@ impl Identifier {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ImportBindings {
-    /// Using `*` to import all bindings.
-    All,
-    /// Using `{ a, b }` to import `a` and `b` bindings.
-    Named(Vec<String>),
-    /// Using `A` to import the module as `A` (doing `A.a` to get `a`).
+    /// Leaving empty to import the module by its file name:
+    ///
+    ///   import "a"
+    ///   println(a.b)
     Module,
+
+    /// Using `A` to import the module as `A` (doing `A.b` to get `b`).
+    ///
+    ///   import A "a"
+    ///   println(A.b)
+    AliasedModule(String),
+
+    /// Using `{ b }` to import the `b` export:
+    ///
+    ///   import { b } "a"
+    ///   println(b)
+    NamedExports(Vec<String>),
+
+    /// Using `*` to import all bindings:
+    ///
+    ///   import * "a"
+    ///   println(b)
+    AllExports,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Import {
-    source: String,
-    bindings: ImportBindings,
+    pub name: String,
+    pub bindings: ImportBindings,
 }
 
 impl Import {
-    pub fn new(source: String, bindings: ImportBindings) -> Self {
-        Self { source, bindings }
+    pub fn new(name: String, bindings: ImportBindings) -> Self {
+        Self { name, bindings }
     }
 
     pub fn path(&self) -> PathBuf {
-        self.source.clone().into()
+        self.name.clone().into()
     }
 }
 
