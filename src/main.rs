@@ -1,7 +1,10 @@
+extern crate codespan;
+extern crate codespan_reporting;
 #[macro_use]
 extern crate gc;
 #[macro_use]
 extern crate lazy_static;
+extern crate termcolor;
 
 use std::env;
 use std::process::exit;

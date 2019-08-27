@@ -14,6 +14,8 @@ pub struct InnerLoadedModule {
     /// The name of the module. This should almost always be the canonicalized
     /// path to the source file.
     name: String,
+    /// The source code of the module.
+    source: String,
     functions: Vec<LoadedFunction>,
     /// The module's static scope; it holds:
     ///   - Imports
@@ -28,9 +30,10 @@ pub struct InnerLoadedModule {
 }
 
 impl InnerLoadedModule {
-    fn empty(name: String, builtins_closure: Option<Closure>) -> Self {
+    fn empty(name: String, source: String, builtins_closure: Option<Closure>) -> Self {
         Self {
             name,
+            source,
             functions: vec![],
             static_closure: Closure::new_static(builtins_closure),
             initialized: false,
@@ -48,10 +51,12 @@ impl LoadedModule {
     pub fn from_bytecode(
         module: bytecode::layout::Module,
         name: String,
+        source: String,
         builtins_closure: Option<Closure>,
     ) -> Self {
         let inner = Rc::new(RefCell::new(InnerLoadedModule::empty(
             name,
+            source,
             builtins_closure,
         )));
         let functions = module
@@ -68,6 +73,10 @@ impl LoadedModule {
 
     pub fn name(&self) -> String {
         self.0.borrow().name.clone()
+    }
+
+    pub fn source(&self) -> String {
+        self.0.borrow().source.clone()
     }
 
     /// Returns a path to the directory in which relative imports can be

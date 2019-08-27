@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::error;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Write;
 use std::path::PathBuf;
@@ -9,7 +8,7 @@ use std::rc::Rc;
 use super::super::ast_to_ir;
 use super::super::parser;
 use super::super::target::bytecode::layout::{Instruction, Reg};
-use super::errors::UndefinedNameError;
+use super::errors::{DebugSource, VmError};
 use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
 use super::operators;
 use super::value::Value;
@@ -70,7 +69,7 @@ impl Closure {
         })))
     }
 
-    fn get(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
+    fn get(&self, name: &String) -> Result<Value, VmError> {
         let inner = &self.0.borrow();
         if let Some(value) = inner.locals.get(name) {
             return match value {
@@ -81,7 +80,7 @@ impl Closure {
         if let Some(parent) = &inner.parent {
             return parent.get(name);
         }
-        Err(Box::new(UndefinedNameError::new(name.to_owned())))
+        Err(VmError::new_undefined_name(name.clone()))
     }
 
     /// Returns true if it found a closure in which to set the variable,
@@ -119,10 +118,11 @@ impl Closure {
 
 // An action for the VM to do.
 pub enum Action {
-    Import(String, Option<PathBuf>), // (name, relative_import_path)
+    // (name, relative_import_path, source)
+    Import(String, Option<PathBuf>, Option<DebugSource>),
     Call(Frame),
     Return(Value),
-    Error(Box<dyn error::Error>),
+    Error(VmError),
 }
 
 pub enum Frame {
@@ -175,7 +175,7 @@ impl FrameApi for Frame {
         }
     }
 
-    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), VmError> {
         match self {
             Frame::Bytecode(frame) => frame.receive_import(module),
             Frame::Module(frame) => frame.receive_import(module),
@@ -183,7 +183,7 @@ impl FrameApi for Frame {
         }
     }
 
-    fn can_catch_error(&self, error: &Box<dyn error::Error>) -> bool {
+    fn can_catch_error(&self, error: &VmError) -> bool {
         match self {
             Frame::Bytecode(frame) => frame.can_catch_error(error),
             Frame::Module(frame) => frame.can_catch_error(error),
@@ -191,7 +191,7 @@ impl FrameApi for Frame {
         }
     }
 
-    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+    fn catch_error(&mut self, error: VmError) {
         match self {
             Frame::Bytecode(frame) => frame.catch_error(error),
             Frame::Module(frame) => frame.catch_error(error),
@@ -216,7 +216,7 @@ pub trait FrameApi {
 
     /// Called when the VM has finished initializing a module imported by this
     /// frame's module.
-    fn receive_import(&mut self, _module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+    fn receive_import(&mut self, _module: LoadedModule) -> Result<(), VmError> {
         unimplemented!()
     }
 
@@ -233,13 +233,13 @@ pub trait FrameApi {
     ///     stack.pop()
     ///   }
     ///
-    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
+    fn can_catch_error(&self, _error: &VmError) -> bool {
         false
     }
 
     /// This method should not do any evaluation. Instead it should merely
     /// prepare for evaluation to resume in this frame.
-    fn catch_error(&mut self, _error: Box<dyn error::Error>) {
+    fn catch_error(&mut self, _error: VmError) {
         unreachable!()
     }
 }
@@ -296,6 +296,11 @@ impl BytecodeFrame {
         self.bytecode.instruction(self.current_address)
     }
 
+    /// Look up a source mapping for the current instruction.
+    fn current_span(&self) -> Option<parser::Span> {
+        self.bytecode.span(self.current_address)
+    }
+
     #[inline]
     pub fn advance(&mut self) {
         self.current_address += 1;
@@ -320,17 +325,17 @@ impl BytecodeFrame {
         self.locals[index as usize] = value;
     }
 
-    fn get_lexical(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
+    fn get_lexical(&self, name: &String) -> Result<Value, VmError> {
         if let Some(index) = self.get_index_of_local(name) {
             return Ok(self.locals[index].clone());
         }
         if let Some(closure) = &self.closure {
             return closure.get(name);
         }
-        Err(Box::new(UndefinedNameError::new(name.clone())))
+        Err(VmError::new_undefined_name(name.clone()))
     }
 
-    fn set_lexical(&mut self, name: &String, value: Value) -> Result<(), Box<dyn error::Error>> {
+    fn set_lexical(&mut self, name: &String, value: Value) -> Result<(), VmError> {
         if let Some(closure) = &self.closure {
             if closure.try_set(name.clone(), value.clone()) {
                 return Ok(());
@@ -340,18 +345,18 @@ impl BytecodeFrame {
             self.locals[index] = value;
             return Ok(());
         }
-        Err(Box::new(UndefinedNameError::new(name.clone())))
+        Err(VmError::new_undefined_name(name.clone()))
     }
 
-    pub fn get_static(&self, name: &String) -> Result<Value, Box<dyn error::Error>> {
+    pub fn get_static(&self, name: &String) -> Result<Value, VmError> {
         self.static_closure.get(name)
     }
 
-    pub fn set_static(&self, name: &String, value: Value) -> Result<(), Box<dyn error::Error>> {
+    pub fn set_static(&self, name: &String, value: Value) -> Result<(), VmError> {
         if self.static_closure.try_set(name.to_owned(), value) {
             Ok(())
         } else {
-            Err(Box::new(UndefinedNameError::new(name.clone())))
+            Err(VmError::new_undefined_name(name.clone()))
         }
     }
 
@@ -364,7 +369,7 @@ impl BytecodeFrame {
 
     /// Using an inner function so that we can use the `?` operator.
     #[inline]
-    fn run_inner(&mut self) -> Result<Action, Box<dyn error::Error>> {
+    fn run_inner(&mut self) -> Result<Action, VmError> {
         loop {
             let instruction = self.current();
 
@@ -483,10 +488,15 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::Import(_alias, name) => {
+                    let source = match self.current_span() {
+                        Some(span) => Some(DebugSource::new(self.module(), span)),
+                        None => None,
+                    };
                     return Ok(Action::Import(
                         name.clone(),
                         self.module().relative_import_path(),
-                    ))
+                        source,
+                    ));
                 }
             }
         }
@@ -497,7 +507,14 @@ impl FrameApi for BytecodeFrame {
     fn run(&mut self) -> Action {
         match self.run_inner() {
             Ok(action) => action,
-            Err(error) => Action::Error(error),
+            Err(mut error) => {
+                // Try to use our source mappings to get additional
+                // debugging information for the error.
+                if let Some(span) = self.current_span() {
+                    error.set_source(DebugSource::new(self.module(), span))
+                }
+                Action::Error(error)
+            }
         }
     }
 
@@ -507,7 +524,7 @@ impl FrameApi for BytecodeFrame {
         self.return_register = None;
     }
 
-    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), VmError> {
         let instruction = self.current();
         self.advance();
 
@@ -618,7 +635,7 @@ pub struct ReplFrame {
     static_closure: Closure,
     // The result of the last expression's evaluation.
     last_result: Option<Value>,
-    last_error: Option<Box<dyn error::Error>>,
+    last_error: Option<VmError>,
 }
 
 impl ReplFrame {
@@ -639,10 +656,11 @@ impl ReplFrame {
     fn compile_line(&mut self, line: String, counter: u16) -> LoadedModule {
         let name = format!("repl[{}]", counter);
 
-        let ast_module = parser::parse(line);
+        let ast_module = parser::parse(line.clone());
         let loaded_module = loader::compile_ast_into_module(
             &ast_module,
             name,
+            line,
             ast_to_ir::CompilationFlags::Repl,
             None,
         )
@@ -702,11 +720,11 @@ impl FrameApi for ReplFrame {
     }
 
     /// The top-level REPL frame can always catch any errors that bubble up.
-    fn can_catch_error(&self, _error: &Box<dyn error::Error>) -> bool {
+    fn can_catch_error(&self, _error: &VmError) -> bool {
         true
     }
 
-    fn catch_error(&mut self, error: Box<dyn error::Error>) {
+    fn catch_error(&mut self, error: VmError) {
         println!("{}", error);
         self.last_result = None;
         self.last_error = Some(error);

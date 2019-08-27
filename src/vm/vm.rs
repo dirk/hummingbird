@@ -1,7 +1,8 @@
-use std::error;
 use std::path::Path;
 
-use super::errors::AnnotatedError;
+use termcolor::{ColorChoice, StandardStream};
+
+use super::errors::VmError;
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::loader::Loader;
 use super::prelude;
@@ -52,26 +53,43 @@ impl Vm {
             let result = self.process_action(action);
 
             // If we had a problem processing the action then start unwinding.
-            if let Err(error) = result {
-                let annotated = AnnotatedError::new(error, self.snapshot_stack());
-                // Get a formatted string for the error before it's
-                // consumed by the call to `error_unwind`.
-                let formatted = format!("{}", annotated);
-                if !self.error_unwind(Box::new(annotated)) {
+            if let Err(mut error) = result {
+                let snapshot = self.snapshot_stack();
+                error.set_stack(snapshot);
+
+                if let Some(uncaught) = self.error_unwind(error) {
                     // If we weren't able to catch the error then print
                     // what went wrong and exit.
-                    println!("{}", formatted);
+                    let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+                    uncaught
+                        .print_debug(&mut stdout)
+                        .expect("Unable to debug-print uncaught error");
                     return;
                 }
             }
         }
     }
 
-    fn process_action(&mut self, action: Action) -> Result<(), Box<dyn error::Error>> {
+    fn process_action(&mut self, action: Action) -> Result<(), VmError> {
         match action {
-            Action::Import(name, relative_import_path) => {
-                let (module, already_loaded) =
-                    self.loader.load_file_by_name(name, relative_import_path)?;
+            Action::Import(name, relative_import_path, source) => {
+                let result = match self.loader.load_file_by_name(name, relative_import_path) {
+                    Ok(loaded) => Ok(loaded),
+                    Err(mut error) => {
+                        println!("Load error!");
+                        // Annotate the error with its source. Imports happen
+                        // outside of the normal frame fetch-execute loop, so
+                        // they instead include the source of the import with
+                        // the `Action` so that it can be automatically
+                        // embedded in the load error if one occurs.
+                        if let Some(source) = source {
+                            println!("Have source!");
+                            error.set_source(source);
+                        }
+                        Err(error)
+                    }
+                };
+                let (module, already_loaded) = result?;
                 if already_loaded {
                     let top = self.stack.last_mut().unwrap();
                     top.receive_import(module)?;
@@ -105,15 +123,17 @@ impl Vm {
         }
     }
 
-    // Returns true if it found a frame to catch the error, false if not.
-    fn error_unwind(&mut self, error: Box<dyn error::Error>) -> bool {
+    /// Tries to find a frame to catch the error. If it does then it consumes
+    /// the error and returns `None`. If doesn't then it returns the error
+    /// back to the caller.
+    fn error_unwind(&mut self, error: VmError) -> Option<VmError> {
         loop {
             let can_catch_error = {
                 let top = match self.stack.last() {
                     Some(frame) => frame,
                     None => {
                         // Out of stack frames to unwind from.
-                        return false;
+                        return Some(error);
                     }
                 };
                 top.can_catch_error(&error)
@@ -122,7 +142,7 @@ impl Vm {
             if can_catch_error {
                 let top = self.stack.last_mut().unwrap();
                 top.catch_error(error);
-                return true;
+                return None;
             } else {
                 // If this frame didn't catch the error then keep on
                 // unwinding.
