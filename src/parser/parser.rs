@@ -66,11 +66,11 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
     } else {
         match next {
             Token::Export => match ctx {
-                StatementContext::Module => parse_export(input),
+                StatementContext::Module => expect_export(input),
                 other @ _ => unreachable!("Cannot parse export in {:?}", other),
             },
             Token::Import => match ctx {
-                StatementContext::Module => parse_import(input),
+                StatementContext::Module => export_import(input),
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
             },
             Token::Let(_) => parse_let_and_var(input),
@@ -116,13 +116,29 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     None
 }
 
-fn parse_export(input: &mut TokenStream) -> Node {
+fn expect_export(input: &mut TokenStream) -> Node {
     expect_to_read(input, Token::Export);
-    let identifier = expect_identifier(input);
-    Node::Export(Export::new(identifier))
+    expect_to_read(input, Token::BraceLeft);
+    let mut identifiers: Vec<Identifier> = vec![];
+    loop {
+        if input.peek() == Token::BraceRight {
+            input.read();
+            break;
+        }
+        identifiers.push(expect_identifier(input));
+        match input.read() {
+            Token::BraceRight => break,
+            Token::Comma => continue,
+            other @ _ => {
+                panic_unexpected_names(other, "BraceRight or Comma");
+                unreachable!()
+            }
+        }
+    }
+    Node::Export(Export::new(identifiers))
 }
 
-fn parse_import(input: &mut TokenStream) -> Node {
+fn export_import(input: &mut TokenStream) -> Node {
     expect_to_read(input, Token::Import);
     let bindings = match input.peek() {
         Token::Star => {
@@ -553,13 +569,39 @@ mod tests {
 
     #[test]
     fn it_parses_export() {
-        let nodes = parse_complete("export foo");
+        let nodes = parse_complete("export { }");
+        assert_eq!(nodes, vec![Node::Export(Export::new(vec![]))],);
+        let nodes = parse_complete("export { foo }");
         assert_eq!(
             nodes,
-            vec![Node::Export(Export::new(Identifier::new(
+            vec![Node::Export(Export::new(vec![Identifier::new(
                 "foo",
                 Span::unknown()
-            )))],
+            )]))],
+        );
+        let nodes = parse_complete("export { foo, }");
+        assert_eq!(
+            nodes,
+            vec![Node::Export(Export::new(vec![Identifier::new(
+                "foo",
+                Span::unknown()
+            )]))],
+        );
+        let nodes = parse_complete("export { foo, bar }");
+        assert_eq!(
+            nodes,
+            vec![Node::Export(Export::new(vec![
+                Identifier::new("foo", Span::unknown()),
+                Identifier::new("bar", Span::unknown())
+            ]))],
+        );
+        let nodes = parse_complete("export { foo, bar, }");
+        assert_eq!(
+            nodes,
+            vec![Node::Export(Export::new(vec![
+                Identifier::new("foo", Span::unknown()),
+                Identifier::new("bar", Span::unknown())
+            ]))],
         );
     }
 

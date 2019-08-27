@@ -76,12 +76,12 @@ impl PartialEq for Function {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Export {
-    pub identifier: Identifier,
+    pub identifiers: Vec<Identifier>,
 }
 
 impl Export {
-    pub fn new(identifier: Identifier) -> Self {
-        Self { identifier }
+    pub fn new(identifiers: Vec<Identifier>) -> Self {
+        Self { identifiers }
     }
 }
 
