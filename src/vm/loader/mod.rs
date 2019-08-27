@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use super::super::ast;
@@ -40,10 +41,57 @@ impl Loader {
         }
     }
 
+    /// Searches load-path for a file with the given name.
+    ///
+    /// If given a local path (normally for the module from which the import
+    /// originated) then it will support relative imports; otherwise only
+    /// absolute imports from the load-path are supported.
+    pub fn load_file_by_name(
+        &mut self,
+        name: String,
+        relative_import_path: Option<PathBuf>,
+    ) -> Result<(LoadedModule, bool), Box<dyn Error>> {
+        let resolved = self.search(name, relative_import_path)?;
+        self.load_file(resolved)
+    }
+
+    fn search(
+        &self,
+        name: String,
+        relative_import_path: Option<PathBuf>,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        let is_relative = name.starts_with("./") || name.starts_with("../");
+        let path = Path::new(&name);
+
+        match (is_relative, relative_import_path) {
+            (true, Some(relative_import_path)) => {
+                // FIXME: Make providing the ".hb" extension in the path optional.
+                return match relative_import_path.join(path).canonicalize() {
+                    Ok(resolved) => Ok(resolved),
+                    Err(error) =>{
+                        Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Error resolving relative path {:?}: {:?}", path, error),
+                        )))
+                    }
+                }
+            },
+            (true, None) => {
+                unreachable!("Cannot import from a relative path when there is no relative import path to search")
+            }
+            _ => (),
+        };
+        unreachable!("Cannot search non-relative yet ({:?})", name)
+    }
+
+    /// Load a file at a given path. This will not search load-paths!
+    ///
+    /// Returns a tuple of the loaded module and whether or not the module
+    /// was already loaded.
     pub fn load_file<P: AsRef<Path>>(
         &mut self,
         path: P,
-    ) -> Result<LoadedModule, Box<dyn Error>> {
+    ) -> Result<(LoadedModule, bool), Box<dyn Error>> {
         let canonicalized = path
             .as_ref()
             .canonicalize()
@@ -51,16 +99,15 @@ impl Loader {
 
         if let Some(existing) = self.loaded_modules.get(&canonicalized) {
             if existing.initialized() {
-                return Ok(existing.clone())
+                return Ok((existing.clone(), true));
             } else {
                 panic!("Circular dependency detected: {:?}", canonicalized)
             }
         }
 
-        let new = load_file(path, Some(self.builtins_closure.clone()))?;
-        self.loaded_modules
-            .insert(canonicalized, new.clone());
-        Ok(new)
+        let new = load_file(canonicalized.clone(), Some(self.builtins_closure.clone()))?;
+        self.loaded_modules.insert(canonicalized, new.clone());
+        Ok((new, false))
     }
 }
 

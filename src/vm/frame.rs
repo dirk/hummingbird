@@ -3,12 +3,12 @@ use std::collections::{HashMap, HashSet};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Write;
+use std::path::PathBuf;
 use std::rc::Rc;
-
-use super::super::target::bytecode::layout::{Instruction, Reg};
 
 use super::super::ast_to_ir;
 use super::super::parser;
+use super::super::target::bytecode::layout::{Instruction, Reg};
 use super::errors::UndefinedNameError;
 use super::loader::{self, BytecodeFunction, LoadedFunction, LoadedModule};
 use super::operators;
@@ -119,7 +119,7 @@ impl Closure {
 
 // An action for the VM to do.
 pub enum Action {
-    Import(String),
+    Import(String, Option<PathBuf>), // (name, relative_import_path)
     Call(Frame),
     Return(Value),
     Error(Box<dyn error::Error>),
@@ -172,6 +172,14 @@ impl FrameApi for Frame {
             Frame::Bytecode(frame) => frame.receive_return(value),
             Frame::Module(frame) => frame.receive_return(value),
             Frame::Repl(frame) => frame.receive_return(value),
+        }
+    }
+
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        match self {
+            Frame::Bytecode(frame) => frame.receive_import(module),
+            Frame::Module(frame) => frame.receive_import(module),
+            Frame::Repl(frame) => frame.receive_import(module),
         }
     }
 
@@ -432,7 +440,7 @@ impl BytecodeFrame {
                         .map(|argument| self.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::DynamicFunction(dynamic_function) => {
+                        Value::Function(dynamic_function) => {
                             // Save the return register for when the VM calls `receive_return`.
                             self.return_register = Some(*lval);
                             // TODO: Make `CallTarget` able to do specialization.
@@ -444,7 +452,7 @@ impl BytecodeFrame {
                             self.advance();
                             return Ok(Action::Call(frame));
                         }
-                        Value::NativeFunction(native_function) => {
+                        Value::BuiltinFunction(native_function) => {
                             let result = native_function.call(arguments);
                             self.write_register(*lval, result);
                             self.advance();
@@ -458,6 +466,12 @@ impl BytecodeFrame {
                 }
                 Instruction::ReturnNull => {
                     return Ok(Action::Return(Value::Null));
+                }
+                Instruction::Import(name, _alias) => {
+                    return Ok(Action::Import(
+                        name.clone(),
+                        self.module().relative_import_path(),
+                    ))
                 }
             }
         }
@@ -476,6 +490,25 @@ impl FrameApi for BytecodeFrame {
         let return_register = self.return_register.expect("Return register not set");
         self.write_register(return_register, value);
         self.return_register = None;
+    }
+
+    fn receive_import(&mut self, module: LoadedModule) -> Result<(), Box<dyn error::Error>> {
+        let instruction = self.current();
+        self.advance();
+
+        let static_closure = self.module().static_closure();
+        match instruction {
+            Instruction::Import(_name, alias) => {
+                static_closure.set_directly(alias, Value::Module(module));
+            }
+            other @ _ => {
+                panic!(
+                    "Cannot receive import to non-import instruction: {:?}",
+                    other
+                );
+            }
+        }
+        Ok(())
     }
 }
 

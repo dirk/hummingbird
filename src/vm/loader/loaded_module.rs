@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::path::PathBuf;
+use std::env;
+use std::path::{Path, PathBuf};
 use std::rc::{Rc, Weak};
 
 use super::super::super::target::bytecode;
@@ -69,6 +70,21 @@ impl LoadedModule {
         self.0.borrow().name.clone()
     }
 
+    /// Returns a path to the directory in which relative imports can be
+    /// processed for this module.
+    pub fn relative_import_path(&self) -> Option<PathBuf> {
+        let name = self.name();
+        // FIXME: Make REPL detection and handling smarter.
+        if name.starts_with("repl[") {
+            return env::current_dir().ok();
+        }
+        let path = Path::new(&name);
+        if path.is_file() {
+            return path.parent().map(Path::to_path_buf);
+        }
+        None
+    }
+
     pub fn main(&self) -> LoadedFunction {
         self.0.borrow().functions[0].clone()
     }
@@ -77,7 +93,9 @@ impl LoadedModule {
         self.0.borrow().static_closure.clone()
     }
 
-    pub fn initialized(&self) -> bool { self.0.borrow().initialized }
+    pub fn initialized(&self) -> bool {
+        self.0.borrow().initialized
+    }
 
     pub fn set_initialized(&self) {
         let mut inner = self.0.borrow_mut();

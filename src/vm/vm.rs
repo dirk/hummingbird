@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::errors::AnnotatedError;
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
-use super::loader::{self, Loader, LoadedModule};
+use super::loader::{self, LoadedModule, Loader};
 use super::prelude;
 
 pub type StackSnapshot = Vec<(u16, String)>;
@@ -27,7 +27,7 @@ impl Vm {
 
     pub fn run_file<P: AsRef<Path>>(path: P) {
         let mut vm = Self::new();
-        let module = vm.loader.load_file(path).expect("Unable to read file");
+        let (module, _already_loaded) = vm.loader.load_file(path).expect("Unable to read file");
         vm.stack.push(Frame::Module(ModuleFrame::new(module)));
         vm.run();
     }
@@ -70,16 +70,23 @@ impl Vm {
 
     fn process_action(&mut self, action: Action) -> Result<(), Box<dyn error::Error>> {
         match action {
-            Action::Import(path) => {
-                let module = self.loader.load_file(path)?;
-                self.stack.push(Frame::Module(ModuleFrame::new(module)));
+            Action::Import(name, relative_import_path) => {
+                let (module, already_loaded) =
+                    self.loader.load_file_by_name(name, relative_import_path)?;
+                if already_loaded {
+                    let top = self.stack.last_mut().unwrap();
+                    top.receive_import(module);
+                } else {
+                    self.stack.push(Frame::Module(ModuleFrame::new(module)));
+                }
                 Ok(())
             }
             Action::Call(frame) => {
                 self.stack.push(frame);
                 Ok(())
-            },
+            }
             Action::Return(return_value) => {
+                let snapshot = self.snapshot_stack();
                 let returning_from = self.stack.pop().expect("Empty stack");
                 if let Some(returning_to) = self.stack.last_mut() {
                     // Processing imports happens through a dedicated path
@@ -96,9 +103,7 @@ impl Vm {
                 }
                 Ok(())
             }
-            Action::Error(error) => {
-                Err(error)
-            }
+            Action::Error(error) => Err(error),
         }
     }
 
