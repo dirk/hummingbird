@@ -532,7 +532,7 @@ mod tests {
             nodes,
             vec![Node::Import(Import::new(
                 "foo".to_string(),
-                ImportBindings::All,
+                ImportBindings::AllExports,
             ))],
         );
     }
