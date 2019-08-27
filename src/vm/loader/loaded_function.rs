@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::convert::TryInto;
+use std::ffi::OsStr;
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
@@ -37,7 +38,7 @@ impl LoadedFunction {
     pub fn qualified_name(&self) -> String {
         let module_basename = Path::new(&self.module().name())
             .file_name()
-            .and_then(|os_str| os_str.to_str())
+            .and_then(OsStr::to_str)
             .unwrap_or("(unknown)")
             .to_owned();
         let own_name = self.0.bytecode.name();
