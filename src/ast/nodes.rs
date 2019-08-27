@@ -8,6 +8,7 @@ pub enum Node {
     Assignment(Assignment),
     Block(Block),
     Function(Function),
+    Export(Export),
     Identifier(Identifier),
     Import(Import),
     Infix(Infix),
@@ -70,6 +71,17 @@ impl Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Function) -> bool {
         self.name == other.name && self.body == other.body
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Export {
+    pub identifier: Identifier,
+}
+
+impl Export {
+    pub fn new(identifier: Identifier) -> Self {
+        Self { identifier }
     }
 }
 

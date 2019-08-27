@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use super::super::ast::nodes::{
-    Assignment, Block, Function, Identifier, Infix, Integer, Let, Module, Node, PostfixCall,
-    PostfixProperty, Return, Var, While,
+    Assignment, Block, Export, Function, Identifier, Infix, Integer, Let, Module, Node,
+    PostfixCall, PostfixProperty, Return, Var, While,
 };
 
 use super::super::ast::{Import, ImportBindings, StringLiteral};
@@ -65,6 +65,10 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
         named_function
     } else {
         match next {
+            Token::Export => match ctx {
+                StatementContext::Module => parse_export(input),
+                other @ _ => unreachable!("Cannot parse export in {:?}", other),
+            },
             Token::Import => match ctx {
                 StatementContext::Module => parse_import(input),
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
@@ -110,6 +114,12 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     // need to backtrack.
     input.backtrack(&savepoint);
     None
+}
+
+fn parse_export(input: &mut TokenStream) -> Node {
+    expect_to_read(input, Token::Export);
+    let identifier = expect_identifier(input);
+    Node::Export(Export::new(identifier))
 }
 
 fn parse_import(input: &mut TokenStream) -> Node {
@@ -171,7 +181,7 @@ fn parse_while(input: &mut TokenStream) -> Node {
         }
     }
     let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
-    let block = expect_to_parse_block(input);
+    let block = expect_block(input);
     Node::While(While::new(condition, block))
 }
 
@@ -267,13 +277,13 @@ fn infix(token: Token) -> bool {
 
 fn parse_block(input: &mut TokenStream) -> Node {
     if let Token::BraceLeft = input.peek() {
-        Node::Block(expect_to_parse_block(input))
+        Node::Block(expect_block(input))
     } else {
         parse_anonymous_function(input)
     }
 }
 
-fn expect_to_parse_block(input: &mut TokenStream) -> Block {
+fn expect_block(input: &mut TokenStream) -> Block {
     expect_to_read(input, Token::BraceLeft); // Opening brace
     let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block);
     expect_to_read(input, Token::BraceRight); // Closing brace
@@ -412,13 +422,29 @@ fn parse_parentheses(input: &mut TokenStream) -> Node {
 }
 
 fn parse_atom(input: &mut TokenStream) -> Node {
-    let next = input.read();
+    let next = input.peek();
     match next {
-        Token::Identifier(_, _) => Node::Identifier(next.into()),
-        Token::Integer(value) => Node::Integer(Integer { value }),
-        Token::String(value) => Node::String(StringLiteral { value }),
+        Token::Identifier(_, _) => Node::Identifier(expect_identifier(input)),
+        Token::Integer(value) => {
+            input.read();
+            Node::Integer(Integer { value })
+        }
+        Token::String(value) => {
+            input.read();
+            Node::String(StringLiteral { value })
+        }
         _ => {
             panic_unexpected(next, None);
+            unreachable!()
+        }
+    }
+}
+
+fn expect_identifier(input: &mut TokenStream) -> Identifier {
+    match input.read() {
+        Token::Identifier(value, span) => Identifier::new(value, span),
+        other @ _ => {
+            panic_unexpected_names(other, "Identifier");
             unreachable!()
         }
     }
@@ -468,8 +494,8 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Assignment, Block, Function, Identifier, Import, ImportBindings, Infix, Integer, Let,
-        Module, Node, PostfixCall, PostfixProperty, Return,
+        Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
+        Let, Module, Node, PostfixCall, PostfixProperty, Return,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -523,6 +549,18 @@ mod tests {
             }
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn it_parses_export() {
+        let nodes = parse_complete("export foo");
+        assert_eq!(
+            nodes,
+            vec![Node::Export(Export::new(Identifier::new(
+                "foo",
+                Span::unknown()
+            )))],
+        );
     }
 
     #[test]
