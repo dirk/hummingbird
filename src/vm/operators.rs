@@ -1,5 +1,6 @@
 use std::error;
 
+use super::errors::PropertyNotFoundError;
 use super::value::Value;
 
 #[inline]
@@ -20,8 +21,14 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Erro
 
 #[inline]
 pub fn op_property(target: Value, value: String) -> Result<Value, Box<dyn error::Error>> {
-    match target {
-        Value::Module(module) => Ok(module.get_export(value).unwrap()),
+    match &target {
+        Value::Module(module) => {
+            if let Some(found) = module.get_export(&value) {
+                Ok(found)
+            } else {
+                Err(Box::new(PropertyNotFoundError::new(target, value)))
+            }
+        },
         _ => panic!("Cannot get property of {:?}", target),
     }
 }

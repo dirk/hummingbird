@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt::{Display, Error, Formatter};
 
+use super::value::Value;
 use super::vm::StackSnapshot;
 
 #[derive(Debug)]
@@ -49,3 +50,30 @@ impl Display for UndefinedNameError {
 }
 
 impl error::Error for UndefinedNameError {}
+
+#[derive(Debug)]
+pub struct PropertyNotFoundError {
+    target: Value,
+    value: String,
+}
+
+impl PropertyNotFoundError {
+    pub fn new(target: Value, value: String) -> Self {
+        Self {
+            target,
+            value
+        }
+    }
+}
+
+impl Display for PropertyNotFoundError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(
+            f,
+            "PropertyNotFoundError: `{}' not found on {:?}",
+            self.value, self.target
+        )
+    }
+}
+
+impl error::Error for PropertyNotFoundError {}

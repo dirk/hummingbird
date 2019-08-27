@@ -141,6 +141,7 @@ pub fn compile_ast_into_module(
     if *DEBUG_BYTECODE {
         println!("Bytecode({}):", name);
         bytecode::printer::Printer::new(std::io::stdout()).print_module(&bytecode_module)?;
+        println!();
     }
 
     let loaded_module = LoadedModule::from_bytecode(bytecode_module, name, builtins_closure);
