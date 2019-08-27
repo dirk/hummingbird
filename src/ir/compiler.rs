@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 
 use super::super::target::bytecode::layout as bytecode;
+use super::super::parser::Span;
 use super::layout as ir;
 
 struct BasicBlockTracker {
@@ -143,6 +144,7 @@ impl Compiler {
         let register_allocator = RefCell::new(RegisterAllocator::new());
 
         let mut instructions: Vec<bytecode::Instruction> = vec![];
+        let mut source_mappings: Vec<(u16, Span)> = vec![];
 
         for basic_block in function.basic_blocks.iter() {
             Compiler::compile_basic_block(
@@ -150,6 +152,8 @@ impl Compiler {
                 &mut instructions,
                 &mut basic_block_tracker,
                 &register_allocator,
+                &function.source_mappings,
+                &mut source_mappings,
             );
         }
 
@@ -175,6 +179,7 @@ impl Compiler {
             name: function.name.clone(),
             registers,
             instructions,
+            source_mappings,
             locals: function.locals.len() as u8,
             locals_names: function.locals.clone(),
             bindings: function.bindings.clone(),
@@ -187,6 +192,8 @@ impl Compiler {
         instructions: &mut Vec<bytecode::Instruction>,
         basic_block_tracker: &mut BasicBlockTracker,
         register_allocator: &RefCell<RegisterAllocator>,
+        input_source_mappings: &Vec<(ir::Address, Span)>,
+        output_source_mappings: &mut Vec<(u16, Span)>,
     ) {
         basic_block_tracker.track_start(basic_block, instructions.len());
 
@@ -276,7 +283,15 @@ impl Compiler {
                     bytecode::Instruction::Import(name.clone(), alias.clone())
                 }
             };
-            instructions.push(bytecode_instruction)
+            let bytecode_address = instructions.len() as u16;
+            instructions.push(bytecode_instruction);
+
+            // Copy corresponding mappings based on the IR address.
+            for (input_address, span) in input_source_mappings {
+                if *address == *input_address {
+                    output_source_mappings.push((bytecode_address, span.clone()));
+                }
+            }
         }
     }
 }

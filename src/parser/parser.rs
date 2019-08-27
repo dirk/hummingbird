@@ -7,6 +7,7 @@ use super::super::ast::nodes::{
 
 use super::super::ast::{Import, ImportBindings, StringLiteral};
 use super::lexer::{Token, TokenStream};
+use crate::parser::Span;
 
 pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
@@ -381,14 +382,19 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
     }
 
     if input.peek() == Token::Dot {
+        let dot_start = input.location();
         input.read(); // Dot
         needs_backtrack = true;
 
-        if let Token::Identifier(value, _) = input.peek() {
-            input.read(); // Identifier
+        if let Token::Identifier(value, identifier_span) = input.peek() {
+            // Identifier
+            input.read();
+            // Build a span holding both the dot and the identifier.
+            let span = Span::new(dot_start, identifier_span.end);
             return Some(Node::PostfixProperty(PostfixProperty::new(
                 target.to_owned(),
                 value,
+                span,
             )));
         }
     }

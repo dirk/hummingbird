@@ -227,13 +227,15 @@ impl PostfixCall {
 pub struct PostfixProperty {
     pub target: Box<Node>,
     pub value: String,
+    pub span: Span,
 }
 
 impl PostfixProperty {
-    pub fn new(target: Node, value: String) -> Self {
+    pub fn new(target: Node, value: String, span: Span) -> Self {
         Self {
             target: Box::new(target),
             value,
+            span,
         }
     }
 }

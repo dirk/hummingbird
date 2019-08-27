@@ -135,6 +135,10 @@ impl TokenStream {
         }
     }
 
+    pub fn location(&self) -> Location {
+        self.input.location()
+    }
+
     pub fn backtrack(&mut self, other: &TokenStream) {
         self.input = other.input.clone();
         self.peeking = other.peeking;
@@ -172,7 +176,7 @@ impl TokenStream {
         self.consume_space_and_comments();
 
         loop {
-            let location = self.input.location();
+            let location = self.location();
             let character = self.input.peek();
 
             if identifier_head(character) {
@@ -225,7 +229,7 @@ impl TokenStream {
             "return" => Token::Return,
             "var" => Token::Var(start),
             "while" => Token::While(start),
-            _ => Token::Identifier(identifier_string, Span::new(start, self.input.location())),
+            _ => Token::Identifier(identifier_string, Span::new(start, self.location())),
         }
     }
 

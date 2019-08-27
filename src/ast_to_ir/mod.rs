@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
+use std::ops::Range;
 use std::rc::Rc;
 
 use super::ast::nodes::*;
@@ -8,6 +9,7 @@ use super::ir::layout::{
     Address, Instruction, InstructionBuilder, Module as IrModule, SharedFunction, SharedSlot,
     SharedValue,
 };
+use super::parser::Span;
 
 #[derive(PartialEq)]
 enum ScopeFlags {
@@ -300,8 +302,10 @@ impl Compiler {
         identifier: &Identifier,
         scope: &mut dyn Scope,
     ) -> SharedValue {
-        let local = &identifier.value;
-        self.build_get(scope.resolve(local))
+        self.set_mappings(identifier.span.clone(), |this| {
+            let local = &identifier.value;
+            this.build_get(scope.resolve(local))
+        })
     }
 
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
@@ -349,7 +353,9 @@ impl Compiler {
         scope: &mut dyn Scope,
     ) -> SharedValue {
         let target = self.compile_node(&property.target, scope);
-        self.build_op_property(target, property.value.clone())
+        self.set_mappings(property.span.clone(), |this| {
+            this.build_op_property(target, property.value.clone())
+        })
     }
 
     fn compile_return(&mut self, ret: &Return, scope: &mut dyn Scope) -> SharedValue {
@@ -362,7 +368,11 @@ impl Compiler {
         self.null_value()
     }
 
-    fn compile_string(&mut self, string_literal: &StringLiteral, _scope: &mut dyn Scope) -> SharedValue {
+    fn compile_string(
+        &mut self,
+        string_literal: &StringLiteral,
+        _scope: &mut dyn Scope,
+    ) -> SharedValue {
         self.build_make_string(string_literal.value.clone())
     }
 
@@ -410,6 +420,29 @@ impl Compiler {
 
     fn null_value(&self) -> SharedValue {
         self.current.borrow().null_value()
+    }
+
+    fn address(&self) -> Address {
+        self.current.borrow().address()
+    }
+
+    fn add_mapping(&self, address: Address, span: Span) {
+        self.current.borrow_mut().add_mapping(address, span);
+    }
+
+    fn set_mappings<T, F: FnOnce(&mut Compiler) -> T>(&mut self, span: Span, f: F) -> T {
+        let start = self.address();
+
+        let value = f(self);
+
+        let range = Range {
+            start,
+            end: self.address(),
+        };
+        for address in range {
+            self.add_mapping(address, span.clone());
+        }
+        value
     }
 }
 
