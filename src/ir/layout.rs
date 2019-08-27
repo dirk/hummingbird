@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
-use std::ops::Range;
 use std::rc::Rc;
 
 use super::super::parser::Span;

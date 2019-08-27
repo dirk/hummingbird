@@ -1,8 +1,8 @@
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 
-use super::super::target::bytecode::layout as bytecode;
 use super::super::parser::Span;
+use super::super::target::bytecode::layout as bytecode;
 use super::layout as ir;
 
 struct BasicBlockTracker {
