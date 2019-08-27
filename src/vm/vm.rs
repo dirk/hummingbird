@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::errors::AnnotatedError;
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
-use super::loader::{self, LoadedModule, Loader};
+use super::loader::Loader;
 use super::prelude;
 
 pub type StackSnapshot = Vec<(u16, String)>;
@@ -75,7 +74,7 @@ impl Vm {
                     self.loader.load_file_by_name(name, relative_import_path)?;
                 if already_loaded {
                     let top = self.stack.last_mut().unwrap();
-                    top.receive_import(module);
+                    top.receive_import(module)?;
                 } else {
                     self.stack.push(Frame::Module(ModuleFrame::new(module)));
                 }
@@ -86,7 +85,6 @@ impl Vm {
                 Ok(())
             }
             Action::Return(return_value) => {
-                let snapshot = self.snapshot_stack();
                 let returning_from = self.stack.pop().expect("Empty stack");
                 if let Some(returning_to) = self.stack.last_mut() {
                     // Processing imports happens through a dedicated path

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::rc::Rc;
 
 use super::ast::nodes::*;
@@ -7,8 +8,6 @@ use super::ir::layout::{
     Address, Instruction, InstructionBuilder, Module as IrModule, SharedFunction, SharedSlot,
     SharedValue,
 };
-use super::vm::prelude::is_in_prelude;
-use std::ffi::OsStr;
 
 #[derive(PartialEq)]
 enum ScopeFlags {
@@ -293,7 +292,7 @@ impl Compiler {
         self.build_get(scope.resolve(local))
     }
 
-    fn compile_import(&mut self, import: &Import, scope: &mut dyn Scope) -> SharedValue {
+    fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
         match &import.bindings {
             ImportBindings::Module => {
                 let name = import
