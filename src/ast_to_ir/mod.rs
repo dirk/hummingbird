@@ -165,13 +165,16 @@ impl Compiler {
         match node {
             &Node::Assignment(ref assignment) => self.compile_assignment(assignment, scope),
             &Node::Block(ref block) => self.compile_anonymous_block(block, scope),
+            &Node::Export(ref export) => self.compile_export(export, scope),
             &Node::Function(ref function) => self.compile_function(function, scope),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier, scope),
             &Node::Import(ref import) => self.compile_import(import, scope),
             &Node::Infix(ref infix) => self.compile_infix(infix, scope),
             &Node::Integer(ref integer) => self.compile_integer(integer, scope),
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
+            &Node::PostfixProperty(ref property) => self.compile_postfix_property(property, scope),
             &Node::Return(ref ret) => self.compile_return(ret, scope),
+            &Node::String(ref string_literal) => self.compile_string(string_literal, scope),
             &Node::Var(ref var) => self.compile_var(var, scope),
             &Node::While(ref while_) => self.compile_while(while_, scope),
             _ => panic!("Cannot compile node: {:?}", node),
@@ -210,6 +213,15 @@ impl Compiler {
         self.current.borrow_mut().push_basic_block(true);
 
         implicit_return
+    }
+
+    fn compile_export(&mut self, export: &Export, scope: &mut dyn Scope) -> SharedValue {
+        for identifier in export.identifiers.iter() {
+            let rval = self.compile_identifier(identifier, scope);
+            let name = identifier.value.clone();
+            self.build_export(name, rval);
+        }
+        self.null_value()
     }
 
     fn compile_function(&mut self, function: &Function, scope: &mut dyn Scope) -> SharedValue {
@@ -295,13 +307,13 @@ impl Compiler {
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
         match &import.bindings {
             ImportBindings::Module => {
-                let name = import
+                let alias = import
                     .path()
-                    .file_name()
+                    .file_stem()
                     .and_then(OsStr::to_str)
                     .expect("Couldn't get file name of import")
                     .to_owned();
-                self.build_import(import.name.clone(), name);
+                self.build_import(alias, import.name.clone());
             }
             other @ _ => println!("Cannot compile import binding: {:?}", other),
         };
@@ -331,6 +343,15 @@ impl Compiler {
         self.build_call(target, arguments)
     }
 
+    fn compile_postfix_property(
+        &mut self,
+        property: &PostfixProperty,
+        scope: &mut dyn Scope,
+    ) -> SharedValue {
+        let target = self.compile_node(&property.target, scope);
+        self.build_op_property(target, property.value.clone())
+    }
+
     fn compile_return(&mut self, ret: &Return, scope: &mut dyn Scope) -> SharedValue {
         if let Some(ref rhs) = ret.rhs {
             let rval = self.compile_node(&rhs, scope);
@@ -339,6 +360,10 @@ impl Compiler {
             self.build_return_null();
         }
         self.null_value()
+    }
+
+    fn compile_string(&mut self, string_literal: &StringLiteral, _scope: &mut dyn Scope) -> SharedValue {
+        self.build_make_string(string_literal.value.clone())
     }
 
     fn compile_var(&mut self, var: &Var, scope: &mut dyn Scope) -> SharedValue {

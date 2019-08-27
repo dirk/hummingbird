@@ -408,6 +408,10 @@ impl BytecodeFrame {
                     self.write_register(*lval, Value::Integer(*value));
                     self.advance();
                 }
+                Instruction::MakeString(lval, value) => {
+                    self.write_register(*lval, Value::String(value.clone()));
+                    self.advance();
+                }
                 Instruction::OpAdd(lval, lhs, rhs) => {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);
@@ -419,6 +423,12 @@ impl BytecodeFrame {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);
                     let value = operators::op_less_than(lhs, rhs)?;
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
+                Instruction::OpProperty(lval, target, value) => {
+                    let target = self.read_register(*target);
+                    let value = operators::op_property(target, value.clone())?;
                     self.write_register(*lval, value);
                     self.advance();
                 }
@@ -467,7 +477,12 @@ impl BytecodeFrame {
                 Instruction::ReturnNull => {
                     return Ok(Action::Return(Value::Null));
                 }
-                Instruction::Import(name, _alias) => {
+                Instruction::Export(name, rval) => {
+                    let value = self.read_register(*rval);
+                    self.module().set_export(name.clone(), value);
+                    self.advance();
+                }
+                Instruction::Import(_alias, name) => {
                     return Ok(Action::Import(
                         name.clone(),
                         self.module().relative_import_path(),
@@ -498,7 +513,7 @@ impl FrameApi for BytecodeFrame {
 
         let static_closure = self.module().static_closure();
         match instruction {
-            Instruction::Import(_name, alias) => {
+            Instruction::Import(alias, _name) => {
                 static_closure.set_directly(alias, Value::Module(module));
             }
             other @ _ => {
@@ -584,7 +599,7 @@ impl FrameApi for ModuleFrame {
                 Action::Return(Value::Null)
             }
             Reentering => {
-                panic!("Cannot reenter a module frame which has been entered and left");
+                unreachable!("Cannot reenter a module frame which has been entered and left")
             }
         }
     }

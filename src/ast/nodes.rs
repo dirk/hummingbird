@@ -8,6 +8,7 @@ pub enum Node {
     Assignment(Assignment),
     Block(Block),
     Function(Function),
+    Export(Export),
     Identifier(Identifier),
     Import(Import),
     Infix(Infix),
@@ -70,6 +71,17 @@ impl Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Function) -> bool {
         self.name == other.name && self.body == other.body
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Export {
+    pub identifiers: Vec<Identifier>,
+}
+
+impl Export {
+    pub fn new(identifiers: Vec<Identifier>) -> Self {
+        Self { identifiers }
     }
 }
 
@@ -213,8 +225,8 @@ impl PostfixCall {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PostfixProperty {
-    target: Box<Node>,
-    value: String,
+    pub target: Box<Node>,
+    pub value: String,
 }
 
 impl PostfixProperty {

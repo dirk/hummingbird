@@ -78,6 +78,7 @@ pub enum Token {
     Dot,
     EOF,
     Equals,
+    Export,
     Identifier(String, Span),
     Import,
     Integer(i64),
@@ -218,6 +219,7 @@ impl TokenStream {
         }
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
+            "export" => Token::Export,
             "let" => Token::Let(start),
             "import" => Token::Import,
             "return" => Token::Return,

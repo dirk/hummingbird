@@ -1,1 +1,5 @@
-println(1)
+println(2)
+
+greeting() -> "Hello world!"
+
+export { greeting }

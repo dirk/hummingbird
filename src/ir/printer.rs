@@ -87,11 +87,17 @@ impl<O: Write> Printer<O> {
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", id(lval), value)
             }
+            Instruction::MakeString(lval, value) => {
+                format!("{} = MakeString({:?})", id(lval), value)
+            }
             Instruction::OpAdd(lval, lhs, rhs) => {
                 format!("{} = OpAdd({}, {})", id(lval), id(lhs), id(rhs))
             }
             Instruction::OpLessThan(lval, lhs, rhs) => {
                 format!("{} = OpLessThan({}, {})", id(lval), id(lhs), id(rhs))
+            }
+            Instruction::OpProperty(lval, target, value) => {
+                format!("{} = OpProperty({}, {})", id(lval), id(target), value)
             }
             Instruction::Branch(destination) => format!("Branch({})", destination.borrow().name),
             Instruction::BranchIf(destination, condition) => {
@@ -109,7 +115,8 @@ impl<O: Write> Printer<O> {
             ),
             Instruction::Return(rval) => format!("Return({})", id(rval)),
             Instruction::ReturnNull => "ReturnNull".to_string(),
-            Instruction::Import(name, alias) => format!("{} = Import({:?})", alias, name),
+            Instruction::Export(name, rval) => format!("Export({}, {})", name, id(rval)),
+            Instruction::Import(alias, name) => format!("Import(Static({}), {:?})", alias, name),
         };
         writeln!(
             self.output,

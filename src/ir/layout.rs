@@ -289,18 +289,21 @@ pub enum Instruction {
     Set(SharedSlot, SharedValue),
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
+    MakeString(SharedValue, String),
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
+    OpProperty(SharedValue, SharedValue, String), // $1 = $2.$3
     Branch(SharedBasicBlock),
     BranchIf(SharedBasicBlock, SharedValue),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,
-    Import(String, String),
-    // If the option is present it should only bind those names, if it's not
-    // present then all exports should be bound.
-    // ImportNamed(String, Option<Vec<String>>),
+    Export(String, SharedValue),
+    Import(String, String), // static($1) = import($2)
 }
+// If the option is present it should only bind those names, if it's not
+// present then all exports should be bound.
+// ImportNamed(String, Option<Vec<String>>),
 
 #[derive(Debug)]
 pub struct BasicBlock {
@@ -358,6 +361,12 @@ pub trait InstructionBuilder {
         lval
     }
 
+    fn build_make_string(&mut self, value: String) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::MakeString(lval.clone(), value));
+        lval
+    }
+
     fn build_op_add(&mut self, lhs: SharedValue, rhs: SharedValue) -> SharedValue {
         let lval = self.new_value();
         let address = self.push(Instruction::OpAdd(lval.clone(), lhs.clone(), rhs.clone()));
@@ -375,6 +384,13 @@ pub trait InstructionBuilder {
         ));
         self.track(lhs, address);
         self.track(rhs, address);
+        lval
+    }
+
+    fn build_op_property(&mut self, target: SharedValue, value: String) -> SharedValue {
+        let lval = self.new_value();
+        let address = self.push(Instruction::OpProperty(lval.clone(), target.clone(), value));
+        self.track(target, address);
         lval
     }
 
@@ -410,8 +426,13 @@ pub trait InstructionBuilder {
         self.push(Instruction::ReturnNull);
     }
 
-    fn build_import(&mut self, name: String, alias: String) {
-        self.push(Instruction::Import(name, alias));
+    fn build_export(&mut self, name: String, rval: SharedValue) {
+        let address = self.push(Instruction::Export(name, rval.clone()));
+        self.track(rval, address);
+    }
+
+    fn build_import(&mut self, alias: String, name: String) {
+        self.push(Instruction::Import(alias, name));
     }
 }
 

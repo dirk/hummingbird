@@ -12,16 +12,20 @@ pub enum Instruction {
     SetStatic(String, Reg),
     MakeFunction(Reg, u16),
     MakeInteger(Reg, i64),
-    OpAdd(Reg, Reg, Reg),      // $1 = $2 + $3
-    OpLessThan(Reg, Reg, Reg), // $1 = $2 < $3
+    MakeString(Reg, String),
+    OpAdd(Reg, Reg, Reg),         // $1 = $2 + $3
+    OpLessThan(Reg, Reg, Reg),    // $1 = $2 < $3
+    OpProperty(Reg, Reg, String), // $1 = $2.$3
     Branch(u8),
     BranchIf(u8, Reg),
     Call(Reg, Reg, Vec<Reg>), // $1 = $2($3[])
     Return(Reg),
     ReturnNull,
-    // The second string is the alias for the import to be assigned to in the
-    // module's static scope.
-    Import(String, String), // $2 = import($1)
+    // Export the val in $2 as the name $1.
+    Export(String, Reg),
+    // The first string is the alias for the import to be assigned to in the
+    // module's static scope. The second string is the name/path of the file.
+    Import(String, String), // static($1) = import($2)
 }
 
 #[derive(Clone, Debug)]

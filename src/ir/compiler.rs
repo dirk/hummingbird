@@ -228,6 +228,9 @@ impl Compiler {
                 ir::Instruction::MakeInteger(lval, value) => {
                     bytecode::Instruction::MakeInteger(allocate(lval), *value)
                 }
+                ir::Instruction::MakeString(lval, value) => {
+                    bytecode::Instruction::MakeString(allocate(lval), value.clone())
+                }
                 ir::Instruction::OpAdd(lval, lhs, rhs) => bytecode::Instruction::OpAdd(
                     allocate(lval),
                     read(lhs, address),
@@ -238,6 +241,13 @@ impl Compiler {
                     read(lhs, address),
                     read(rhs, address),
                 ),
+                ir::Instruction::OpProperty(lval, target, value) => {
+                    bytecode::Instruction::OpProperty(
+                        allocate(lval),
+                        read(target, address),
+                        value.clone(),
+                    )
+                }
                 ir::Instruction::Branch(destination) => {
                     let bytecode_address = instructions.len();
                     basic_block_tracker.track_branch(bytecode_address, &destination.borrow());
@@ -259,6 +269,9 @@ impl Compiler {
                 }
                 ir::Instruction::Return(rval) => bytecode::Instruction::Return(read(rval, address)),
                 ir::Instruction::ReturnNull => bytecode::Instruction::ReturnNull,
+                ir::Instruction::Export(name, rval) => {
+                    bytecode::Instruction::Export(name.clone(), read(rval, address))
+                }
                 ir::Instruction::Import(name, alias) => {
                     bytecode::Instruction::Import(name.clone(), alias.clone())
                 }
