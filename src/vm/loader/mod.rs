@@ -109,6 +109,13 @@ impl Loader {
         self.loaded_modules.insert(canonicalized, new.clone());
         Ok((new, false))
     }
+
+    /// Tries to remove the module. Should be called if the module fails to be
+    /// initialized (eg. its `ModuleFrame` is unwound).
+    pub fn unload(&mut self, module: &LoadedModule) -> bool {
+        let path: PathBuf = module.name().into();
+        self.loaded_modules.remove(&path).is_some()
+    }
 }
 
 fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn Error>> {

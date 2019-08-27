@@ -128,7 +128,15 @@ impl Vm {
             } else {
                 // If this frame didn't catch the error then keep on
                 // unwinding.
-                self.stack.pop();
+                let popped = self.stack.pop();
+                if let Some(module) = popped.and_then(|frame| frame.initializing_module()) {
+                    if !self.loader.unload(&module) {
+                        println!(
+                            "WARNING: Unable to unload module while unwinding: {:?}",
+                            module.name()
+                        );
+                    }
+                }
             }
         }
     }
