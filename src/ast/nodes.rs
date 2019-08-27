@@ -131,11 +131,16 @@ pub enum ImportBindings {
 pub struct Import {
     pub name: String,
     pub bindings: ImportBindings,
+    pub span: Span,
 }
 
 impl Import {
-    pub fn new(name: String, bindings: ImportBindings) -> Self {
-        Self { name, bindings }
+    pub fn new(name: String, bindings: ImportBindings, span: Span) -> Self {
+        Self {
+            name,
+            bindings,
+            span,
+        }
     }
 
     pub fn path(&self) -> PathBuf {

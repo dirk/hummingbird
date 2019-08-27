@@ -75,12 +75,12 @@ pub enum Token {
     BraceLeft,
     BraceRight,
     Comma,
-    Dot,
+    Dot(Location),
     EOF,
     Equals,
     Export,
     Identifier(String, Span),
-    Import,
+    Import(Span),
     Integer(i64),
     LeftAngle,
     Let(Location),
@@ -90,7 +90,7 @@ pub enum Token {
     Plus,
     Return,
     Star,
-    String(String),
+    String(String, Span),
     Terminal(char),
     Var(Location),
     While(Location),
@@ -135,10 +135,6 @@ impl TokenStream {
         }
     }
 
-    pub fn location(&self) -> Location {
-        self.input.location()
-    }
-
     pub fn backtrack(&mut self, other: &TokenStream) {
         self.input = other.input.clone();
         self.peeking = other.peeking;
@@ -169,14 +165,14 @@ impl TokenStream {
     pub fn read(&mut self) -> Token {
         let token = self.peek();
         self.peeking = false;
-        return token;
+        token
     }
 
     fn lex(&mut self) -> Token {
         self.consume_space_and_comments();
 
         loop {
-            let location = self.location();
+            let location = self.input.location();
             let character = self.input.peek();
 
             if identifier_head(character) {
@@ -184,7 +180,7 @@ impl TokenStream {
             } else if numeric_head(character) {
                 return self.lex_arrow_minus_or_numeric();
             } else if string_head(character) {
-                return self.lex_string();
+                return self.lex_string(location);
             } else {
                 self.input.read();
                 match character {
@@ -194,7 +190,7 @@ impl TokenStream {
                     '(' => return Token::ParenthesesLeft,
                     ')' => return Token::ParenthesesRight,
                     ',' => return Token::Comma,
-                    '.' => return Token::Dot,
+                    '.' => return Token::Dot(location),
                     '=' => return Token::Equals,
                     '<' => return Token::LeftAngle,
                     '+' => return Token::Plus,
@@ -221,24 +217,27 @@ impl TokenStream {
                 break;
             }
         }
+        let span = Span::new(start.clone(), self.input.location());
         let identifier_string: String = identifier.into_iter().collect();
         match identifier_string.as_str() {
             "export" => Token::Export,
             "let" => Token::Let(start),
-            "import" => Token::Import,
+            "import" => Token::Import(span),
             "return" => Token::Return,
             "var" => Token::Var(start),
             "while" => Token::While(start),
-            _ => Token::Identifier(identifier_string, Span::new(start, self.location())),
+            _ => Token::Identifier(identifier_string, span),
         }
     }
 
-    fn lex_string(&mut self) -> Token {
+    fn lex_string(&mut self, start: Location) -> Token {
         let opening = self.input.read();
         assert_eq!(opening, '"');
         let mut characters = vec![];
+        let mut end;
         loop {
             let character = self.input.read();
+            end = self.input.location();
             if character != '"' {
                 characters.push(character);
             } else {
@@ -246,7 +245,7 @@ impl TokenStream {
             }
         }
         let string: String = characters.into_iter().collect();
-        Token::String(string)
+        Token::String(string, Span::new(start, end))
     }
 
     fn lex_arrow_minus_or_numeric(&mut self) -> Token {

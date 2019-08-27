@@ -309,19 +309,21 @@ impl Compiler {
     }
 
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
-        match &import.bindings {
-            ImportBindings::Module => {
-                let alias = import
-                    .path()
-                    .file_stem()
-                    .and_then(OsStr::to_str)
-                    .expect("Couldn't get file name of import")
-                    .to_owned();
-                self.build_import(alias, import.name.clone());
-            }
-            other @ _ => println!("Cannot compile import binding: {:?}", other),
-        };
-        self.null_value()
+        self.set_mappings(import.span.clone(), |this| {
+            match &import.bindings {
+                ImportBindings::Module => {
+                    let alias = import
+                        .path()
+                        .file_stem()
+                        .and_then(OsStr::to_str)
+                        .expect("Couldn't get file name of import")
+                        .to_owned();
+                    this.build_import(alias, import.name.clone());
+                }
+                other @ _ => println!("Cannot compile import binding: {:?}", other),
+            };
+            this.null_value()
+        })
     }
 
     fn compile_infix(&mut self, infix: &Infix, scope: &mut dyn Scope) -> SharedValue {
