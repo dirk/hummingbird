@@ -12,6 +12,7 @@ pub enum Instruction {
     SetStatic(String, Reg),
     MakeFunction(Reg, u16),
     MakeInteger(Reg, i64),
+    MakeString(Reg, String),
     OpAdd(Reg, Reg, Reg),         // $1 = $2 + $3
     OpLessThan(Reg, Reg, Reg),    // $1 = $2 < $3
     OpProperty(Reg, Reg, String), // $1 = $2.$3

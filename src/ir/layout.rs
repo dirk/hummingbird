@@ -289,6 +289,7 @@ pub enum Instruction {
     Set(SharedSlot, SharedValue),
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
+    MakeString(SharedValue, String),
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
     OpProperty(SharedValue, SharedValue, String), // $1 = $2.$3
@@ -357,6 +358,12 @@ pub trait InstructionBuilder {
     fn build_make_integer(&mut self, value: i64) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::MakeInteger(lval.clone(), value));
+        lval
+    }
+
+    fn build_make_string(&mut self, value: String) -> SharedValue {
+        let lval = self.new_value();
+        self.push(Instruction::MakeString(lval.clone(), value));
         lval
     }
 

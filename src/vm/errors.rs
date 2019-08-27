@@ -59,10 +59,7 @@ pub struct PropertyNotFoundError {
 
 impl PropertyNotFoundError {
     pub fn new(target: Value, value: String) -> Self {
-        Self {
-            target,
-            value
-        }
+        Self { target, value }
     }
 }
 

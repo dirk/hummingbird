@@ -408,6 +408,10 @@ impl BytecodeFrame {
                     self.write_register(*lval, Value::Integer(*value));
                     self.advance();
                 }
+                Instruction::MakeString(lval, value) => {
+                    self.write_register(*lval, Value::String(value.clone()));
+                    self.advance();
+                }
                 Instruction::OpAdd(lval, lhs, rhs) => {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);

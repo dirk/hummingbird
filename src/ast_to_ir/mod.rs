@@ -174,6 +174,7 @@ impl Compiler {
             &Node::PostfixCall(ref call) => self.compile_postfix_call(call, scope),
             &Node::PostfixProperty(ref property) => self.compile_postfix_property(property, scope),
             &Node::Return(ref ret) => self.compile_return(ret, scope),
+            &Node::String(ref string_literal) => self.compile_string(string_literal, scope),
             &Node::Var(ref var) => self.compile_var(var, scope),
             &Node::While(ref while_) => self.compile_while(while_, scope),
             _ => panic!("Cannot compile node: {:?}", node),
@@ -359,6 +360,10 @@ impl Compiler {
             self.build_return_null();
         }
         self.null_value()
+    }
+
+    fn compile_string(&mut self, string_literal: &StringLiteral, _scope: &mut dyn Scope) -> SharedValue {
+        self.build_make_string(string_literal.value.clone())
     }
 
     fn compile_var(&mut self, var: &Var, scope: &mut dyn Scope) -> SharedValue {

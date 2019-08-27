@@ -47,11 +47,12 @@ impl NativeFunction {
 pub enum Value {
     Null,
     Boolean(bool),
-    // DynamicObject(Gc<GcCell<DynamicObject>>),
-    Integer(i64),
-    Function(DynamicFunction),
-    Module(LoadedModule),
     BuiltinFunction(NativeFunction),
+    // DynamicObject(Gc<GcCell<DynamicObject>>),
+    Function(DynamicFunction),
+    Integer(i64),
+    Module(LoadedModule),
+    String(String),
 }
 
 impl Value {
@@ -78,15 +79,16 @@ impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         use Value::*;
         match self {
+            Null => write!(f, "null"),
+            Boolean(value) => write!(f, "{:?}", value),
+            BuiltinFunction(_) => write!(f, "BuiltinFunction"),
             Function(function) => {
                 let name = function.call_target.function.qualified_name();
                 write!(f, "Function({})", name)
             }
-            Boolean(value) => write!(f, "{:?}", value),
             Integer(value) => write!(f, "{}", value),
             Module(module) => write!(f, "Module({})", module.name()),
-            BuiltinFunction(_) => write!(f, "NativeFunction"),
-            Null => write!(f, "null"),
+            String(value) => write!(f, "{:?}", value),
         }
     }
 }

@@ -87,6 +87,9 @@ impl<O: Write> Printer<O> {
             Instruction::MakeInteger(lval, value) => {
                 format!("{} = MakeInteger({})", id(lval), value)
             }
+            Instruction::MakeString(lval, value) => {
+                format!("{} = MakeString({:?})", id(lval), value)
+            }
             Instruction::OpAdd(lval, lhs, rhs) => {
                 format!("{} = OpAdd({}, {})", id(lval), id(lhs), id(rhs))
             }

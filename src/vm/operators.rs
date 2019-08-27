@@ -28,7 +28,7 @@ pub fn op_property(target: Value, value: String) -> Result<Value, Box<dyn error:
             } else {
                 Err(Box::new(PropertyNotFoundError::new(target, value)))
             }
-        },
+        }
         _ => panic!("Cannot get property of {:?}", target),
     }
 }
