@@ -19,9 +19,11 @@ pub enum Instruction {
     Call(Reg, Reg, Vec<Reg>), // $1 = $2($3[])
     Return(Reg),
     ReturnNull,
-    // The second string is the alias for the import to be assigned to in the
-    // module's static scope.
-    Import(String, String), // $2 = import($1)
+    // Export the val in $2 as the name $1.
+    Export(String, Reg),
+    // The first string is the alias for the import to be assigned to in the
+    // module's static scope. The second string is the name/path of the file.
+    Import(String, String), // static($1) = import($2)
 }
 
 #[derive(Clone, Debug)]

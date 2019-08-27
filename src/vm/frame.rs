@@ -467,7 +467,12 @@ impl BytecodeFrame {
                 Instruction::ReturnNull => {
                     return Ok(Action::Return(Value::Null));
                 }
-                Instruction::Import(name, _alias) => {
+                Instruction::Export(name, rval) => {
+                    let value = self.read_register(*rval);
+                    self.module().set_export(name.clone(), value);
+                    self.advance();
+                }
+                Instruction::Import(_alias, name) => {
                     return Ok(Action::Import(
                         name.clone(),
                         self.module().relative_import_path(),
@@ -498,7 +503,7 @@ impl FrameApi for BytecodeFrame {
 
         let static_closure = self.module().static_closure();
         match instruction {
-            Instruction::Import(_name, alias) => {
+            Instruction::Import(alias, _name) => {
                 static_closure.set_directly(alias, Value::Module(module));
             }
             other @ _ => {
@@ -584,7 +589,7 @@ impl FrameApi for ModuleFrame {
                 Action::Return(Value::Null)
             }
             Reentering => {
-                panic!("Cannot reenter a module frame which has been entered and left");
+                unreachable!("Cannot reenter a module frame which has been entered and left")
             }
         }
     }

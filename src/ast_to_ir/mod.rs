@@ -165,6 +165,7 @@ impl Compiler {
         match node {
             &Node::Assignment(ref assignment) => self.compile_assignment(assignment, scope),
             &Node::Block(ref block) => self.compile_anonymous_block(block, scope),
+            &Node::Export(ref export) => self.compile_export(export, scope),
             &Node::Function(ref function) => self.compile_function(function, scope),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier, scope),
             &Node::Import(ref import) => self.compile_import(import, scope),
@@ -210,6 +211,15 @@ impl Compiler {
         self.current.borrow_mut().push_basic_block(true);
 
         implicit_return
+    }
+
+    fn compile_export(&mut self, export: &Export, scope: &mut dyn Scope) -> SharedValue {
+        for identifier in export.identifiers.iter() {
+            let rval = self.compile_identifier(identifier, scope);
+            let name = identifier.value.clone();
+            self.build_export(name, rval);
+        }
+        self.null_value()
     }
 
     fn compile_function(&mut self, function: &Function, scope: &mut dyn Scope) -> SharedValue {
@@ -295,13 +305,13 @@ impl Compiler {
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
         match &import.bindings {
             ImportBindings::Module => {
-                let name = import
+                let alias = import
                     .path()
-                    .file_name()
+                    .file_stem()
                     .and_then(OsStr::to_str)
                     .expect("Couldn't get file name of import")
                     .to_owned();
-                self.build_import(import.name.clone(), name);
+                self.build_import(alias, import.name.clone());
             }
             other @ _ => println!("Cannot compile import binding: {:?}", other),
         };

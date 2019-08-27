@@ -109,7 +109,8 @@ impl<O: Write> Printer<O> {
             ),
             Instruction::Return(rval) => format!("Return({})", id(rval)),
             Instruction::ReturnNull => "ReturnNull".to_string(),
-            Instruction::Import(name, alias) => format!("{} = Import({:?})", alias, name),
+            Instruction::Export(name, rval) => format!("Export({}, {})", name, id(rval)),
+            Instruction::Import(alias, name) => format!("Import(Static({}), {:?})", alias, name),
         };
         writeln!(
             self.output,

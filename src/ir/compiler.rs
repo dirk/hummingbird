@@ -259,6 +259,9 @@ impl Compiler {
                 }
                 ir::Instruction::Return(rval) => bytecode::Instruction::Return(read(rval, address)),
                 ir::Instruction::ReturnNull => bytecode::Instruction::ReturnNull,
+                ir::Instruction::Export(name, rval) => {
+                    bytecode::Instruction::Export(name.clone(), read(rval, address))
+                }
                 ir::Instruction::Import(name, alias) => {
                     bytecode::Instruction::Import(name.clone(), alias.clone())
                 }

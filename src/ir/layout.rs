@@ -296,7 +296,8 @@ pub enum Instruction {
     Call(SharedValue, SharedValue, Vec<SharedValue>),
     Return(SharedValue),
     ReturnNull,
-    Import(String, String),
+    Export(String, SharedValue),
+    Import(String, String), // static($1) = import($2)
     // If the option is present it should only bind those names, if it's not
     // present then all exports should be bound.
     // ImportNamed(String, Option<Vec<String>>),
@@ -410,8 +411,13 @@ pub trait InstructionBuilder {
         self.push(Instruction::ReturnNull);
     }
 
-    fn build_import(&mut self, name: String, alias: String) {
-        self.push(Instruction::Import(name, alias));
+    fn build_export(&mut self, name: String, rval: SharedValue) {
+        let address = self.push(Instruction::Export(name, rval.clone()));
+        self.track(rval, address);
+    }
+
+    fn build_import(&mut self, alias: String, name: String) {
+        self.push(Instruction::Import(alias, name));
     }
 }
 

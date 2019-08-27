@@ -117,16 +117,21 @@ impl LoadedModule {
             .clone()
     }
 
-    pub fn get_exports(&self) -> HashMap<String, Option<Value>> {
-        self.0.borrow().exports.exports.to_owned()
-    }
-
-    pub fn insert_export<N: Into<String>>(&self, name: N, value: Value) {
+    pub fn get_export<N: AsRef<str>>(&self, name: N) -> Option<Value> {
         self.0
             .borrow_mut()
             .exports
             .exports
-            .insert(name.into(), Some(value));
+            .get(name.as_ref())
+            .map(Clone::clone)
+    }
+
+    pub fn set_export<N: Into<String>>(&self, name: N, value: Value) {
+        self.0
+            .borrow_mut()
+            .exports
+            .exports
+            .insert(name.into(), value);
     }
 }
 
@@ -157,9 +162,7 @@ impl Imports {
 }
 
 struct Exports {
-    /// Exports start out as `None`s and are then filled in as the module
-    /// is initialized.
-    exports: HashMap<String, Option<Value>>,
+    exports: HashMap<String, Value>,
 }
 
 impl Exports {
