@@ -1,13 +1,11 @@
 use std::path::Path;
 
-use termcolor::{ColorChoice, StandardStream};
-
-use super::errors::VmError;
+use super::errors::{DebugSource, VmError};
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::loader::Loader;
 use super::prelude;
 
-pub type StackSnapshot = Vec<(u16, String)>;
+pub type StackSnapshot = Vec<(u16, DebugSource)>;
 
 pub struct Vm {
     loader: Loader,
@@ -60,9 +58,8 @@ impl Vm {
                 if let Some(uncaught) = self.error_unwind(error) {
                     // If we weren't able to catch the error then print
                     // what went wrong and exit.
-                    let mut stdout = StandardStream::stdout(ColorChoice::Auto);
                     uncaught
-                        .print_debug(&mut stdout)
+                        .print_debug()
                         .expect("Unable to debug-print uncaught error");
                     return;
                 }
@@ -166,7 +163,7 @@ impl Vm {
             if frame.is_module() {
                 continue;
             }
-            captured.push((index, frame.stack_description()));
+            captured.push((index, frame.debug_source()));
             index += 1;
         }
         captured

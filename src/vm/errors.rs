@@ -1,10 +1,10 @@
 use std::error;
 use std::fmt::{Debug, Display, Error, Formatter};
-use std::io;
+use std::io::{self, Write};
 
 use codespan::{Files, Span as CodespanSpan};
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use termcolor::WriteColor;
+use termcolor::{ColorChoice, StandardStream};
 
 use super::super::parser::Span;
 use super::loader::LoadedModule;
@@ -55,6 +55,7 @@ impl Display for Kind {
 pub struct VmError {
     kind: Kind,
     stack: Option<StackSnapshot>,
+    /// The source directly responsible for the error.
     source: Option<DebugSource>,
 }
 
@@ -90,11 +91,23 @@ impl VmError {
         self.source = Some(source);
     }
 
-    pub fn print_debug<W: WriteColor>(&self, w: &mut W) -> io::Result<()> {
+    pub fn print_debug(&self) -> io::Result<()> {
+        let mut w = StandardStream::stdout(ColorChoice::Auto);
         writeln!(w, "{}", self)?;
         if let Some(stack) = &self.stack {
-            for (index, description) in stack.iter() {
-                writeln!(w, "  {}: {}", index, description)?;
+            for (index, debug_source) in stack.iter() {
+                write!(w, "  {}: ", index)?;
+                if let Some(function) = &debug_source.function {
+                    write!(w, "{} at ", function)?;
+                }
+                write!(w, "{}", debug_source.module.name())?;
+                if let Some(span) = &debug_source.span {
+                    write!(w, ":{}", span.start.line)?;
+                    if span.start.line != span.end.line {
+                        write!(w, "-{}", span.end.line)?;
+                    }
+                }
+                write!(w, "\n")?;
             }
         }
         if let Some(source) = &self.source {
@@ -103,9 +116,12 @@ impl VmError {
             let file = files.add(name, source.module.source());
 
             let label = self.kind.diagnostic_label();
-            let span = CodespanSpan::new(source.span.start.index, source.span.end.index);
-            let diagnostic = Diagnostic::new_error("".to_owned(), Label::new(file, span, label));
-            codespan_reporting::term::emit(w, &Default::default(), &files, &diagnostic)?;
+            if let Some(source_span) = &source.span {
+                let span = CodespanSpan::new(source_span.start.index, source_span.end.index);
+                let diagnostic =
+                    Diagnostic::new_error("".to_owned(), Label::new(file, span, label));
+                codespan_reporting::term::emit(&mut w, &Default::default(), &files, &diagnostic)?;
+            }
         }
         Ok(())
     }
@@ -128,82 +144,16 @@ impl error::Error for VmError {}
 /// Describes in a module where an error occurred.
 pub struct DebugSource {
     module: LoadedModule,
-    span: Span,
+    function: Option<String>,
+    span: Option<Span>,
 }
 
 impl DebugSource {
-    pub fn new(module: LoadedModule, span: Span) -> Self {
-        Self { module, span }
-    }
-}
-
-#[derive(Debug)]
-pub struct AnnotatedError {
-    wrapped: Box<dyn error::Error>,
-    stack: StackSnapshot,
-}
-
-impl AnnotatedError {
-    pub fn new(wrapped: Box<dyn error::Error>, stack: StackSnapshot) -> Self {
-        Self { wrapped, stack }
-    }
-
-    pub fn get_wrapped(&self) -> &Box<dyn error::Error> {
-        &self.wrapped
-    }
-}
-
-impl Display for AnnotatedError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.wrapped)?;
-        for (index, description) in self.stack.iter() {
-            write!(f, "\n  {}: {}", index, description)?;
+    pub fn new(module: LoadedModule, function: Option<String>, span: Option<Span>) -> Self {
+        Self {
+            module,
+            function,
+            span,
         }
-        Ok(())
     }
 }
-
-impl error::Error for AnnotatedError {}
-
-#[derive(Debug)]
-pub struct UndefinedNameError {
-    name: String,
-}
-
-impl UndefinedNameError {
-    pub fn new(name: String) -> Self {
-        Self { name }
-    }
-}
-
-impl Display for UndefinedNameError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "UndefinedNameError: `{}' not found", self.name)
-    }
-}
-
-impl error::Error for UndefinedNameError {}
-
-#[derive(Debug)]
-pub struct PropertyNotFoundError {
-    target: Value,
-    value: String,
-}
-
-impl PropertyNotFoundError {
-    pub fn new(target: Value, value: String) -> Self {
-        Self { target, value }
-    }
-}
-
-impl Display for PropertyNotFoundError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(
-            f,
-            "PropertyNotFoundError: `{}' not found on {:?}",
-            self.value, self.target
-        )
-    }
-}
-
-impl error::Error for PropertyNotFoundError {}

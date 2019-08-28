@@ -198,6 +198,14 @@ impl FrameApi for Frame {
             Frame::Repl(frame) => frame.catch_error(error),
         }
     }
+
+    fn debug_source(&self) -> DebugSource {
+        match self {
+            Frame::Bytecode(frame) => frame.debug_source(),
+            Frame::Module(frame) => frame.debug_source(),
+            Frame::Repl(frame) => frame.debug_source(),
+        }
+    }
 }
 
 pub trait FrameApi {
@@ -242,6 +250,8 @@ pub trait FrameApi {
     fn catch_error(&mut self, _error: VmError) {
         unreachable!()
     }
+
+    fn debug_source(&self) -> DebugSource;
 }
 
 // Frame evaluating a bytecode function.
@@ -488,14 +498,10 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::Import(_alias, name) => {
-                    let source = match self.current_span() {
-                        Some(span) => Some(DebugSource::new(self.module(), span)),
-                        None => None,
-                    };
                     return Ok(Action::Import(
                         name.clone(),
                         self.module().relative_import_path(),
-                        source,
+                        Some(self.debug_source()),
                     ));
                 }
             }
@@ -510,9 +516,7 @@ impl FrameApi for BytecodeFrame {
             Err(mut error) => {
                 // Try to use our source mappings to get additional
                 // debugging information for the error.
-                if let Some(span) = self.current_span() {
-                    error.set_source(DebugSource::new(self.module(), span))
-                }
+                error.set_source(self.debug_source());
                 Action::Error(error)
             }
         }
@@ -541,6 +545,14 @@ impl FrameApi for BytecodeFrame {
             }
         }
         Ok(())
+    }
+
+    fn debug_source(&self) -> DebugSource {
+        DebugSource::new(
+            self.module(),
+            Some(self.bytecode.name().to_owned()),
+            self.current_span(),
+        )
     }
 }
 
@@ -623,6 +635,10 @@ impl FrameApi for ModuleFrame {
 
     fn receive_return(&mut self, _value: Value) {
         // No-op. Our return will always be the module as a value.
+    }
+
+    fn debug_source(&self) -> DebugSource {
+        DebugSource::new(self.module.clone(), None, None)
     }
 }
 
@@ -725,8 +741,16 @@ impl FrameApi for ReplFrame {
     }
 
     fn catch_error(&mut self, error: VmError) {
-        println!("{}", error);
+        error.print_debug().expect("Unable to print error");
         self.last_result = None;
         self.last_error = Some(error);
+    }
+
+    fn debug_source(&self) -> DebugSource {
+        DebugSource::new(
+            self.loaded_modules.last().expect("Empty REPL").clone(),
+            Some("(repl)".to_owned()),
+            None,
+        )
     }
 }
