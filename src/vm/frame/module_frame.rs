@@ -1,4 +1,5 @@
 use super::super::errors::DebugSource;
+use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::LoadedModule;
 use super::super::value::Value;
 use super::{Action, BytecodeFrame, Frame, FrameApi};
@@ -28,7 +29,7 @@ impl ModuleFrame {
 }
 
 impl FrameApi for ModuleFrame {
-    fn run(&mut self) -> Action {
+    fn run(&mut self, _gc: &mut GcAllocator) -> Action {
         use ModuleFrameState::*;
         match self.state {
             // When the VM first runs us we call our main function and set our
@@ -63,5 +64,11 @@ impl FrameApi for ModuleFrame {
 
     fn debug_source(&self) -> DebugSource {
         DebugSource::new(self.module.clone(), None, None)
+    }
+}
+
+impl GcTrace for ModuleFrame {
+    fn trace(&self) -> () {
+        self.module.static_closure().trace();
     }
 }

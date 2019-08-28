@@ -1,6 +1,7 @@
 mod call_target;
 mod errors;
 mod frame;
+mod gc;
 mod loader;
 mod operators;
 pub mod prelude;

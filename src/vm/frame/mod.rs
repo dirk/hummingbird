@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::errors::{DebugSource, VmError};
+use super::gc::{GcAllocator, GcTrace};
 use super::loader::LoadedModule;
 use super::value::Value;
 
@@ -59,11 +60,11 @@ impl Frame {
 }
 
 impl FrameApi for Frame {
-    fn run(&mut self) -> Action {
+    fn run(&mut self, gc: &mut GcAllocator) -> Action {
         match self {
-            Frame::Bytecode(frame) => frame.run(),
-            Frame::Module(frame) => frame.run(),
-            Frame::Repl(frame) => frame.run(),
+            Frame::Bytecode(frame) => frame.run(gc),
+            Frame::Module(frame) => frame.run(gc),
+            Frame::Repl(frame) => frame.run(gc),
         }
     }
 
@@ -104,6 +105,16 @@ impl FrameApi for Frame {
             Frame::Bytecode(frame) => frame.debug_source(),
             Frame::Module(frame) => frame.debug_source(),
             Frame::Repl(frame) => frame.debug_source(),
+        }
+    }
+}
+
+impl GcTrace for Frame {
+    fn trace(&self) -> () {
+        match self {
+            Frame::Bytecode(frame) => frame.trace(),
+            Frame::Module(frame) => frame.trace(),
+            Frame::Repl(frame) => frame.trace(),
         }
     }
 }

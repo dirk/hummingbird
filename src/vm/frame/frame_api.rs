@@ -1,12 +1,13 @@
 use super::super::errors::VmError;
+use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::LoadedModule;
 use super::super::value::Value;
 use super::{Action, DebugSource};
 
-pub trait FrameApi {
+pub trait FrameApi: GcTrace {
     // Run the frame's fetch-execute loop. Will be different depending on if
     // it's a bytecode or native frame.
-    fn run(&mut self) -> Action;
+    fn run(&mut self, gc: &mut GcAllocator) -> Action;
 
     /// Called before the frame resumes execution after the higher frame has
     /// returned a value.
