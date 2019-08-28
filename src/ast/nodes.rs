@@ -131,11 +131,16 @@ pub enum ImportBindings {
 pub struct Import {
     pub name: String,
     pub bindings: ImportBindings,
+    pub span: Span,
 }
 
 impl Import {
-    pub fn new(name: String, bindings: ImportBindings) -> Self {
-        Self { name, bindings }
+    pub fn new(name: String, bindings: ImportBindings, span: Span) -> Self {
+        Self {
+            name,
+            bindings,
+            span,
+        }
     }
 
     pub fn path(&self) -> PathBuf {
@@ -227,13 +232,15 @@ impl PostfixCall {
 pub struct PostfixProperty {
     pub target: Box<Node>,
     pub value: String,
+    pub span: Span,
 }
 
 impl PostfixProperty {
-    pub fn new(target: Node, value: String) -> Self {
+    pub fn new(target: Node, value: String, span: Span) -> Self {
         Self {
             target: Box::new(target),
             value,
+            span,
         }
     }
 }

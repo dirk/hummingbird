@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use super::super::super::parser::Span;
+
 pub type Reg = u8;
 
 #[derive(Clone, Debug)]
@@ -39,6 +41,7 @@ pub struct Function {
     pub name: String,
     pub registers: u8,
     pub instructions: Vec<Instruction>,
+    pub source_mappings: Vec<(u16, Span)>,
     pub locals: u8,
     pub locals_names: Vec<String>,
     pub bindings: HashSet<String>,

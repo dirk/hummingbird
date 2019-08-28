@@ -10,6 +10,7 @@ use super::super::ast_to_ir;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
+use super::errors::VmError;
 use super::frame::Closure;
 
 mod loaded_function;
@@ -50,9 +51,14 @@ impl Loader {
         &mut self,
         name: String,
         relative_import_path: Option<PathBuf>,
-    ) -> Result<(LoadedModule, bool), Box<dyn Error>> {
-        let resolved = self.search(name, relative_import_path)?;
-        self.load_file(resolved)
+    ) -> Result<(LoadedModule, bool), VmError> {
+        let result = self
+            .search(name.clone(), relative_import_path)
+            .and_then(|resolved| self.load_file(resolved));
+        match result {
+            Ok(details) => Ok(details),
+            Err(error) => Err(VmError::new_load_file(name, error)),
+        }
     }
 
     fn search(
@@ -118,14 +124,15 @@ impl Loader {
     }
 }
 
-fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<ast::Module, Box<dyn Error>> {
+fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<(ast::Module, String), Box<dyn Error>> {
     let source = fs::read_to_string(path)?;
-    Ok(parser::parse(source))
+    Ok((parser::parse(source.clone()), source))
 }
 
 pub fn compile_ast_into_module(
     ast_module: &ast::Module,
     name: String,
+    source: String,
     ast_flags: ast_to_ir::CompilationFlags,
     // The highest closure in the system; normally should hold all the builtins.
     builtins_closure: Option<Closure>,
@@ -144,7 +151,8 @@ pub fn compile_ast_into_module(
         println!();
     }
 
-    let loaded_module = LoadedModule::from_bytecode(bytecode_module, name, builtins_closure);
+    let loaded_module =
+        LoadedModule::from_bytecode(bytecode_module, name, source, builtins_closure);
     Ok(loaded_module)
 }
 
@@ -158,12 +166,18 @@ pub fn load_file<P: AsRef<Path>>(
         .expect("Couldn't convert path to string")
         .to_owned();
 
-    let ast_module = read_and_parse_file(&name)?;
+    let (ast_module, source) = read_and_parse_file(&name)?;
     if *DEBUG_AST {
         println!("AST({}):", name);
         ast::printer::Printer::new(std::io::stdout()).print_module(ast_module.clone())?;
         println!();
     }
 
-    compile_ast_into_module(&ast_module, name, Default::default(), builtins_closure)
+    compile_ast_into_module(
+        &ast_module,
+        name,
+        source,
+        Default::default(),
+        builtins_closure,
+    )
 }

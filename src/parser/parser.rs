@@ -7,6 +7,7 @@ use super::super::ast::nodes::{
 
 use super::super::ast::{Import, ImportBindings, StringLiteral};
 use super::lexer::{Token, TokenStream};
+use super::location::Span;
 
 pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
@@ -69,8 +70,8 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
                 StatementContext::Module => expect_export(input),
                 other @ _ => unreachable!("Cannot parse export in {:?}", other),
             },
-            Token::Import => match ctx {
-                StatementContext::Module => export_import(input),
+            Token::Import(_) => match ctx {
+                StatementContext::Module => expect_import(input),
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
             },
             Token::Let(_) => parse_let_and_var(input),
@@ -138,24 +139,30 @@ fn expect_export(input: &mut TokenStream) -> Node {
     Node::Export(Export::new(identifiers))
 }
 
-fn export_import(input: &mut TokenStream) -> Node {
-    expect_to_read(input, Token::Import);
+fn expect_import(input: &mut TokenStream) -> Node {
+    let start = match input.read() {
+        Token::Import(location) => location,
+        other @ _ => {
+            panic_unexpected_names(other, "Import");
+            unreachable!()
+        }
+    };
     let bindings = match input.peek() {
         Token::Star => {
             input.read();
             ImportBindings::AllExports
         }
-        Token::String(_) => ImportBindings::Module,
+        Token::String(_, _) => ImportBindings::Module,
         other @ _ => unreachable!("Cannot yet parse in import: {:?}", other),
     };
-    let name = match input.read() {
-        Token::String(value) => value,
+    let (name, end) = match input.read() {
+        Token::String(value, span) => (value, span.end),
         other @ _ => {
             panic_unexpected_names(other, "String");
             unreachable!()
         }
     };
-    Node::Import(Import::new(name, bindings))
+    Node::Import(Import::new(name, bindings, Span::new(start, end)))
 }
 
 fn parse_let_and_var(input: &mut TokenStream) -> Node {
@@ -380,15 +387,19 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
         needs_backtrack = true;
     }
 
-    if input.peek() == Token::Dot {
+    if let Token::Dot(dot_start) = input.peek() {
         input.read(); // Dot
         needs_backtrack = true;
 
-        if let Token::Identifier(value, _) = input.peek() {
-            input.read(); // Identifier
+        if let Token::Identifier(value, identifier_span) = input.peek() {
+            // Identifier
+            input.read();
+            // Build a span holding both the dot and the identifier.
+            let span = Span::new(dot_start, identifier_span.end);
             return Some(Node::PostfixProperty(PostfixProperty::new(
                 target.to_owned(),
                 value,
+                span,
             )));
         }
     }
@@ -445,7 +456,7 @@ fn parse_atom(input: &mut TokenStream) -> Node {
             input.read();
             Node::Integer(Integer { value })
         }
-        Token::String(value) => {
+        Token::String(value, _) => {
             input.read();
             Node::String(StringLiteral { value })
         }
@@ -613,6 +624,7 @@ mod tests {
             vec![Node::Import(Import::new(
                 "foo".to_string(),
                 ImportBindings::AllExports,
+                Span::unknown(),
             ))],
         );
     }
@@ -833,6 +845,7 @@ mod tests {
             Node::PostfixProperty(PostfixProperty::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 "bar".to_string(),
+                Span::unknown(),
             ))
         );
     }

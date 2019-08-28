@@ -75,12 +75,12 @@ pub enum Token {
     BraceLeft,
     BraceRight,
     Comma,
-    Dot,
+    Dot(Location),
     EOF,
     Equals,
     Export,
     Identifier(String, Span),
-    Import,
+    Import(Location),
     Integer(i64),
     LeftAngle,
     Let(Location),
@@ -90,7 +90,7 @@ pub enum Token {
     Plus,
     Return,
     Star,
-    String(String),
+    String(String, Span),
     Terminal(char),
     Var(Location),
     While(Location),
@@ -165,7 +165,7 @@ impl TokenStream {
     pub fn read(&mut self) -> Token {
         let token = self.peek();
         self.peeking = false;
-        return token;
+        token
     }
 
     fn lex(&mut self) -> Token {
@@ -180,7 +180,7 @@ impl TokenStream {
             } else if numeric_head(character) {
                 return self.lex_arrow_minus_or_numeric();
             } else if string_head(character) {
-                return self.lex_string();
+                return self.lex_string(location);
             } else {
                 self.input.read();
                 match character {
@@ -190,7 +190,7 @@ impl TokenStream {
                     '(' => return Token::ParenthesesLeft,
                     ')' => return Token::ParenthesesRight,
                     ',' => return Token::Comma,
-                    '.' => return Token::Dot,
+                    '.' => return Token::Dot(location),
                     '=' => return Token::Equals,
                     '<' => return Token::LeftAngle,
                     '+' => return Token::Plus,
@@ -221,20 +221,25 @@ impl TokenStream {
         match identifier_string.as_str() {
             "export" => Token::Export,
             "let" => Token::Let(start),
-            "import" => Token::Import,
+            "import" => Token::Import(start),
             "return" => Token::Return,
             "var" => Token::Var(start),
             "while" => Token::While(start),
-            _ => Token::Identifier(identifier_string, Span::new(start, self.input.location())),
+            _ => Token::Identifier(
+                identifier_string,
+                Span::new(start.clone(), self.input.location()),
+            ),
         }
     }
 
-    fn lex_string(&mut self) -> Token {
+    fn lex_string(&mut self, start: Location) -> Token {
         let opening = self.input.read();
         assert_eq!(opening, '"');
         let mut characters = vec![];
+        let mut end;
         loop {
             let character = self.input.read();
+            end = self.input.location();
             if character != '"' {
                 characters.push(character);
             } else {
@@ -242,7 +247,7 @@ impl TokenStream {
             }
         }
         let string: String = characters.into_iter().collect();
-        Token::String(string)
+        Token::String(string, Span::new(start, end))
     }
 
     fn lex_arrow_minus_or_numeric(&mut self) -> Token {
@@ -497,11 +502,23 @@ mod tests {
     fn it_parses_strings() {
         assert_eq!(
             parse("\"\""),
-            vec![Token::String("".to_string()), Token::EOF]
+            vec![
+                Token::String(
+                    "".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(2, 1, 3),)
+                ),
+                Token::EOF
+            ]
         );
         assert_eq!(
             parse("\"abc123\""),
-            vec![Token::String("abc123".to_string()), Token::EOF]
+            vec![
+                Token::String(
+                    "abc123".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(8, 1, 9),)
+                ),
+                Token::EOF
+            ]
         );
     }
 

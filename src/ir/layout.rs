@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
+use super::super::parser::Span;
+
 // We have to share a lot of things around, so use reference-counting to keep
 // track of them.
 pub type SharedBasicBlock = Rc<RefCell<BasicBlock>>;
@@ -108,6 +110,8 @@ pub struct Function {
     pub current: SharedBasicBlock,
     // Used for compilation.
     pub basic_blocks: Vec<SharedBasicBlock>,
+    // Keep track of source maps.
+    pub source_mappings: Vec<(Address, Span)>,
 
     // All the values allocated within the function.
     pub values: Vec<SharedValue>,
@@ -130,6 +134,7 @@ impl Function {
             entry: entry.clone(),
             current: entry.clone(),
             basic_blocks: vec![entry],
+            source_mappings: vec![],
             values: vec![],
             instruction_counter: 0,
         }
@@ -161,10 +166,18 @@ impl Function {
     //     }
     // }
 
+    pub fn address(&self) -> Address {
+        self.instruction_counter
+    }
+
     pub fn next_address(&mut self) -> Address {
         let address = self.instruction_counter;
         self.instruction_counter += 1;
         address
+    }
+
+    pub fn add_mapping(&mut self, address: Address, span: Span) {
+        self.source_mappings.push((address, span));
     }
 
     pub fn push_basic_block(&mut self, build_branch: bool) -> SharedBasicBlock {

@@ -1,10 +1,8 @@
-use std::error;
-
-use super::errors::PropertyNotFoundError;
+use super::errors::VmError;
 use super::value::Value;
 
 #[inline]
-pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
+pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, VmError> {
     match (&lhs, &rhs) {
         (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Integer(*lhs + *rhs)),
         _ => panic!("Cannot add {:?} and {:?}", lhs, rhs),
@@ -12,7 +10,7 @@ pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
 }
 
 #[inline]
-pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Error>> {
+pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, VmError> {
     match (&lhs, &rhs) {
         (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Boolean(*lhs < *rhs)),
         _ => panic!("Cannot less-than {:?} and {:?}", lhs, rhs),
@@ -20,13 +18,13 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, Box<dyn error::Erro
 }
 
 #[inline]
-pub fn op_property(target: Value, value: String) -> Result<Value, Box<dyn error::Error>> {
+pub fn op_property(target: Value, value: String) -> Result<Value, VmError> {
     match &target {
         Value::Module(module) => {
             if let Some(found) = module.get_export(&value) {
                 Ok(found)
             } else {
-                Err(Box::new(PropertyNotFoundError::new(target, value)))
+                Err(VmError::new_property_not_found(target, value))
             }
         }
         _ => panic!("Cannot get property of {:?}", target),
@@ -35,7 +33,7 @@ pub fn op_property(target: Value, value: String) -> Result<Value, Box<dyn error:
 
 /// Only `null` and `false` are falsy. Everything else is truthy.
 #[inline]
-pub fn is_truthy(value: Value) -> Result<bool, Box<dyn error::Error>> {
+pub fn is_truthy(value: Value) -> Result<bool, VmError> {
     match &value {
         Value::Null => Ok(false),
         Value::Boolean(value) => Ok(*value),

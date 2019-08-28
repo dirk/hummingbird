@@ -38,6 +38,11 @@ impl<O: Write> Printer<O> {
             self.print_instruction(instruction, address)?;
         }
         writeln!(self.output, "  }}")?;
+        // writeln!(self.output, "  source_mappings {{")?;
+        // for (address, span) in function.source_mappings.iter() {
+        //     writeln!(self.output, "    {:04} {:?}", address, span)?;
+        // }
+        // writeln!(self.output, "  }}")?;
         writeln!(self.output, "}}")
     }
 

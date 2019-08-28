@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
 
+use super::super::super::parser::Span;
 use super::super::super::target::bytecode;
 use super::super::frame::Closure;
 use super::{LoadedModule, WeakLoadedModule};
@@ -103,6 +104,15 @@ impl InnerBytecodeFunction {
     #[inline]
     pub fn instruction(&self, instruction_address: usize) -> bytecode::layout::Instruction {
         self.function.instructions[instruction_address].clone()
+    }
+
+    pub fn span(&self, instruction_address: usize) -> Option<Span> {
+        for (address, span) in self.function.source_mappings.iter() {
+            if ((*address) as usize) == instruction_address {
+                return Some(span.clone());
+            }
+        }
+        None
     }
 
     pub fn locals_names(&self) -> Vec<String> {
