@@ -369,6 +369,7 @@ fn parse_postfix(input: &mut TokenStream) -> Node {
         }
         if input.peek() == Token::ParenthesesLeft {
             target = parse_postfix_call(input, target);
+            continue;
         }
         break;
     }

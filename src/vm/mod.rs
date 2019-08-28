@@ -7,4 +7,4 @@ pub mod prelude;
 mod value;
 mod vm;
 
-pub use self::vm::Vm;
+pub use vm::Vm;
