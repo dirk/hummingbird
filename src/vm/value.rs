@@ -80,7 +80,7 @@ impl Debug for Value {
             String(value) => {
                 let string = &**value;
                 write!(f, "{:?}", string)
-            },
+            }
         }
     }
 }

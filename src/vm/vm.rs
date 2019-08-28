@@ -44,12 +44,18 @@ impl Vm {
         let mut gc = GcAllocator::new(gc_debug);
 
         loop {
-            // Check if we need garbage collect in between every stack change.
-            // This means currently all garbage collection is inter-frame. If
-            // we need intra-frame collection then we can do that as part of
-            // generational GC.
+            // Check if we need to garbage collect in between every stack
+            // change. This means currently all garbage collection is
+            // inter-frame. If we need intra-frame collection then we can do
+            // that as part of generational GC.
             if gc.needs_collection() {
                 gc.collect(|| {
+                    // In a full GC we need to trace both the stack and all
+                    // loaded modules (so that their static closures and
+                    // exports remain alive).
+                    for loaded_module in self.loader.loaded_modules_iter() {
+                        loaded_module.trace();
+                    }
                     for frame in self.stack.iter() {
                         frame.trace();
                     }

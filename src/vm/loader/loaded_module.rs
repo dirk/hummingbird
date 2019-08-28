@@ -7,6 +7,7 @@ use std::rc::{Rc, Weak};
 
 use super::super::super::target::bytecode;
 use super::super::frame::Closure;
+use super::super::gc::GcTrace;
 use super::super::value::Value;
 use super::LoadedFunction;
 
@@ -153,6 +154,16 @@ impl TryInto<LoadedModule> for WeakLoadedModule {
         match self.upgrade() {
             Some(inner) => Ok(LoadedModule(inner)),
             None => Err(()),
+        }
+    }
+}
+
+impl GcTrace for LoadedModule {
+    fn trace(&self) {
+        let inner = self.0.borrow();
+        inner.static_closure.trace();
+        for export in inner.exports.exports.values() {
+            export.trace();
         }
     }
 }
