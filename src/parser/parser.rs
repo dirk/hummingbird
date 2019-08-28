@@ -523,7 +523,7 @@ impl From<Token> for Identifier {
 mod tests {
     use super::super::super::ast::nodes::{
         Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
-        Let, Module, Node, PostfixCall, PostfixProperty, Return,
+        Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -711,6 +711,64 @@ mod tests {
     }
 
     #[test]
+    fn it_parses_nested_functions() {
+        // Nested anonymous.
+        assert_eq!(
+            parse_complete("() -> () -> 123"),
+            vec![Node::Function(Function::new_anonymous(Box::new(
+                Node::Function(Function::new_anonymous(Box::new(Node::Integer(Integer {
+                    value: 123
+                }))))
+            )))],
+        );
+        // Nested anonymous as right-hand-side of assignment.
+        assert_eq!(
+            parse_complete("let a = () -> () -> 123"),
+            vec![Node::Let(Let::new(
+                Identifier::new("a", Span::unknown()),
+                Some(Node::Function(Function::new_anonymous(Box::new(
+                    Node::Function(Function::new_anonymous(Box::new(Node::Integer(Integer {
+                        value: 123
+                    })))),
+                )))),
+            ))],
+        );
+        // Nested anonymous within named.
+        assert_eq!(
+            parse_complete("foo() -> () -> 123"),
+            vec![Node::Function(Function::new_named(
+                "foo".to_string(),
+                Box::new(Node::Function(Function::new_anonymous(Box::new(
+                    Node::Integer(Integer { value: 123 })
+                )))),
+            ))],
+        );
+        // Nested named within blocks.
+        assert_eq!(
+            parse_complete("foo() -> { bar() -> 123 \n bar }"),
+            vec![Node::Function(Function::new_named(
+                "foo".to_string(),
+                Box::new(Node::Block(Block {
+                    nodes: vec![
+                        Node::Function(Function::new_named(
+                            "bar".to_string(),
+                            Box::new(Node::Integer(Integer { value: 123 })),
+                        )),
+                        Node::Identifier(Identifier::new("bar", Span::unknown())),
+                    ],
+                })),
+            ))],
+        );
+    }
+
+    // Named functions are statements so they cannot be nested as expressions.
+    #[test]
+    #[should_panic]
+    fn it_doesnt_parse_nested_named_functions() {
+        parse_complete("a() -> b() -> 123");
+    }
+
+    #[test]
     fn it_parses_named_function() {
         assert_eq!(
             parse_complete("foo() -> { 123 }"),
@@ -721,17 +779,33 @@ mod tests {
                 })),
             ))],
         );
+        // Check that `;` terminates the expression.
+        assert_eq!(
+            parse_complete("foo() -> 456; \"not in function\""),
+            vec![
+                Node::Function(Function::new_named(
+                    "foo".to_string(),
+                    Box::new(Node::Integer(Integer { value: 456 }),)
+                )),
+                Node::String(StringLiteral::new("not in function".to_owned())),
+            ],
+        );
     }
 
     #[test]
     fn it_parses_atom() {
+        let parsed = parse_complete("/* */\n  foo");
         assert_eq!(
-            parse_complete("/* */\n  foo"),
-            vec![Node::Identifier(Identifier::new(
-                "foo",
-                Span::new(Location::new(8, 2, 3), Location::new(11, 2, 6)),
-            )),],
+            parsed,
+            vec![Node::Identifier(Identifier::new("foo", Span::unknown(),))],
         );
+        match &parsed[0] {
+            Node::Identifier(identifier) => assert_eq!(
+                identifier.span,
+                Span::new(Location::new(8, 2, 3), Location::new(11, 2, 6))
+            ),
+            _ => unreachable!(),
+        }
     }
 
     #[test]
@@ -854,45 +928,45 @@ mod tests {
     #[test]
     fn it_parses_postfix_call() {
         assert_eq!(
-            parse_postfix(&mut input("foo()")),
-            Node::PostfixCall(PostfixCall::new(
+            parse_complete("foo()"),
+            vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![],
-            )),
+            ))],
         );
         assert_eq!(
-            parse_postfix(&mut input("foo(1)")),
-            Node::PostfixCall(PostfixCall::new(
+            parse_complete("foo(1)"),
+            vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![Node::Integer(Integer { value: 1 }),],
-            )),
+            ))],
         );
         assert_eq!(
-            parse_postfix(&mut input("foo(1,)")),
-            Node::PostfixCall(PostfixCall::new(
+            parse_complete("foo(1,)"),
+            vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![Node::Integer(Integer { value: 1 }),],
-            )),
+            ))],
         );
         assert_eq!(
-            parse_postfix(&mut input("foo(1, 2)")),
-            Node::PostfixCall(PostfixCall::new(
+            parse_complete("foo(1, 2)"),
+            vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            )),
+            ))],
         );
         assert_eq!(
-            parse_postfix(&mut input("foo(1, 2,)")),
-            Node::PostfixCall(PostfixCall::new(
+            parse_complete("foo(1, 2,)"),
+            vec![Node::PostfixCall(PostfixCall::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            )),
+            ))],
         );
         assert_eq!(
             parse_complete("foo(bar())"),
@@ -903,6 +977,20 @@ mod tests {
                     vec![],
                 )),],
             )),]
+        );
+    }
+
+    #[test]
+    fn it_parses_chained_postfix_call() {
+        assert_eq!(
+            parse_complete("foo(1)(2)"),
+            vec![Node::PostfixCall(PostfixCall::new(
+                Node::PostfixCall(PostfixCall::new(
+                    Node::Identifier(Identifier::new("foo", Span::unknown())),
+                    vec![Node::Integer(Integer { value: 1 })],
+                )),
+                vec![Node::Integer(Integer { value: 2 })],
+            ))],
         );
     }
 }

@@ -181,6 +181,12 @@ pub struct StringLiteral {
     pub value: String,
 }
 
+impl StringLiteral {
+    pub fn new(value: String) -> Self {
+        Self { value }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum InfixOp {
     Add,
