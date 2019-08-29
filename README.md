@@ -1,6 +1,6 @@
 [![Build Status][travis-image]][travis-url]
 
-[travis-image]: https://travis-ci.org/dirk/hummingbird.svg
+[travis-image]: https://travis-ci.org/dirk/hummingbird.svg?branch=master
 [travis-url]: https://travis-ci.org/dirk/hummingbird
 
 # Hummingbird
