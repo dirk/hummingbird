@@ -1,10 +1,17 @@
 use super::errors::VmError;
+use super::gc::GcAllocator;
 use super::value::Value;
 
 #[inline]
-pub fn op_add(lhs: Value, rhs: Value) -> Result<Value, VmError> {
+pub fn op_add(lhs: Value, rhs: Value, gc: &mut GcAllocator) -> Result<Value, VmError> {
     match (&lhs, &rhs) {
         (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Integer(*lhs + *rhs)),
+        (Value::String(lhs), Value::String(rhs)) => {
+            let lhs = &**lhs;
+            let rhs = &**rhs;
+            let value = gc.allocate(lhs.clone() + rhs);
+            Ok(Value::String(value))
+        }
         _ => panic!("Cannot add {:?} and {:?}", lhs, rhs),
     }
 }

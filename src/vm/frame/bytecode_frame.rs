@@ -186,7 +186,7 @@ impl BytecodeFrame {
                 Instruction::OpAdd(lval, lhs, rhs) => {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);
-                    let value = operators::op_add(lhs, rhs)?;
+                    let value = operators::op_add(lhs, rhs, gc)?;
                     self.write_register(*lval, value);
                     self.advance();
                 }
