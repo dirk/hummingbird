@@ -1,4 +1,4 @@
-RSpec.describe 'Integration' do
+RSpec.describe 'End-to-end' do
   directories = Dir[File.join(File.dirname(__FILE__), '*')]
     .select { |entry| File.directory?(entry) }
 
