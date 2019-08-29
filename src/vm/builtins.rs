@@ -1,10 +1,10 @@
 use super::frame::Closure;
 use super::value::Value;
 
-pub fn build_prelude() -> Closure {
+pub fn build() -> Closure {
     let closure = Closure::new_builtins();
 
-    let functions = vec![("println".to_owned(), prelude_println)];
+    let functions = vec![("println".to_owned(), builtin_println)];
 
     for (name, function) in functions.into_iter() {
         closure.set_directly(name, Value::make_builtin_function(function));
@@ -13,7 +13,7 @@ pub fn build_prelude() -> Closure {
     closure
 }
 
-fn prelude_println(arguments: Vec<Value>) -> Value {
+fn builtin_println(arguments: Vec<Value>) -> Value {
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),

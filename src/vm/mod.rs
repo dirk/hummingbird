@@ -1,9 +1,9 @@
+pub mod builtins;
 mod errors;
 mod frame;
 mod gc;
 mod loader;
 mod operators;
-pub mod prelude;
 mod value;
 mod vm;
 

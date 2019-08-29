@@ -1,11 +1,11 @@
 use std::env;
 use std::path::Path;
 
+use super::builtins;
 use super::errors::{DebugSource, VmError};
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
 use super::gc::{GcAllocator, GcTrace};
 use super::loader::Loader;
-use super::prelude;
 
 pub type StackSnapshot = Vec<(u16, DebugSource)>;
 
@@ -17,7 +17,7 @@ pub struct Vm {
 
 impl Vm {
     pub fn new() -> Self {
-        let builtins_closure = prelude::build_prelude();
+        let builtins_closure = builtins::build();
         Self {
             loader: Loader::new(builtins_closure.clone()),
             builtins_closure,
