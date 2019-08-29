@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+./script/test-unit
+./script/test-end-to-end
