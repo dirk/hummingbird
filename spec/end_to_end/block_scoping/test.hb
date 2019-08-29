@@ -4,7 +4,7 @@ println(retrieve())
 
 {
   var test = "inner"
-  retrieve() -> test2
+  retrieve() -> test
   println(retrieve()) // Should print "inner"
 }
 
