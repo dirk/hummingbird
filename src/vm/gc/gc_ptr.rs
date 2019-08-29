@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use super::{GcManaged, GcTrace};
+use super::GcManaged;
 
 /// Heap-allocated box holding a GC'ed value.
 pub struct GcBox<T: GcManaged + ?Sized> {
@@ -68,16 +68,5 @@ impl<T: GcManaged> DerefMut for GcPtr<T> {
     fn deref_mut(&mut self) -> &mut T {
         let value = unsafe { &mut (*self.boxed).value };
         value
-    }
-}
-
-/// For types which support `GcTrace` add an automatic convenience
-/// implementation to mark the pointer and then trace its contents.
-impl<T: GcManaged + GcTrace> GcTrace for GcPtr<T> {
-    /// Tracing a `GcPtr` will mark it and then trace its contents.
-    fn trace(&self) {
-        self.mark();
-        let value = &**self;
-        value.trace();
     }
 }
