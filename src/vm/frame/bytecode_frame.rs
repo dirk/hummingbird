@@ -164,13 +164,15 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::MakeFunction(lval, id) => {
-                    let function = self.module().function(*id);
-                    let closure = if function.binds_on_create() {
+                    let loaded_function = self.module().function(*id);
+                    // This is the parent environment in which the function's
+                    // expressions will be evaluated when it is called.
+                    let parent = if loaded_function.binds_on_create() {
                         self.closure.clone()
                     } else {
                         None
                     };
-                    let value = Value::from_dynamic_function(function, closure);
+                    let value = Value::make_function(loaded_function, parent);
                     self.write_register(*lval, value);
                     self.advance();
                 }
@@ -221,14 +223,13 @@ impl BytecodeFrame {
                         .map(|argument| self.read_register(*argument))
                         .collect::<Vec<Value>>();
                     match target {
-                        Value::Function(dynamic_function) => {
+                        Value::Function(function) => {
                             // Save the return register for when the VM calls `receive_return`.
                             self.return_register = Some(*lval);
-                            // TODO: Make `CallTarget` able to do specialization.
-                            let function = dynamic_function.call_target.function;
-                            let parent_closure = dynamic_function.closure;
-                            let closure = function.build_closure_for_call(parent_closure);
-                            let frame = Frame::Bytecode(BytecodeFrame::new(function, closure));
+                            let loaded_function = function.loaded_function;
+                            let closure = loaded_function.build_closure_for_call(function.parent);
+                            let frame =
+                                Frame::Bytecode(BytecodeFrame::new(loaded_function, closure));
                             // Be at the next instruction when control flow returns to us.
                             self.advance();
                             return Ok(Action::Call(frame));
