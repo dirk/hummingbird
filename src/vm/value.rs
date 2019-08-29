@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use super::call_target::CallTarget;
 use super::frame::Closure;
-use super::gc::{GcPtr, GcTrace};
+use super::gc::{GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
 
 #[derive(Clone)]
@@ -85,6 +85,8 @@ impl Debug for Value {
     }
 }
 
+impl GcManaged for Value {}
+
 impl GcTrace for Value {
     fn trace(&self) {
         use Value::*;
@@ -94,14 +96,10 @@ impl GcTrace for Value {
                     closure.trace();
                 }
             }
-            String(value) => value.trace(),
+            String(value) => value.mark(),
             _ => (),
         }
     }
 }
 
-impl GcTrace for String {
-    fn trace(&self) {
-        // No children, so nothing to do for trace.
-    }
-}
+impl GcManaged for String {}

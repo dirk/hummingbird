@@ -1,10 +1,10 @@
-// GcBox is a private implementation detail of the GC.
+// `GcBox` is a private implementation detail of the GC.
 use super::gc_ptr::GcBox;
-use super::GcPtr;
+use super::{GcManaged, GcPtr};
 
 /// Manages allocation and collection of objects for a stack.
 pub struct GcAllocator {
-    slots: Vec<*mut GcBox<dyn GcTrace>>,
+    slots: Vec<*mut GcBox<dyn GcManaged>>,
     debug: bool,
 }
 
@@ -16,7 +16,7 @@ impl GcAllocator {
         }
     }
 
-    pub fn allocate<T: GcTrace + 'static>(&mut self, value: T) -> GcPtr<T> {
+    pub fn allocate<T: GcManaged + 'static>(&mut self, value: T) -> GcPtr<T> {
         let boxed = Box::into_raw(Box::new(GcBox::new(value)));
         self.slots.push(boxed);
         GcPtr::new(boxed)
@@ -64,9 +64,4 @@ impl GcAllocator {
             println!("GC: {}", message.into())
         }
     }
-}
-
-pub trait GcTrace {
-    /// Mark any `GcPtr`s in self or self's children.
-    fn trace(&self) -> ();
 }

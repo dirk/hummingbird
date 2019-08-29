@@ -50,15 +50,7 @@ impl Vm {
             // that as part of generational GC.
             if gc.needs_collection() {
                 gc.collect(|| {
-                    // In a full GC we need to trace both the stack and all
-                    // loaded modules (so that their static closures and
-                    // exports remain alive).
-                    for loaded_module in self.loader.loaded_modules_iter() {
-                        loaded_module.trace();
-                    }
-                    for frame in self.stack.iter() {
-                        frame.trace();
-                    }
+                    self.trace();
                 });
             }
 
@@ -190,5 +182,19 @@ impl Vm {
             index += 1;
         }
         captured
+    }
+}
+
+impl GcTrace for Vm {
+    fn trace(&self) {
+        // In a full GC we need to trace both the stack and all
+        // loaded modules (so that their static closures and
+        // exports remain alive).
+        for loaded_module in self.loader.loaded_modules_iter() {
+            loaded_module.trace();
+        }
+        for frame in self.stack.iter() {
+            frame.trace();
+        }
     }
 }
