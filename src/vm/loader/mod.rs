@@ -1,3 +1,4 @@
+use std::collections::hash_map::Values;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -121,6 +122,10 @@ impl Loader {
     pub fn unload(&mut self, module: &LoadedModule) -> bool {
         let path: PathBuf = module.name().into();
         self.loaded_modules.remove(&path).is_some()
+    }
+
+    pub fn loaded_modules_iter(&self) -> Values<PathBuf, LoadedModule> {
+        self.loaded_modules.values()
     }
 }
 

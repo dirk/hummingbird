@@ -4,6 +4,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use super::super::errors::VmError;
+use super::super::gc::GcTrace;
 use super::super::value::Value;
 
 struct InnerClosure {
@@ -106,6 +107,17 @@ impl Closure {
     pub fn set_directly(&self, name: String, value: Value) {
         let inner = &mut self.0.borrow_mut();
         inner.locals.insert(name, Some(value));
+    }
+}
+
+impl GcTrace for Closure {
+    fn trace(&self) -> () {
+        let inner = self.0.borrow();
+        for value in inner.locals.values() {
+            if let Some(value) = value {
+                value.trace();
+            }
+        }
     }
 }
 

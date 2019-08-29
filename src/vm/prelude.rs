@@ -24,7 +24,10 @@ fn prelude_println(arguments: Vec<Value>) -> Value {
             Value::Integer(value) => println!("{}", value),
             Value::Module(module) => println!("Module({})", module.name()),
             Value::Null => println!("null"),
-            Value::String(value) => println!("{}", value),
+            Value::String(value) => {
+                let string = &**value;
+                println!("{}", string)
+            }
             _ => unreachable!(),
         }
     };

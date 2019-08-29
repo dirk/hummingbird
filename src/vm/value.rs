@@ -2,10 +2,9 @@ use std::fmt::{Debug, Error, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
 
-// use gc::{Finalize, Gc, GcCell, Trace};
-
 use super::call_target::CallTarget;
 use super::frame::Closure;
+use super::gc::{GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
 
 #[derive(Clone)]
@@ -32,16 +31,6 @@ impl NativeFunction {
 // pub struct DynamicObject {
 //     properties: HashMap<String, Value>,
 // }
-//
-// impl Finalize for DynamicObject {}
-//
-// unsafe impl Trace for DynamicObject {
-//     custom_trace!(this, {
-//         for (_key, value) in this.properties.iter() {
-//             mark(value);
-//         }
-//     });
-// }
 
 #[derive(Clone)]
 pub enum Value {
@@ -52,7 +41,7 @@ pub enum Value {
     Function(DynamicFunction),
     Integer(i64),
     Module(LoadedModule),
-    String(String),
+    String(GcPtr<String>),
 }
 
 impl Value {
@@ -88,18 +77,29 @@ impl Debug for Value {
             }
             Integer(value) => write!(f, "{}", value),
             Module(module) => write!(f, "Module({})", module.name()),
-            String(value) => write!(f, "{:?}", value),
+            String(value) => {
+                let string = &**value;
+                write!(f, "{:?}", string)
+            }
         }
     }
 }
 
-// impl Finalize for Value {}
-//
-// unsafe impl Trace for Value {
-//     custom_trace!(this, {
-//         match this {
-//             Value::DynamicObject(dynamic_object) => mark(dynamic_object),
-//             _ => (),
-//         }
-//     });
-// }
+impl GcManaged for Value {}
+
+impl GcTrace for Value {
+    fn trace(&self) {
+        use Value::*;
+        match self {
+            Function(function) => {
+                if let Some(closure) = &function.closure {
+                    closure.trace();
+                }
+            }
+            String(value) => value.mark(),
+            _ => (),
+        }
+    }
+}
+
+impl GcManaged for String {}

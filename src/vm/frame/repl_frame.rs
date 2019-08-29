@@ -3,6 +3,7 @@ use std::io::Write;
 use super::super::super::ast_to_ir;
 use super::super::super::parser;
 use super::super::errors::{DebugSource, VmError};
+use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::{self, LoadedModule};
 use super::super::value::Value;
 use super::{Action, BytecodeFrame, Closure, Frame, FrameApi};
@@ -56,7 +57,7 @@ impl ReplFrame {
 }
 
 impl FrameApi for ReplFrame {
-    fn run(&mut self) -> Action {
+    fn run(&mut self, _gc: &mut GcAllocator) -> Action {
         if let Some(result) = &self.last_result {
             println!("{:?}", result);
             self.last_result = None;
@@ -117,5 +118,14 @@ impl FrameApi for ReplFrame {
             Some("(repl)".to_owned()),
             None,
         )
+    }
+}
+
+impl GcTrace for ReplFrame {
+    fn trace(&self) -> () {
+        self.static_closure.trace();
+        if let Some(value) = &self.last_result {
+            value.trace();
+        }
     }
 }

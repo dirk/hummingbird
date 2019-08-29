@@ -3,6 +3,7 @@ use std::fmt;
 use super::super::super::parser;
 use super::super::super::target::bytecode::layout::{Instruction, Reg};
 use super::super::errors::{DebugSource, VmError};
+use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::super::operators;
 use super::super::value::Value;
@@ -133,7 +134,7 @@ impl BytecodeFrame {
 
     /// Using an inner function so that we can use the `?` operator.
     #[inline]
-    fn run_inner(&mut self) -> Result<Action, VmError> {
+    fn run_inner(&mut self, gc: &mut GcAllocator) -> Result<Action, VmError> {
         loop {
             let instruction = self.current();
 
@@ -178,7 +179,8 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::MakeString(lval, value) => {
-                    self.write_register(*lval, Value::String(value.clone()));
+                    let value = gc.allocate(value.clone());
+                    self.write_register(*lval, Value::String(value));
                     self.advance();
                 }
                 Instruction::OpAdd(lval, lhs, rhs) => {
@@ -264,8 +266,8 @@ impl BytecodeFrame {
 }
 
 impl FrameApi for BytecodeFrame {
-    fn run(&mut self) -> Action {
-        match self.run_inner() {
+    fn run(&mut self, gc: &mut GcAllocator) -> Action {
+        match self.run_inner(gc) {
             Ok(action) => action,
             Err(mut error) => {
                 // Try to use our source mappings to get additional
@@ -307,6 +309,21 @@ impl FrameApi for BytecodeFrame {
             Some(self.bytecode.name().to_owned()),
             self.current_span(),
         )
+    }
+}
+
+impl GcTrace for BytecodeFrame {
+    fn trace(&self) -> () {
+        for local_value in self.locals.iter() {
+            local_value.trace();
+        }
+        if let Some(closure) = &self.closure {
+            closure.trace();
+        }
+        self.static_closure.trace();
+        for register_value in self.registers.iter() {
+            register_value.trace();
+        }
     }
 }
 

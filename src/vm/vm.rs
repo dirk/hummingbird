@@ -1,7 +1,9 @@
+use std::env;
 use std::path::Path;
 
 use super::errors::{DebugSource, VmError};
 use super::frame::{Action, Closure, Frame, FrameApi, ModuleFrame, ReplFrame};
+use super::gc::{GcAllocator, GcTrace};
 use super::loader::Loader;
 use super::prelude;
 
@@ -38,10 +40,23 @@ impl Vm {
     }
 
     fn run(&mut self) {
+        let gc_debug = env::var("GC_DEBUG").is_ok();
+        let mut gc = GcAllocator::new(gc_debug);
+
         loop {
+            // Check if we need to garbage collect in between every stack
+            // change. This means currently all garbage collection is
+            // inter-frame. If we need intra-frame collection then we can do
+            // that as part of generational GC.
+            if gc.needs_collection() {
+                gc.collect(|| {
+                    self.trace();
+                });
+            }
+
             let action = {
                 if let Some(top) = self.stack.last_mut() {
-                    top.run()
+                    top.run(&mut gc)
                 } else {
                     // If the stack's empty then we have nothing more to do!
                     return;
@@ -167,5 +182,19 @@ impl Vm {
             index += 1;
         }
         captured
+    }
+}
+
+impl GcTrace for Vm {
+    fn trace(&self) {
+        // In a full GC we need to trace both the stack and all
+        // loaded modules (so that their static closures and
+        // exports remain alive).
+        for loaded_module in self.loader.loaded_modules_iter() {
+            loaded_module.trace();
+        }
+        for frame in self.stack.iter() {
+            frame.trace();
+        }
     }
 }
