@@ -5,6 +5,10 @@ language: rust
 rust:
   - "1.37.0"
 
+cache:
+  bundler: true
+  cargo: true
+
 before_install:
   # Keep this Bundler version in sync with `Gemfile.lock`.
   - "gem install bundler -v '2.0.2'"
