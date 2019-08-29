@@ -309,11 +309,11 @@ impl TokenStream {
 }
 
 fn identifier_head(character: char) -> bool {
-    alphabetical(character)
+    alphabetical(character) || character == '_'
 }
 
 fn identifier_tail(character: char) -> bool {
-    alphabetical(character)
+    alphabetical(character) || digit(character) || character == '_'
 }
 
 fn numeric_head(character: char) -> bool {
@@ -362,6 +362,26 @@ mod tests {
                 Token::Identifier(
                     "foo".to_string(),
                     Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
+                ),
+                Token::EOF,
+            ]
+        );
+        assert_eq!(
+            parse("a1_b2"),
+            vec![
+                Token::Identifier(
+                    "a1_b2".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(5, 1, 6)),
+                ),
+                Token::EOF,
+            ]
+        );
+        assert_eq!(
+            parse("_"),
+            vec![
+                Token::Identifier(
+                    "_".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(1, 1, 2)),
                 ),
                 Token::EOF,
             ]
