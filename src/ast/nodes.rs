@@ -19,6 +19,7 @@ pub enum Node {
     PostfixProperty(PostfixProperty),
     Return(Return),
     String(StringLiteral),
+    Symbol(SymbolLiteral),
     Var(Var),
     While(While),
 }
@@ -182,6 +183,17 @@ pub struct StringLiteral {
 }
 
 impl StringLiteral {
+    pub fn new(value: String) -> Self {
+        Self { value }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SymbolLiteral {
+    pub value: String,
+}
+
+impl SymbolLiteral {
     pub fn new(value: String) -> Self {
         Self { value }
     }

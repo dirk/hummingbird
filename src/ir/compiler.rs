@@ -238,6 +238,9 @@ impl Compiler {
                 ir::Instruction::MakeString(lval, value) => {
                     bytecode::Instruction::MakeString(allocate(lval), value.clone())
                 }
+                ir::Instruction::MakeSymbol(lval, symbol) => {
+                    bytecode::Instruction::MakeSymbol(allocate(lval), *symbol)
+                }
                 ir::Instruction::OpAdd(lval, lhs, rhs) => bytecode::Instruction::OpAdd(
                     allocate(lval),
                     read(lhs, address),

@@ -1,4 +1,5 @@
 use super::frame::Closure;
+use super::symbol::desymbolicate;
 use super::value::Value;
 
 pub fn build() -> Closure {
@@ -26,6 +27,10 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
             Value::String(value) => {
                 let string = &**value;
                 println!("{}", string)
+            }
+            Value::Symbol(symbol) => {
+                let string = desymbolicate(symbol).expect("Symbol not found");
+                println!(":{}", string)
             }
             _ => unreachable!(),
         }

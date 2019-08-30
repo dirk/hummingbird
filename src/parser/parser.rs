@@ -8,6 +8,7 @@ use super::super::ast::nodes::{
 use super::super::ast::{Import, ImportBindings, StringLiteral};
 use super::lexer::{Token, TokenStream};
 use super::location::Span;
+use crate::ast::SymbolLiteral;
 
 pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
@@ -461,6 +462,10 @@ fn parse_atom(input: &mut TokenStream) -> Node {
             input.read();
             Node::String(StringLiteral { value })
         }
+        Token::Symbol(value, _) => {
+            input.read();
+            Node::Symbol(SymbolLiteral::new(value))
+        }
         _ => {
             panic_unexpected(next, None);
             unreachable!()
@@ -523,7 +528,7 @@ impl From<Token> for Identifier {
 mod tests {
     use super::super::super::ast::nodes::{
         Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
-        Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral,
+        Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral, SymbolLiteral,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -991,6 +996,14 @@ mod tests {
                 )),
                 vec![Node::Integer(Integer { value: 2 })],
             ))],
+        );
+    }
+
+    #[test]
+    fn it_parses_symbol() {
+        assert_eq!(
+            parse_complete(":foo"),
+            vec![Node::Symbol(SymbolLiteral::new("foo".to_string()))],
         );
     }
 }

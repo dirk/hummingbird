@@ -4,6 +4,7 @@ use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
 use super::super::parser::Span;
+use super::super::vm::{symbolicate, Symbol};
 
 // We have to share a lot of things around, so use reference-counting to keep
 // track of them.
@@ -303,6 +304,7 @@ pub enum Instruction {
     MakeFunction(SharedValue, SharedFunction),
     MakeInteger(SharedValue, i64),
     MakeString(SharedValue, String),
+    MakeSymbol(SharedValue, Symbol),
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
     OpProperty(SharedValue, SharedValue, String), // $1 = $2.$3
@@ -377,6 +379,13 @@ pub trait InstructionBuilder {
     fn build_make_string(&mut self, value: String) -> SharedValue {
         let lval = self.new_value();
         self.push(Instruction::MakeString(lval.clone(), value));
+        lval
+    }
+
+    fn build_make_symbol(&mut self, value: String) -> SharedValue {
+        let lval = self.new_value();
+        let symbol = symbolicate(value);
+        self.push(Instruction::MakeSymbol(lval.clone(), symbol));
         lval
     }
 

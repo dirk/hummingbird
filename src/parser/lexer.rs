@@ -91,6 +91,7 @@ pub enum Token {
     Return,
     Star,
     String(String, Span),
+    Symbol(String, Span),
     Terminal(char),
     Var(Location),
     While(Location),
@@ -181,6 +182,8 @@ impl TokenStream {
                 return self.lex_arrow_minus_or_numeric();
             } else if string_head(character) {
                 return self.lex_string(location);
+            } else if symbol_head(character) {
+                return self.lex_symbol(location);
             } else {
                 self.input.read();
                 match character {
@@ -248,6 +251,24 @@ impl TokenStream {
         }
         let string: String = characters.into_iter().collect();
         Token::String(string, Span::new(start, end))
+    }
+
+    fn lex_symbol(&mut self, start: Location) -> Token {
+        let marker = self.input.read();
+        assert_eq!(marker, ':');
+        let mut characters = vec![];
+        let mut end = start.clone();
+        loop {
+            let character = self.input.read();
+            if identifier_tail(character) {
+                end = self.input.location();
+                characters.push(character);
+            } else {
+                break;
+            }
+        }
+        let string: String = characters.into_iter().collect();
+        Token::Symbol(string, Span::new(start, end))
     }
 
     fn lex_arrow_minus_or_numeric(&mut self) -> Token {
@@ -322,6 +343,10 @@ fn numeric_head(character: char) -> bool {
 
 fn string_head(character: char) -> bool {
     character == '"'
+}
+
+fn symbol_head(character: char) -> bool {
+    character == ':'
 }
 
 fn alphabetical(character: char) -> bool {
@@ -525,7 +550,7 @@ mod tests {
             vec![
                 Token::String(
                     "".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(2, 1, 3),)
+                    Span::new(Location::new(0, 1, 1), Location::new(2, 1, 3)),
                 ),
                 Token::EOF
             ]
@@ -535,7 +560,21 @@ mod tests {
             vec![
                 Token::String(
                     "abc123".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(8, 1, 9),)
+                    Span::new(Location::new(0, 1, 1), Location::new(8, 1, 9)),
+                ),
+                Token::EOF
+            ]
+        );
+    }
+
+    #[test]
+    fn it_parses_symbols() {
+        assert_eq!(
+            parse(":abc123"),
+            vec![
+                Token::Symbol(
+                    "abc123".to_string(),
+                    Span::new(Location::new(0, 1, 1), Location::new(7, 1, 8)),
                 ),
                 Token::EOF
             ]
