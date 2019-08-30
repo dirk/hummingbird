@@ -129,13 +129,17 @@ mod tests {
             .map(|handle| handle.join().unwrap())
             .for_each(drop);
 
-        // Spawn 10 of threads that will all race to desymbolicate.
-        (0..10)
+        // Spawn 20 of threads that will all race to symbolicate and desymbolicate.
+        (0..20)
             .into_iter()
-            .map(|_| {
+            .map(|index| {
                 let movable = symbolicator.clone();
                 thread::spawn(move || {
-                    assert_eq!(movable.desymbolicate(&Symbol(0)), Some("foo".to_string()));
+                    if index % 2 == 1 {
+                        assert_eq!(movable.symbolicate("foo"), Symbol(0));
+                    } else {
+                        assert_eq!(movable.desymbolicate(&Symbol(0)), Some("foo".to_string()));
+                    }
                 })
             })
             .map(|handle| handle.join().unwrap())
