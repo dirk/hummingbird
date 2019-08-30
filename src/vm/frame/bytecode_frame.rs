@@ -196,6 +196,13 @@ impl BytecodeFrame {
                     self.write_register(*lval, value);
                     self.advance();
                 }
+                Instruction::OpEquality(lval, lhs, rhs) => {
+                    let lhs = self.read_register(*lhs);
+                    let rhs = self.read_register(*rhs);
+                    let value = operators::op_equality(lhs, rhs)?;
+                    self.write_register(*lval, value);
+                    self.advance();
+                }
                 Instruction::OpLessThan(lval, lhs, rhs) => {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);
