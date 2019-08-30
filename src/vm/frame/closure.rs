@@ -97,7 +97,7 @@ impl Closure {
         if let Some(parent) = &inner.parent {
             return parent.try_set(name.clone(), value);
         }
-        return false;
+        false
     }
 
     /// Set a local directly into this exact closure. This should only be used
