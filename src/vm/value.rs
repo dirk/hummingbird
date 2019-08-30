@@ -14,6 +14,20 @@ pub struct Function {
     pub parent: Option<Closure>,
 }
 
+impl PartialEq for Function {
+    /// Functions are equal if they're calling the same `LoadedFunction` and
+    /// using the same `Closure`.
+    fn eq(&self, other: &Self) -> bool {
+        let loaded_function_eq = self.loaded_function.ptr_eq(&other.loaded_function);
+        let closure_eq = match (&self.parent, &other.parent) {
+            (Some(own), Some(other)) => &own == &other,
+            (None, None) => true,
+            _ => false,
+        };
+        loaded_function_eq && closure_eq
+    }
+}
+
 #[derive(Clone)]
 pub struct BuiltinFunction {
     call_target: Rc<dyn Fn(Vec<Value>) -> Value>,
@@ -103,3 +117,51 @@ impl GcTrace for Value {
 }
 
 impl GcManaged for String {}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::super::super::target::bytecode::layout as bytecode;
+    use super::super::loader::LoadedModule;
+    use super::Function;
+
+    fn empty_function(id: u16) -> bytecode::Function {
+        bytecode::Function {
+            id,
+            name: "test".to_string(),
+            registers: 0,
+            instructions: vec![],
+            source_mappings: vec![],
+            locals: 0,
+            locals_names: vec![],
+            bindings: HashSet::new(),
+            parent_bindings: false,
+        }
+    }
+
+    #[test]
+    fn it_tests_functions_for_equality() {
+        let loaded_module = LoadedModule::from_bytecode(
+            bytecode::Module {
+                functions: vec![empty_function(0), empty_function(1)],
+            },
+            "test".to_string(),
+            "".to_string(),
+            None,
+        );
+
+        let first = Function {
+            loaded_function: loaded_module.function(0),
+            parent: None,
+        };
+        let first_clone = first.clone();
+        assert!(first == first_clone);
+
+        let second = Function {
+            loaded_function: loaded_module.function(1),
+            parent: None,
+        };
+        assert!(first != second);
+    }
+}
