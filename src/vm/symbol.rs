@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use std::borrow::Borrow;
 
 lazy_static! {
     static ref SYMBOLICATOR: Symbolicator = Symbolicator::new();
@@ -23,6 +22,16 @@ impl Symbolicator {
         let next_id = inner.symbols.len() as u32;
         inner.symbols.insert(string, next_id);
         Symbol(next_id)
+    }
+
+    pub fn desymbolicate(&self, symbol: Symbol) -> Option<String> {
+        let inner = self.0.lock().unwrap();
+        for (key, value) in inner.symbols.iter() {
+            if *value == symbol.0 {
+                return Some(key.clone())
+            }
+        }
+        None
     }
 }
 
