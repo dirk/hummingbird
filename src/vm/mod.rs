@@ -8,4 +8,5 @@ mod symbol;
 mod value;
 mod vm;
 
+pub use symbol::{desymbolicate, symbolicate, Symbol};
 pub use vm::Vm;

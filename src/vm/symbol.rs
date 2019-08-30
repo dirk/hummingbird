@@ -6,6 +6,14 @@ lazy_static! {
     static ref SYMBOLICATOR: Symbolicator = Symbolicator::new();
 }
 
+pub fn symbolicate<S: Into<String>>(string: S) -> Symbol {
+    (*SYMBOLICATOR).symbolicate(string)
+}
+
+pub fn desymbolicate<S: AsRef<Symbol>>(symbol: &S) -> Option<String> {
+    (*SYMBOLICATOR).desymbolicate(symbol)
+}
+
 #[derive(Clone)]
 struct Symbolicator(Arc<Mutex<InnerSymbolicator>>);
 
@@ -40,8 +48,14 @@ impl Symbolicator {
 
 type SymbolId = u32;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Symbol(SymbolId);
+
+impl Symbol {
+    pub fn id(&self) -> SymbolId {
+        self.0
+    }
+}
 
 impl AsRef<Symbol> for Symbol {
     fn as_ref(&self) -> &Symbol {

@@ -5,6 +5,7 @@ use std::rc::Rc;
 use super::frame::Closure;
 use super::gc::{GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
+use super::symbol::{desymbolicate, Symbol};
 
 #[derive(Clone)]
 pub struct Function {
@@ -42,6 +43,7 @@ pub enum Value {
     Integer(i64),
     Module(LoadedModule),
     String(GcPtr<String>),
+    Symbol(Symbol),
 }
 
 impl Value {
@@ -74,6 +76,10 @@ impl Debug for Value {
             String(value) => {
                 let string = &**value;
                 write!(f, "{:?}", string)
+            }
+            Symbol(symbol) => {
+                let string = desymbolicate(symbol).unwrap_or("?".to_string());
+                write!(f, "Symbol({}:{})", symbol.id(), string)
             }
         }
     }
