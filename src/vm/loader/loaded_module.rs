@@ -93,6 +93,14 @@ impl LoadedModule {
         None
     }
 
+    pub fn calculate_relative_import_path(name: &String) -> Option<PathBuf> {
+        let path = Path::new(&name);
+        if path.is_file() {
+            return path.parent().map(Path::to_path_buf);
+        }
+        None
+    }
+
     pub fn main(&self) -> LoadedFunction {
         self.0.borrow().functions[0].clone()
     }

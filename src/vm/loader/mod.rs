@@ -14,9 +14,11 @@ use super::super::target::bytecode;
 use super::errors::VmError;
 use super::frame::Closure;
 
+mod file_reader;
 mod loaded_function;
 mod loaded_module;
 
+use file_reader::FileReader;
 pub use loaded_function::{BytecodeFunction, LoadedFunction};
 pub use loaded_module::LoadedModule;
 use loaded_module::WeakLoadedModule;
@@ -32,6 +34,7 @@ pub struct Loader {
     load_path: Vec<PathBuf>,
     loaded_modules: HashMap<PathBuf, LoadedModule>,
     builtins_closure: Closure,
+    file_reader: FileReader,
 }
 
 impl Loader {
@@ -40,6 +43,7 @@ impl Loader {
             load_path: vec![],
             loaded_modules: HashMap::new(),
             builtins_closure,
+            file_reader: FileReader::new(),
         }
     }
 
@@ -84,7 +88,10 @@ impl Loader {
                 }
             },
             (true, None) => {
-                unreachable!("Cannot import from a relative path when there is no relative import path to search")
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Cannot import from a relative path when there is no relative import path to search ({:?})", path),
+                )))
             }
             _ => (),
         };
@@ -112,9 +119,46 @@ impl Loader {
             }
         }
 
-        let new = load_file(canonicalized.clone(), Some(self.builtins_closure.clone()))?;
-        self.loaded_modules.insert(canonicalized, new.clone());
-        Ok((new, false))
+        let name = canonicalized
+            .to_str()
+            .expect("Couldn't convert path to string")
+            .to_owned();
+
+        println!("get {:?}", path.as_ref());
+        let (ast_module, source) = self.file_reader.get(path.as_ref().to_path_buf()).unwrap();
+
+        // Calculate the path that imports from this newly-read file will be
+        // relative to.
+        let relative_import_path = LoadedModule::calculate_relative_import_path(&name);
+        // Discover and enqueue imports ahead-of-time.
+        for node in ast_module.nodes.iter() {
+            match node {
+                ast::Node::Import(import) => {
+                    let name = import.name.clone();
+                    println!("name {:?}", name);
+                    println!("relative_import_path {:?}", &relative_import_path);
+                    if let Ok(resolved) = self.search(name, relative_import_path.clone()) {
+                        self.file_reader.enqueue(resolved);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        let loaded_module = compile_ast_into_module(
+            &ast_module,
+            name,
+            source,
+            Default::default(),
+            Some(self.builtins_closure.clone()),
+        )?;
+        self.loaded_modules
+            .insert(canonicalized, loaded_module.clone());
+        Ok((loaded_module, false))
+
+        // let new = load_file(canonicalized.clone(), Some(self.builtins_closure.clone()))?;
+        // self.loaded_modules.insert(canonicalized, new.clone());
+        // Ok((new, false))
     }
 
     /// Tries to remove the module. Should be called if the module fails to be
