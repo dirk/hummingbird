@@ -71,18 +71,19 @@ impl StringStream {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    AngleLeft,
     Arrow,
     BraceLeft,
     BraceRight,
     Comma,
     Dot(Location),
+    DoubleEqual,
     EOF,
-    Equals,
+    Equal,
     Export,
     Identifier(String, Span),
     Import(Location),
     Integer(i64),
-    LeftAngle,
     Let(Location),
     Minus,
     ParenthesesLeft,
@@ -194,8 +195,15 @@ impl TokenStream {
                     ')' => return Token::ParenthesesRight,
                     ',' => return Token::Comma,
                     '.' => return Token::Dot(location),
-                    '=' => return Token::Equals,
-                    '<' => return Token::LeftAngle,
+                    '=' => {
+                        return if self.input.peek() == '=' {
+                            self.input.read();
+                            Token::DoubleEqual
+                        } else {
+                            Token::Equal
+                        }
+                    },
+                    '<' => return Token::AngleLeft,
                     '+' => return Token::Plus,
                     '*' => return Token::Star,
                     ';' => return Token::Terminal(character),
@@ -499,6 +507,28 @@ mod tests {
                 Token::ParenthesesRight,
                 Token::EOF,
             ]
+        );
+    }
+
+    #[test]
+    fn it_parses_equal() {
+        assert_eq!(
+            parse("="),
+            vec![
+                Token::Equal,
+                Token::EOF,
+            ],
+        );
+    }
+
+    #[test]
+    fn it_parses_double_equal() {
+        assert_eq!(
+            parse("=="),
+            vec![
+                Token::DoubleEqual,
+                Token::EOF,
+            ],
         );
     }
 
