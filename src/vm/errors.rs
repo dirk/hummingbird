@@ -13,6 +13,8 @@ use super::vm::StackSnapshot;
 
 #[derive(Debug)]
 enum Kind {
+    /// (message)
+    Argument(String),
     /// An error loading a file.
     /// (name, wrapped)
     LoadFile(String, Box<dyn error::Error>),
@@ -27,6 +29,7 @@ impl Kind {
     fn diagnostic_label(&self) -> String {
         use Kind::*;
         let label = match self {
+            Argument(_) => "Argument here",
             LoadFile(_, _) => "Import occurred here",
             PropertyNotFound(_, _) => "Missing property",
             UndefinedName(_) => "Undefined name",
@@ -39,6 +42,9 @@ impl Display for Kind {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         use Kind::*;
         match self {
+            Argument(message) => {
+                write!(f, "ArgumentError: {}", message)
+            }
             LoadFile(name, wrapped) => {
                 write!(f, "LoadFileError: could not load `{}': {:?}", name, wrapped)
             }
@@ -60,6 +66,10 @@ pub struct VmError {
 }
 
 impl VmError {
+    pub fn new_argument_error<S: Into<String>>(message: S) -> Self {
+        Self::new(Kind::Argument(message.into()))
+    }
+
     pub fn new_load_file(path: String, wrapped: Box<dyn error::Error>) -> Self {
         Self::new(Kind::LoadFile(path, wrapped))
     }
