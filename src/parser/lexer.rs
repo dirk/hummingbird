@@ -512,12 +512,12 @@ mod tests {
 
     #[test]
     fn it_parses_equal() {
-        assert_eq!(parse("="), vec![Token::Equal, Token::EOF,],);
+        assert_eq!(parse("="), vec![Token::Equal, Token::EOF]);
     }
 
     #[test]
     fn it_parses_double_equal() {
-        assert_eq!(parse("=="), vec![Token::DoubleEqual, Token::EOF,],);
+        assert_eq!(parse("=="), vec![Token::DoubleEqual, Token::EOF]);
     }
 
     #[test]
