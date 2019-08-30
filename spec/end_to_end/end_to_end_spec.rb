@@ -5,7 +5,8 @@ RSpec.describe 'End-to-end' do
   def expect_runs(source_file, expected_output)
     executable = File.expand_path('../../../target/debug/hummingbird', __FILE__)
     
-    output = `#{executable} #{source_file}`
+    command = "#{executable} #{source_file}"
+    output = `#{command}`
     if $?.exitstatus != 0
       $stderr.puts "Command failed: #{command}"
       $stderr.puts output
