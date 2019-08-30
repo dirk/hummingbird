@@ -181,8 +181,7 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::MakeString(lval, value) => {
-                    let value = gc.allocate(value.clone());
-                    self.write_register(*lval, Value::String(value));
+                    self.write_register(*lval, Value::make_string(value.clone(), gc));
                     self.advance();
                 }
                 Instruction::MakeSymbol(lval, symbol) => {

@@ -42,9 +42,7 @@ impl Display for Kind {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         use Kind::*;
         match self {
-            Argument(message) => {
-                write!(f, "ArgumentError: {}", message)
-            }
+            Argument(message) => write!(f, "ArgumentError: {}", message),
             LoadFile(name, wrapped) => {
                 write!(f, "LoadFileError: could not load `{}': {:?}", name, wrapped)
             }

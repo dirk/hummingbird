@@ -4,8 +4,7 @@ use std::rc::Rc;
 
 use super::errors::VmError;
 use super::frame::Closure;
-use super::gc::GcAllocator;
-use super::gc::{GcManaged, GcPtr, GcTrace};
+use super::gc::{GcAllocator, GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
 use super::symbol::{desymbolicate, Symbol};
 
@@ -58,6 +57,16 @@ pub enum BuiltinObject {
     File(GcPtr<File>),
 }
 
+impl Debug for BuiltinObject {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "BuiltinObject(")?;
+        match self {
+            BuiltinObject::File(_) => write!(f, "File")?,
+        }
+        write!(f, ")")
+    }
+}
+
 impl GcTrace for BuiltinObject {
     fn trace(&self) {
         match self {
@@ -92,6 +101,11 @@ impl Value {
         let builtin_function = BuiltinFunction::new(Rc::new(call_target));
         Value::BuiltinFunction(builtin_function)
     }
+
+    pub fn make_string(string: String, gc: &mut GcAllocator) -> Self {
+        let allocated = gc.allocate(string);
+        Value::String(allocated)
+    }
 }
 
 impl Debug for Value {
@@ -100,13 +114,7 @@ impl Debug for Value {
             Value::Null => write!(f, "null"),
             Value::Boolean(value) => write!(f, "{:?}", value),
             Value::BuiltinFunction(_) => write!(f, "BuiltinFunction"),
-            Value::BuiltinObject(object) => {
-                write!(f, "BuiltinObject(")?;
-                match object {
-                    BuiltinObject::File(_) => write!(f, "File")?,
-                }
-                write!(f, ")")
-            }
+            Value::BuiltinObject(object) => write!(f, "{:?}", object),
             Value::Function(function) => {
                 let name = function.loaded_function.qualified_name();
                 write!(f, "Function({})", name)
