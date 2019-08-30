@@ -286,7 +286,9 @@ fn parse_infix(input: &mut TokenStream) -> Node {
     // reductions have higher associativity than later ones.
     reduce_subnodes(&mut subnodes, Token::Star);
     reduce_subnodes(&mut subnodes, Token::Plus);
+    reduce_subnodes(&mut subnodes, Token::Minus);
     reduce_subnodes(&mut subnodes, Token::AngleLeft);
+    reduce_subnodes(&mut subnodes, Token::DoubleEqual);
     // It better have fully reduced!
     assert_eq!(subnodes.len(), 1);
     subnodes.remove(0).into()
@@ -294,7 +296,7 @@ fn parse_infix(input: &mut TokenStream) -> Node {
 
 fn infix(token: Token) -> bool {
     match token {
-        Token::AngleLeft | Token::Minus | Token::Plus | Token::Star => true,
+        Token::AngleLeft | Token::DoubleEqual | Token::Minus | Token::Plus | Token::Star => true,
         _ => false,
     }
 }
@@ -880,6 +882,22 @@ mod tests {
                 )),
                 Token::Star,
                 Node::Integer(Integer { value: 3 }),
+            )),
+        );
+        assert_eq!(
+            parse_infix(&mut input("1 + 3 == 2 * 2")),
+            Node::Infix(Infix::new(
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Token::Plus,
+                    Node::Integer(Integer { value: 3 }),
+                )),
+                Token::DoubleEqual,
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 2 }),
+                    Token::Star,
+                    Node::Integer(Integer { value: 2 }),
+                )),
             )),
         );
         // Now with associativity!

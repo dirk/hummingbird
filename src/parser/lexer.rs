@@ -202,7 +202,7 @@ impl TokenStream {
                         } else {
                             Token::Equal
                         }
-                    },
+                    }
                     '<' => return Token::AngleLeft,
                     '+' => return Token::Plus,
                     '*' => return Token::Star,
@@ -512,24 +512,12 @@ mod tests {
 
     #[test]
     fn it_parses_equal() {
-        assert_eq!(
-            parse("="),
-            vec![
-                Token::Equal,
-                Token::EOF,
-            ],
-        );
+        assert_eq!(parse("="), vec![Token::Equal, Token::EOF,],);
     }
 
     #[test]
     fn it_parses_double_equal() {
-        assert_eq!(
-            parse("=="),
-            vec![
-                Token::DoubleEqual,
-                Token::EOF,
-            ],
-        );
+        assert_eq!(parse("=="), vec![Token::DoubleEqual, Token::EOF,],);
     }
 
     #[test]
