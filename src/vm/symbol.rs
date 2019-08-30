@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 lazy_static! {
     static ref SYMBOLICATOR: Symbolicator = Symbolicator::new();
@@ -15,29 +15,32 @@ pub fn desymbolicate<S: AsRef<Symbol>>(symbol: &S) -> Option<String> {
 }
 
 #[derive(Clone)]
-struct Symbolicator(Arc<Mutex<InnerSymbolicator>>);
+struct Symbolicator(Arc<RwLock<InnerSymbolicator>>);
 
 impl Symbolicator {
     fn new() -> Self {
         let inner = InnerSymbolicator::new();
-        Self(Arc::new(Mutex::new(inner)))
+        Self(Arc::new(RwLock::new(inner)))
     }
 
     pub fn symbolicate<S: Into<String>>(&self, string: S) -> Symbol {
         let string = string.into();
-        let mut inner = self.0.lock().unwrap();
-        if let Some(existing_id) = inner.symbols.get(&string) {
-            return Symbol(*existing_id);
+        {
+            let reader = self.0.read().unwrap();
+            if let Some(existing_id) = reader.symbols.get(&string) {
+                return Symbol(*existing_id);
+            }
         }
-        let next_id = inner.symbols.len() as u32;
-        inner.symbols.insert(string, next_id);
+        let mut writer = self.0.write().unwrap();
+        let next_id = writer.symbols.len() as u32;
+        writer.symbols.insert(string, next_id);
         Symbol(next_id)
     }
 
     pub fn desymbolicate<S: AsRef<Symbol>>(&self, symbol: &S) -> Option<String> {
-        let inner = self.0.lock().unwrap();
+        let reader = self.0.read().unwrap();
         let id = symbol.as_ref().0;
-        for (key, value) in inner.symbols.iter() {
+        for (key, value) in reader.symbols.iter() {
             if *value == id {
                 return Some(key.clone());
             }
