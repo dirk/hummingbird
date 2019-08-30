@@ -82,23 +82,28 @@ impl Value {
 
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        use Value::*;
         match self {
-            Null => write!(f, "null"),
-            Boolean(value) => write!(f, "{:?}", value),
-            BuiltinFunction(_) => write!(f, "BuiltinFunction"),
-            BuiltinObject(_) => write!(f, "BuiltinObject"),
-            Function(function) => {
+            Value::Null => write!(f, "null"),
+            Value::Boolean(value) => write!(f, "{:?}", value),
+            Value::BuiltinFunction(_) => write!(f, "BuiltinFunction"),
+            Value::BuiltinObject(object) => {
+                write!(f, "BuiltinObject(")?;
+                match object {
+                    BuiltinObject::File(_) => write!(f, "File")?,
+                }
+                write!(f, ")")
+            }
+            Value::Function(function) => {
                 let name = function.loaded_function.qualified_name();
                 write!(f, "Function({})", name)
             }
-            Integer(value) => write!(f, "{}", value),
-            Module(module) => write!(f, "Module({})", module.name()),
-            String(value) => {
+            Value::Integer(value) => write!(f, "{}", value),
+            Value::Module(module) => write!(f, "Module({})", module.name()),
+            Value::String(value) => {
                 let string = &**value;
                 write!(f, "{:?}", string)
             }
-            Symbol(symbol) => {
+            Value::Symbol(symbol) => {
                 let string = desymbolicate(symbol).unwrap_or("?".to_string());
                 write!(f, "Symbol({}:{})", symbol.id(), string)
             }
