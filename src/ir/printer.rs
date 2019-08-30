@@ -101,6 +101,9 @@ impl<O: Write> Printer<O> {
             Instruction::OpAdd(lval, lhs, rhs) => {
                 format!("{} = OpAdd({}, {})", id(lval), id(lhs), id(rhs))
             }
+            Instruction::OpEquality(lval, lhs, rhs) => {
+                format!("{} = OpEquality({}, {})", id(lval), id(lhs), id(rhs))
+            }
             Instruction::OpLessThan(lval, lhs, rhs) => {
                 format!("{} = OpLessThan({}, {})", id(lval), id(lhs), id(rhs))
             }

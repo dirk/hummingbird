@@ -136,3 +136,12 @@ impl fmt::Debug for Closure {
         )
     }
 }
+
+impl PartialEq for Closure {
+    /// Closures are equal only if they are holding the same `Rc`.
+    fn eq(&self, other: &Self) -> bool {
+        let self_inner = &self.0;
+        let other_inner = &other.0;
+        Rc::ptr_eq(self_inner, other_inner)
+    }
+}

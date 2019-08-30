@@ -246,6 +246,11 @@ impl Compiler {
                     read(lhs, address),
                     read(rhs, address),
                 ),
+                ir::Instruction::OpEquality(lval, lhs, rhs) => bytecode::Instruction::OpEquality(
+                    allocate(lval),
+                    read(lhs, address),
+                    read(rhs, address),
+                ),
                 ir::Instruction::OpLessThan(lval, lhs, rhs) => bytecode::Instruction::OpLessThan(
                     allocate(lval),
                     read(lhs, address),

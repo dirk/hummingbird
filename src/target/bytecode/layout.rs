@@ -18,6 +18,7 @@ pub enum Instruction {
     MakeString(Reg, String),
     MakeSymbol(Reg, Symbol),
     OpAdd(Reg, Reg, Reg),         // $1 = $2 + $3
+    OpEquality(Reg, Reg, Reg),    // $1 = $2 == $3
     OpLessThan(Reg, Reg, Reg),    // $1 = $2 < $3
     OpProperty(Reg, Reg, String), // $1 = $2.$3
     Branch(u8),

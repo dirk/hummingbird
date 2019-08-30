@@ -173,8 +173,8 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     let lhs: Identifier = input.read().into();
 
     let mut rhs = None;
-    if input.peek() == Token::Equals {
-        expect_to_read(input, Token::Equals);
+    if input.peek() == Token::Equal {
+        expect_to_read(input, Token::Equal);
         rhs = Some(parse_expression(input));
     }
 
@@ -286,7 +286,9 @@ fn parse_infix(input: &mut TokenStream) -> Node {
     // reductions have higher associativity than later ones.
     reduce_subnodes(&mut subnodes, Token::Star);
     reduce_subnodes(&mut subnodes, Token::Plus);
-    reduce_subnodes(&mut subnodes, Token::LeftAngle);
+    reduce_subnodes(&mut subnodes, Token::Minus);
+    reduce_subnodes(&mut subnodes, Token::AngleLeft);
+    reduce_subnodes(&mut subnodes, Token::DoubleEqual);
     // It better have fully reduced!
     assert_eq!(subnodes.len(), 1);
     subnodes.remove(0).into()
@@ -294,7 +296,7 @@ fn parse_infix(input: &mut TokenStream) -> Node {
 
 fn infix(token: Token) -> bool {
     match token {
-        Token::LeftAngle | Token::Minus | Token::Plus | Token::Star => true,
+        Token::AngleLeft | Token::DoubleEqual | Token::Minus | Token::Plus | Token::Star => true,
         _ => false,
     }
 }
@@ -351,7 +353,7 @@ fn try_parse_function(input: &mut TokenStream) -> Option<((), Box<Node>)> {
 
 fn parse_assignment(input: &mut TokenStream) -> Node {
     let lhs = parse_postfix(input);
-    if input.peek() == Token::Equals {
+    if input.peek() == Token::Equal {
         input.read(); // Equals sign
         let rhs = parse_expression(input);
         // FIXME: Check that assignment left-hand-side doesn't end with a call.
@@ -880,6 +882,22 @@ mod tests {
                 )),
                 Token::Star,
                 Node::Integer(Integer { value: 3 }),
+            )),
+        );
+        assert_eq!(
+            parse_infix(&mut input("1 + 3 == 2 * 2")),
+            Node::Infix(Infix::new(
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Token::Plus,
+                    Node::Integer(Integer { value: 3 }),
+                )),
+                Token::DoubleEqual,
+                Node::Infix(Infix::new(
+                    Node::Integer(Integer { value: 2 }),
+                    Token::Star,
+                    Node::Integer(Integer { value: 2 }),
+                )),
             )),
         );
         // Now with associativity!

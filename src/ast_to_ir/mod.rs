@@ -332,6 +332,7 @@ impl Compiler {
         let rhs = self.compile_node(&infix.rhs, scope);
         match &infix.op {
             &InfixOp::Add => self.build_op_add(lhs, rhs),
+            &InfixOp::Equality => self.build_op_equality(lhs, rhs),
             &InfixOp::LessThan => self.build_op_less_than(lhs, rhs),
             other @ _ => panic!("Cannot compile infix op: {:?}", other),
         }
