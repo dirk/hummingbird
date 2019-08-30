@@ -44,6 +44,14 @@ pub enum BuiltinObject {
     File(GcPtr<File>),
 }
 
+impl GcTrace for BuiltinObject {
+    fn trace(&self) {
+        match self {
+            BuiltinObject::File(file) => file.mark(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum Value {
     Null,
@@ -102,14 +110,16 @@ impl GcManaged for Value {}
 
 impl GcTrace for Value {
     fn trace(&self) {
-        use Value::*;
         match self {
-            Function(function) => {
+            Value::BuiltinObject(object) => {
+                object.trace();
+            }
+            Value::Function(function) => {
                 if let Some(parent) = &function.parent {
                     parent.trace();
                 }
             }
-            String(value) => value.mark(),
+            Value::String(value) => value.mark(),
             _ => (),
         }
     }
