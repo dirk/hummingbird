@@ -80,6 +80,14 @@ impl LoadedFunction {
             .try_into()
             .expect("Module has been dropped")
     }
+
+    /// Returns true if the two functions are pointers to the exact same
+    /// `Rc` in memory.
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        let self_inner = &self.0;
+        let other_inner = &other.0;
+        Rc::ptr_eq(self_inner, other_inner)
+    }
 }
 
 pub struct InnerBytecodeFunction {

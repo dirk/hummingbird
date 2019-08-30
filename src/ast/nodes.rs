@@ -202,6 +202,7 @@ impl SymbolLiteral {
 #[derive(Clone, Debug, PartialEq)]
 pub enum InfixOp {
     Add,
+    Equality,
     LessThan,
     Multiply,
     Subtract,
@@ -217,7 +218,8 @@ pub struct Infix {
 impl Infix {
     pub fn new(lhs: Node, token: Token, rhs: Node) -> Self {
         let op = match token {
-            Token::LeftAngle => InfixOp::LessThan,
+            Token::AngleLeft => InfixOp::LessThan,
+            Token::DoubleEqual => InfixOp::Equality,
             Token::Minus => InfixOp::Subtract,
             Token::Plus => InfixOp::Add,
             Token::Star => InfixOp::Multiply,

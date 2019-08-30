@@ -17,6 +17,21 @@ pub fn op_add(lhs: Value, rhs: Value, gc: &mut GcAllocator) -> Result<Value, VmE
 }
 
 #[inline]
+pub fn op_equality(lhs: Value, rhs: Value) -> Result<Value, VmError> {
+    let equal = match (&lhs, &rhs) {
+        (Value::Integer(lhs), Value::Integer(rhs)) => (*lhs == *rhs),
+        (Value::Function(lhs), Value::Function(rhs)) => lhs == rhs,
+        (Value::String(lhs), Value::String(rhs)) => {
+            let lhs = &**lhs;
+            let rhs = &**rhs;
+            lhs == rhs
+        }
+        _ => false,
+    };
+    Ok(Value::Boolean(equal))
+}
+
+#[inline]
 pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, VmError> {
     match (&lhs, &rhs) {
         (Value::Integer(lhs), Value::Integer(rhs)) => Ok(Value::Boolean(*lhs < *rhs)),
