@@ -70,6 +70,15 @@ impl LoadedModule {
         Self(inner)
     }
 
+    pub fn builtin(name: String) -> Self {
+        let inner = Rc::new(RefCell::new(InnerLoadedModule::empty(
+            name,
+            "".to_string(),
+            None,
+        )));
+        Self(inner)
+    }
+
     pub fn name(&self) -> String {
         self.0.borrow().name.clone()
     }

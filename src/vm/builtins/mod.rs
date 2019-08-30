@@ -1,8 +1,14 @@
+use super::errors::VmError;
 use super::frame::Closure;
+use super::gc::GcAllocator;
 use super::symbol::desymbolicate;
 use super::value::Value;
 
-pub fn build() -> Closure {
+mod stdlib;
+
+/// Creates a new builtins closure that is suitable for being the root closure
+/// (closure of last resort for resolution) of all loaded modules.
+pub fn build_closure() -> Closure {
     let closure = Closure::new_builtins();
 
     let functions = vec![("println".to_owned(), builtin_println)];
@@ -14,7 +20,7 @@ pub fn build() -> Closure {
     closure
 }
 
-fn builtin_println(arguments: Vec<Value>) -> Value {
+fn builtin_println(arguments: Vec<Value>, _: &mut GcAllocator) -> Result<Value, VmError> {
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),
@@ -35,5 +41,5 @@ fn builtin_println(arguments: Vec<Value>) -> Value {
             _ => unreachable!(),
         }
     };
-    Value::Null
+    Ok(Value::Null)
 }
