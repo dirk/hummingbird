@@ -31,6 +31,12 @@ impl<T: GcManaged + ?Sized> GcBox<T> {
     }
 }
 
+// impl<T: GcManaged + ?Sized> Drop for GcBox<T> {
+//     fn drop(&mut self) {
+//         println!("GC: drop {:p}", self);
+//     }
+// }
+
 /// Pointer to a box with dynamically-checked mutability.
 #[derive(Debug)]
 pub struct GcPtr<T: GcManaged> {
