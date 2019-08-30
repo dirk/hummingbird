@@ -103,7 +103,10 @@ impl LoadedModule {
     }
 
     pub fn main(&self) -> LoadedFunction {
-        self.0.borrow().functions[0].clone()
+        match self.0.borrow().functions.get(0) {
+            Some(function) => function.clone(),
+            None => unreachable!("Tried getting a main function for an empty module; perhaps it's trying to evaluate a builtin module?")
+        }
     }
 
     pub fn static_closure(&self) -> Closure {
