@@ -185,6 +185,10 @@ impl BytecodeFrame {
                     self.write_register(*lval, Value::String(value));
                     self.advance();
                 }
+                Instruction::MakeSymbol(lval, symbol) => {
+                    self.write_register(*lval, Value::Symbol(*symbol));
+                    self.advance();
+                }
                 Instruction::OpAdd(lval, lhs, rhs) => {
                     let lhs = self.read_register(*lhs);
                     let rhs = self.read_register(*rhs);

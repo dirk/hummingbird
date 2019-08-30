@@ -61,6 +61,9 @@ impl<O: Write> Printer<O> {
             Instruction::MakeString(lval, value) => {
                 format!("{} = MakeString({:?})", reg(lval), value)
             }
+            Instruction::MakeSymbol(lval, symbol) => {
+                format!("{} = MakeSymbol({:?})", reg(lval), symbol)
+            }
             Instruction::OpAdd(lval, lhs, rhs) => {
                 format!("{} = OpAdd({}, {})", reg(lval), reg(lhs), reg(rhs))
             }

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::super::parser::Span;
+use super::super::super::vm::Symbol;
 
 pub type Reg = u8;
 
@@ -15,6 +16,7 @@ pub enum Instruction {
     MakeFunction(Reg, u16),
     MakeInteger(Reg, i64),
     MakeString(Reg, String),
+    MakeSymbol(Reg, Symbol),
     OpAdd(Reg, Reg, Reg),         // $1 = $2 + $3
     OpLessThan(Reg, Reg, Reg),    // $1 = $2 < $3
     OpProperty(Reg, Reg, String), // $1 = $2.$3
