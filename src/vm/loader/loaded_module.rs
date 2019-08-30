@@ -26,8 +26,7 @@ pub struct InnerLoadedModule {
     // A module loaded into memory is uninitialized. Only after it has been
     // evaluated (and imports and exports resolved) is it initialized.
     initialized: bool,
-    imports: Imports,
-    exports: Exports,
+    exports: HashMap<String, Value>,
 }
 
 impl InnerLoadedModule {
@@ -38,8 +37,7 @@ impl InnerLoadedModule {
             functions: vec![],
             static_closure: Closure::new_static(builtins_closure),
             initialized: false,
-            imports: Imports::new(),
-            exports: Exports::new(),
+            exports: HashMap::new(),
         }
     }
 }
@@ -131,17 +129,12 @@ impl LoadedModule {
         self.0
             .borrow_mut()
             .exports
-            .exports
             .get(name.as_ref())
             .map(Clone::clone)
     }
 
     pub fn set_export<N: Into<String>>(&self, name: N, value: Value) {
-        self.0
-            .borrow_mut()
-            .exports
-            .exports
-            .insert(name.into(), value);
+        self.0.borrow_mut().exports.insert(name.into(), value);
     }
 }
 
@@ -162,33 +155,8 @@ impl GcTrace for LoadedModule {
     fn trace(&self) {
         let inner = self.0.borrow();
         inner.static_closure.trace();
-        for export in inner.exports.exports.values() {
+        for export in inner.exports.values() {
             export.trace();
-        }
-    }
-}
-
-struct Imports {
-    /// Maps canonicalized import paths to the corresponding module.
-    imports: HashMap<PathBuf, LoadedModule>,
-}
-
-impl Imports {
-    fn new() -> Self {
-        Self {
-            imports: HashMap::new(),
-        }
-    }
-}
-
-struct Exports {
-    exports: HashMap<String, Value>,
-}
-
-impl Exports {
-    fn new() -> Self {
-        Self {
-            exports: HashMap::new(),
         }
     }
 }
