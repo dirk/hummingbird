@@ -24,6 +24,8 @@ fn builtin_println(arguments: Vec<Value>, _: &mut GcAllocator) -> Result<Value, 
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),
+            Value::BuiltinObject(_) => println!("BuiltinObject"),
+            Value::BuiltinFunction(_) => println!("BuiltinFunction"),
             Value::Function(function) => {
                 println!("Function({})", function.loaded_function.qualified_name())
             }
@@ -38,7 +40,6 @@ fn builtin_println(arguments: Vec<Value>, _: &mut GcAllocator) -> Result<Value, 
                 let string = desymbolicate(symbol).expect("Symbol not found");
                 println!(":{}", string)
             }
-            _ => unreachable!(),
         }
     };
     Ok(Value::Null)
