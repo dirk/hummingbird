@@ -11,6 +11,7 @@ use super::super::ast_to_ir;
 use super::super::ir;
 use super::super::parser;
 use super::super::target::bytecode;
+use super::builtins;
 use super::errors::VmError;
 use super::frame::Closure;
 
@@ -53,6 +54,12 @@ impl Loader {
         name: String,
         relative_import_path: Option<PathBuf>,
     ) -> Result<(LoadedModule, bool), VmError> {
+        // See if there's a builtin (native) stdlib module with the given name.
+        // FIXME: This should be a fallback after we search.
+        if let Some(stdlib_module) = builtins::try_load_stdlib(&name) {
+            return Ok((stdlib_module, true));
+        }
+
         let result = self
             .search(name.clone(), relative_import_path)
             .and_then(|resolved| self.load_file(resolved));
@@ -88,6 +95,8 @@ impl Loader {
             }
             _ => (),
         };
+
+        // FIXME: Support searching a load path for external modules.
         unreachable!("Cannot search non-relative yet ({:?})", name)
     }
 

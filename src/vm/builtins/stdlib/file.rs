@@ -5,7 +5,7 @@ use super::super::super::gc::GcAllocator;
 use super::super::super::loader::LoadedModule;
 use super::super::super::value::{BuiltinObject, Value};
 
-fn load() -> LoadedModule {
+pub fn load() -> LoadedModule {
     let module = LoadedModule::builtin("file".to_string());
     module.set_export("open", Value::make_builtin_function(open));
     module
