@@ -4,6 +4,7 @@ mod frame;
 mod gc;
 mod loader;
 mod operators;
+mod symbol;
 mod value;
 mod vm;
 
