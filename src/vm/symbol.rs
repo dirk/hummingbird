@@ -118,7 +118,7 @@ mod tests {
         let symbolicator = Symbolicator::new();
 
         // Spawn 10 of threads that will all race to symbolicate.
-        let symbolicate_handles = (0..10)
+        (0..10)
             .into_iter()
             .map(|_| {
                 let movable = symbolicator.clone();
@@ -126,10 +126,11 @@ mod tests {
                     assert_eq!(movable.symbolicate("foo"), Symbol(0));
                 })
             })
-            .collect::<Vec<thread::JoinHandle<()>>>();
+            .map(|handle| handle.join().unwrap())
+            .for_each(drop);
 
         // Spawn 10 of threads that will all race to desymbolicate.
-        let desymbolicate_handles = (0..10)
+        (0..10)
             .into_iter()
             .map(|_| {
                 let movable = symbolicator.clone();
@@ -137,13 +138,7 @@ mod tests {
                     assert_eq!(movable.desymbolicate(&Symbol(0)), Some("foo".to_string()));
                 })
             })
-            .collect::<Vec<thread::JoinHandle<()>>>();
-
-        for handle in symbolicate_handles
-            .into_iter()
-            .chain(desymbolicate_handles.into_iter())
-        {
-            handle.join().unwrap();
-        }
+            .map(|handle| handle.join().unwrap())
+            .for_each(drop);
     }
 }
