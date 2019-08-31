@@ -14,8 +14,8 @@ pub fn load() -> LoadedModule {
 }
 
 fn open(arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
-    expect_arg_len!(&arguments, 1);
-    let path = expect_arg_type!(&arguments[0], Value::String(string) => &**string);
+    expect_len!(&arguments, 1);
+    let path = expect_type!(&arguments[0], Value::String(string) => &**string);
     let file = File::open(path).unwrap();
     // Make the GC take ownership of the file handle.
     let file = gc.allocate(file);
@@ -30,9 +30,9 @@ fn method_lut(_this: &GcPtr<File>, value: &str) -> Option<BuiltinMethodFn> {
 }
 
 fn method_read(this: Value, arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
-    expect_arg_len!(&arguments, 0);
-    let this = expect_arg_type!(this, Value::BuiltinObject(object) => object);
-    let mut file = expect_arg_type!(this, BuiltinObject::File(file, _) => file);
+    expect_len!(&arguments, 0);
+    let this = expect_builtin_object(this)?;
+    let mut file = expect_type!(this, BuiltinObject::File(file, _) => file);
 
     let mut buffer = String::new();
     file.read_to_string(&mut buffer)

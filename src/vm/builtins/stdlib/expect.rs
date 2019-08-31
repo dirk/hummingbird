@@ -1,3 +1,6 @@
+use super::super::super::errors::VmError;
+use super::super::super::value::{BuiltinObject, Value};
+
 /// Takes the result of `stringify!` on a pattern and returns just the variant.
 ///
 /// eg. "Value::String(string)" => "String"
@@ -9,7 +12,7 @@ pub fn variant_from_pat(pat: &str) -> &str {
     }
 }
 
-macro_rules! expect_arg_len {
+macro_rules! expect_len {
     ($e:expr, $l:expr) => {
         match ($e.len(), $l) {
             ($l, $l) => (),
@@ -23,7 +26,7 @@ macro_rules! expect_arg_len {
     };
 }
 
-macro_rules! expect_arg_type {
+macro_rules! expect_type {
     ($e:expr, $p:pat => $m:expr) => {
         match $e {
             $p => $m,
@@ -36,4 +39,11 @@ macro_rules! expect_arg_type {
             }
         }
     };
+}
+
+/// Shorthand for expecting a type to be a builtin object.
+#[inline]
+pub fn expect_builtin_object(value: Value) -> Result<BuiltinObject, VmError> {
+    let object = expect_type!(value, Value::BuiltinObject(object) => object);
+    Ok(object)
 }
