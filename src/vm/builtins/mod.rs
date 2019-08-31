@@ -63,6 +63,7 @@ fn builtin_println(arguments: Vec<Value>, _: &mut GcAllocator) -> Result<Value, 
     if let Some(argument) = arguments.first() {
         match argument {
             Value::Boolean(value) => println!("{:?}", value),
+            Value::BoundMethod(_) => println!("BoundMethod"),
             Value::BuiltinObject(_) => println!("BuiltinObject"),
             Value::BuiltinFunction(_) => println!("BuiltinFunction"),
             Value::Function(function) => {

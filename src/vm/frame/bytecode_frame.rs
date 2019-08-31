@@ -6,7 +6,7 @@ use super::super::errors::{DebugSource, VmError};
 use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::super::operators;
-use super::super::value::Value;
+use super::super::value::{BoundMethod, Value};
 use super::{Action, Closure, Frame, FrameApi};
 
 /// Frame evaluating a bytecode function.
@@ -247,6 +247,13 @@ impl BytecodeFrame {
                             self.advance();
                             return Ok(Action::Call(frame));
                         }
+                        Value::BoundMethod(method) => match method {
+                            BoundMethod::Builtin(receiver, call_target) => {
+                                let result = call_target(*receiver.clone(), arguments, gc)?;
+                                self.write_register(*lval, result);
+                                self.advance();
+                            }
+                        },
                         Value::BuiltinFunction(native_function) => {
                             let result = native_function.call(arguments, gc)?;
                             self.write_register(*lval, result);

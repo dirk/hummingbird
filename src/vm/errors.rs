@@ -29,7 +29,7 @@ impl Kind {
     fn diagnostic_label(&self) -> String {
         use Kind::*;
         let label = match self {
-            Argument(_) => "Argument here",
+            Argument(_) => "Argument",
             LoadFile(_, _) => "Import occurred here",
             PropertyNotFound(_, _) => "Missing property",
             UndefinedName(_) => "Undefined name",

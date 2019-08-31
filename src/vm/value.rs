@@ -29,15 +29,15 @@ impl PartialEq for Function {
     }
 }
 
-type BuiltinCallTarget = fn(Vec<Value>, &mut GcAllocator) -> Result<Value, VmError>;
+type BuiltinFunctionFn = fn(Vec<Value>, &mut GcAllocator) -> Result<Value, VmError>;
 
 #[derive(Clone)]
 pub struct BuiltinFunction {
-    call_target: Rc<BuiltinCallTarget>,
+    call_target: Rc<BuiltinFunctionFn>,
 }
 
 impl BuiltinFunction {
-    pub fn new(call_target: Rc<BuiltinCallTarget>) -> Self {
+    pub fn new(call_target: Rc<BuiltinFunctionFn>) -> Self {
         Self { call_target }
     }
 
@@ -50,18 +50,58 @@ impl BuiltinFunction {
 //     properties: HashMap<String, Value>,
 // }
 
+/// If a builtin object supports properties then it will include a static
+/// function to look up a property. Using generics here since we know the LUT
+/// will receive the variant of the object (eg. a file if it's the LUT for
+/// a file builtin object).
+type BuiltinObjectPropertyLUT<T> = fn(&T, &str) -> Option<Value>;
+
+/// Similar to the property LUT but more concise to make method LUT functions
+/// shorter to write.
+type BuiltinObjectMethodLUT<T> = fn(&T, &str) -> Option<BuiltinMethodFn>;
+
 /// Specialized container for builtin objects used by the native stdlib
 /// (see `builtins::stdlib`).
 #[derive(Clone)]
 pub enum BuiltinObject {
-    File(GcPtr<File>),
+    File(GcPtr<File>, BuiltinObjectMethodLUT<GcPtr<File>>),
+}
+
+impl BuiltinObject {
+    pub fn property(&self, value: &str) -> Option<Value> {
+        match self {
+            BuiltinObject::File(this, method_lut) => {
+                self.execute_method_lut(method_lut, this, value)
+            }
+        }
+    }
+
+    /// Calls the given method LUT. If it returns a method function pointer
+    /// then it builds a bound method and returns that.
+    #[inline]
+    fn execute_method_lut<T>(
+        &self,
+        method_lut: &BuiltinObjectMethodLUT<T>,
+        this: &T,
+        value: &str,
+    ) -> Option<Value> {
+        match method_lut(this, value) {
+            Some(method) => {
+                // Convert ourselves back into a value to be the receiver
+                // of the method.
+                let receiver = Value::BuiltinObject(self.clone());
+                Some(Value::make_builtin_bound_method(receiver, method))
+            }
+            None => None,
+        }
+    }
 }
 
 impl Debug for BuiltinObject {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "BuiltinObject(")?;
         match self {
-            BuiltinObject::File(_) => write!(f, "File")?,
+            BuiltinObject::File(_, _) => write!(f, "File")?,
         }
         write!(f, ")")
     }
@@ -70,15 +110,23 @@ impl Debug for BuiltinObject {
 impl GcTrace for BuiltinObject {
     fn trace(&self) {
         match self {
-            BuiltinObject::File(file) => file.mark(),
+            BuiltinObject::File(file, _) => file.mark(),
         }
     }
+}
+
+pub type BuiltinMethodFn = fn(Value, Vec<Value>, &mut GcAllocator) -> Result<Value, VmError>;
+
+#[derive(Clone)]
+pub enum BoundMethod {
+    Builtin(Box<Value>, BuiltinMethodFn),
 }
 
 #[derive(Clone)]
 pub enum Value {
     Null,
     Boolean(bool),
+    BoundMethod(BoundMethod),
     BuiltinFunction(BuiltinFunction),
     BuiltinObject(BuiltinObject),
     // DynamicObject(Gc<GcCell<DynamicObject>>),
@@ -97,7 +145,12 @@ impl Value {
         })
     }
 
-    pub fn make_builtin_function(call_target: BuiltinCallTarget) -> Self {
+    pub fn make_builtin_bound_method(receiver: Value, call_target: BuiltinMethodFn) -> Self {
+        let method = BoundMethod::Builtin(Box::new(receiver), call_target);
+        Value::BoundMethod(method)
+    }
+
+    pub fn make_builtin_function(call_target: BuiltinFunctionFn) -> Self {
         let builtin_function = BuiltinFunction::new(Rc::new(call_target));
         Value::BuiltinFunction(builtin_function)
     }
@@ -106,6 +159,21 @@ impl Value {
         let allocated = gc.allocate(string);
         Value::String(allocated)
     }
+
+    pub fn type_name(&self) -> &str {
+        match self {
+            Value::Null => "Null",
+            Value::Boolean(_) => "Boolean",
+            Value::BoundMethod(_) => "BoundMethod",
+            Value::BuiltinFunction(_) => "BuiltinFunction",
+            Value::BuiltinObject(_) => "BuiltinObject",
+            Value::Function(_) => "Function",
+            Value::Integer(_) => "Integer",
+            Value::Module(_) => "Module",
+            Value::String(_) => "String",
+            Value::Symbol(_) => "Symbol",
+        }
+    }
 }
 
 impl Debug for Value {
@@ -113,6 +181,7 @@ impl Debug for Value {
         match self {
             Value::Null => write!(f, "null"),
             Value::Boolean(value) => write!(f, "{:?}", value),
+            Value::BoundMethod(_) => write!(f, "BoundMethod"),
             Value::BuiltinFunction(_) => write!(f, "BuiltinFunction"),
             Value::BuiltinObject(object) => write!(f, "{:?}", object),
             Value::Function(function) => {
