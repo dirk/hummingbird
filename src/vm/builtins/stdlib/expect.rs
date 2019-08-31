@@ -16,12 +16,11 @@ macro_rules! expect_arg_len {
             (got, expected) => {
                 return Err(VmError::new_argument_error(format!(
                     "Expected {} arguments, got {}",
-                    expected,
-                    got,
+                    expected, got,
                 )))
             }
         }
-    }
+    };
 }
 
 macro_rules! expect_arg_type {
