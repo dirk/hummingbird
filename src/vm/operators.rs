@@ -42,7 +42,7 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, VmError> {
 #[inline]
 pub fn op_property(target: Value, value: String) -> Result<Value, VmError> {
     match &target {
-        Value::BuiltinObject(object) => match object.property(&value) {
+        Value::BuiltinObject(object) => match object.get_property(&value) {
             Some(found) => Ok(found),
             None => Err(VmError::new_property_not_found(target, value)),
         },

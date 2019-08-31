@@ -68,7 +68,7 @@ pub enum BuiltinObject {
 }
 
 impl BuiltinObject {
-    pub fn property(&self, value: &str) -> Option<Value> {
+    pub fn get_property(&self, value: &str) -> Option<Value> {
         match self {
             BuiltinObject::File(this, method_lut) => {
                 self.execute_method_lut(method_lut, this, value)
