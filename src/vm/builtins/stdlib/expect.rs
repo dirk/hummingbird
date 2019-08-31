@@ -45,5 +45,5 @@ macro_rules! expect_type {
 #[inline]
 pub fn expect_builtin_object(value: Value) -> Result<BuiltinObject, VmError> {
     let object = expect_type!(value, Value::BuiltinObject(object) => object);
-    Ok(object)
+    Ok(*object)
 }

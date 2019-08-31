@@ -247,9 +247,9 @@ impl BytecodeFrame {
                             self.advance();
                             return Ok(Action::Call(frame));
                         }
-                        Value::BoundMethod(method) => match method {
+                        Value::BoundMethod(method) => match &**method {
                             BoundMethod::Builtin(receiver, call_target) => {
-                                let result = call_target(*receiver.clone(), arguments, gc)?;
+                                let result = call_target(receiver.clone(), arguments, gc)?;
                                 self.write_register(*lval, result);
                                 self.advance();
                             }

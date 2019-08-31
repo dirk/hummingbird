@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Error, Formatter};
 use std::fs::File;
+use std::mem;
 use std::rc::Rc;
 
 use super::errors::VmError;
@@ -89,7 +90,7 @@ impl BuiltinObject {
             Some(method) => {
                 // Convert ourselves back into a value to be the receiver
                 // of the method.
-                let receiver = Value::BuiltinObject(self.clone());
+                let receiver = Value::BuiltinObject(Box::new(self.clone()));
                 Some(Value::make_builtin_bound_method(receiver, method))
             }
             None => None,
@@ -119,18 +120,18 @@ pub type BuiltinMethodFn = fn(Value, Vec<Value>, &mut GcAllocator) -> Result<Val
 
 #[derive(Clone)]
 pub enum BoundMethod {
-    Builtin(Box<Value>, BuiltinMethodFn),
+    Builtin(Value, BuiltinMethodFn),
 }
 
 #[derive(Clone)]
 pub enum Value {
     Null,
     Boolean(bool),
-    BoundMethod(BoundMethod),
+    BoundMethod(Box<BoundMethod>),
     BuiltinFunction(BuiltinFunction),
-    BuiltinObject(BuiltinObject),
+    BuiltinObject(Box<BuiltinObject>),
     // DynamicObject(Gc<GcCell<DynamicObject>>),
-    Function(Function),
+    Function(Box<Function>),
     Integer(i64),
     Module(LoadedModule),
     String(GcPtr<String>),
@@ -139,15 +140,15 @@ pub enum Value {
 
 impl Value {
     pub fn make_function(loaded_function: LoadedFunction, parent: Option<Closure>) -> Self {
-        Value::Function(Function {
+        Value::Function(Box::new(Function {
             loaded_function,
             parent,
-        })
+        }))
     }
 
     pub fn make_builtin_bound_method(receiver: Value, call_target: BuiltinMethodFn) -> Self {
-        let method = BoundMethod::Builtin(Box::new(receiver), call_target);
-        Value::BoundMethod(method)
+        let method = BoundMethod::Builtin(receiver, call_target);
+        Value::BoundMethod(Box::new(method))
     }
 
     pub fn make_builtin_function(call_target: BuiltinFunctionFn) -> Self {
@@ -174,6 +175,16 @@ impl Value {
             Value::Symbol(_) => "Symbol",
         }
     }
+}
+
+/// On 64-bit platforms the `Value` should be 2 words in size.
+#[cfg(target_pointer_width = "64")]
+const BYTE_SIZE_OF_VALUE: usize = 16;
+
+/// Hack to statically check the size of the `Value`.
+#[allow(dead_code, unreachable_code)]
+fn static_assert_value_size() {
+    unsafe { mem::transmute::<Value, [u8; BYTE_SIZE_OF_VALUE]>(unreachable!()) };
 }
 
 impl Debug for Value {

@@ -19,7 +19,9 @@ fn open(arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
     let file = File::open(path).unwrap();
     // Make the GC take ownership of the file handle.
     let file = gc.allocate(file);
-    Ok(Value::BuiltinObject(BuiltinObject::File(file, method_lut)))
+    Ok(Value::BuiltinObject(Box::new(BuiltinObject::File(
+        file, method_lut,
+    ))))
 }
 
 fn method_lut(_this: &GcPtr<File>, value: &str) -> Option<BuiltinMethodFn> {
