@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use super::super::ast::nodes::{
-    Assignment, Block, Export, Function, Identifier, Infix, Integer, Let, Module, Node,
+    Assignment, Block, Export, Function, Identifier, If, Infix, Integer, Let, Module, Node,
     PostfixCall, PostfixProperty, Return, Var, While,
 };
 
@@ -71,6 +71,7 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
                 StatementContext::Module => expect_export(input),
                 other @ _ => unreachable!("Cannot parse export in {:?}", other),
             },
+            Token::If(_) => parse_if(input),
             Token::Import(_) => match ctx {
                 StatementContext::Module => expect_import(input),
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
@@ -194,6 +195,19 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
             unreachable!()
         }
     }
+}
+
+fn parse_if(input: &mut TokenStream) -> Node {
+    match input.read() {
+        Token::If(_) => (),
+        other @ _ => {
+            panic_unexpected_names(other, "While");
+            unreachable!()
+        }
+    }
+    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
+    let block = expect_block(input);
+    Node::If(If::new(condition, block))
 }
 
 fn parse_while(input: &mut TokenStream) -> Node {
@@ -529,9 +543,9 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
-        Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral, SymbolLiteral,
-        While,
+        Assignment, Block, Export, Function, Identifier, If, Import, ImportBindings, Infix,
+        Integer, Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral,
+        SymbolLiteral, While,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -860,6 +874,19 @@ mod tests {
                     Node::Integer(Integer { value: 2 }),
                 ],
             }),
+        );
+    }
+
+    #[test]
+    fn it_parses_if() {
+        assert_eq!(
+            parse_complete("if 1 { 2 }"),
+            vec![Node::If(If::new(
+                Node::Integer(Integer { value: 1 }),
+                Block {
+                    nodes: vec![Node::Integer(Integer { value: 2 })],
+                },
+            ))],
         );
     }
 
