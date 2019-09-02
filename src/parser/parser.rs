@@ -531,6 +531,7 @@ mod tests {
     use super::super::super::ast::nodes::{
         Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
         Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral, SymbolLiteral,
+        While,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -1022,6 +1023,19 @@ mod tests {
         assert_eq!(
             parse_complete(":foo"),
             vec![Node::Symbol(SymbolLiteral::new("foo".to_string()))],
+        );
+    }
+
+    #[test]
+    fn it_parses_while() {
+        assert_eq!(
+            parse_complete("while 1 { 2 }"),
+            vec![Node::While(While::new(
+                Node::Integer(Integer { value: 1 }),
+                Block {
+                    nodes: vec![Node::Integer(Integer { value: 2 })],
+                },
+            ))],
         );
     }
 }
