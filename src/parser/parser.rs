@@ -71,7 +71,6 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
                 StatementContext::Module => expect_export(input),
                 other @ _ => unreachable!("Cannot parse export in {:?}", other),
             },
-            Token::If(_) => parse_if(input),
             Token::Import(_) => match ctx {
                 StatementContext::Module => expect_import(input),
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
@@ -79,7 +78,6 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
             Token::Let(_) => parse_let_and_var(input),
             Token::Return => parse_return(input, terminator.clone()),
             Token::Var(_) => parse_let_and_var(input),
-            Token::While(_) => parse_while(input),
             _ => parse_expression(input),
         }
     };
@@ -197,7 +195,7 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     }
 }
 
-fn parse_if(input: &mut TokenStream) -> Node {
+fn expect_if(input: &mut TokenStream) -> Node {
     match input.read() {
         Token::If(_) => (),
         other @ _ => {
@@ -210,7 +208,7 @@ fn parse_if(input: &mut TokenStream) -> Node {
     Node::If(If::new(condition, block))
 }
 
-fn parse_while(input: &mut TokenStream) -> Node {
+fn expect_while(input: &mut TokenStream) -> Node {
     match input.read() {
         Token::While(_) => (),
         other @ _ => {
@@ -239,7 +237,11 @@ fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
 }
 
 fn parse_expression(input: &mut TokenStream) -> Node {
-    parse_infix(input)
+    match input.peek() {
+        Token::If(_) => expect_if(input),
+        Token::While(_) => expect_while(input),
+        _ => parse_infix(input),
+    }
 }
 
 fn parse_infix(input: &mut TokenStream) -> Node {
@@ -886,6 +888,18 @@ mod tests {
                 Block {
                     nodes: vec![Node::Integer(Integer { value: 2 })],
                 },
+            ))],
+        );
+        assert_eq!(
+            parse_complete("let a = if 1 { 2 }"),
+            vec![Node::Let(Let::new(
+                Identifier::new("a", Span::unknown()),
+                Some(Node::If(If::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Block {
+                        nodes: vec![Node::Integer(Integer { value: 2 })],
+                    },
+                ))),
             ))],
         );
     }
