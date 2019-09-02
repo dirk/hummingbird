@@ -246,7 +246,19 @@ impl Compiler {
         let slot = name.map(|name| scope.add_local(&name));
         let mut function_scope = FunctionScope::new(scope, self.current.clone());
         let body = &*function.body;
-        let lval = self.compile_node(body, &mut function_scope);
+        let lval = match body {
+            // If it's a block then compile all the nodes ourselves. This
+            // avoids creating the additional inner and successor blocks that
+            // `compile_anonymous_block` generates.
+            Node::Block(block) => {
+                let mut implicit_return = self.null_value();
+                for node in block.nodes.iter() {
+                    implicit_return = self.compile_node(node, &mut function_scope);
+                }
+                implicit_return
+            }
+            other @ _ => self.compile_node(other, &mut function_scope),
+        };
         self.build_return(lval);
         // Save the bindings so that we know how to build the closure.
         Compiler::finalize_function(new_function.clone(), &function_scope, ScopeFlags::None);
