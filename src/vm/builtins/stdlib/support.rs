@@ -1,57 +1,49 @@
-use std::cell::UnsafeCell;
-use std::mem;
-use std::ops::Deref;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::super::super::errors::VmError;
-use super::super::super::symbol::{symbolicate, Symbol};
+use super::super::super::symbol::{symbolicate, Symbol, UNINITIALIZED_ID};
 use super::super::super::value::{BuiltinObject, Value};
 
-/// This is a slightly-unsafe utility type to make it easier to declare static
-/// symbols in a native module.
+/// This is a utility type to make it easier to declare static symbols in a
+/// native module.
 ///
 /// ```
-/// static READ: StaticSymbol = StaticSymbol::new();
+/// static READ: StaticSymbol = StaticSymbol::new("read");
 ///
-/// pub fn load() -> LoadedModule {
-///   READ.initialize("read");
-/// }
-///
-/// fn my_other_function() {
-///   *READ // Will be a `&Symbol`.
+/// fn later() {
+///   READ.get() // Will be a `Symbol`.
 /// }
 /// ```
 ///
-/// If you deref a `StaticSymbol` before it is initialized you will get an
-/// uninitialized symbol.
+/// It uses an `AtomicU32` under the hood to keep track of the symbol ID. It
+/// starts out uninitialized, and on the first get it will symbolicate its
+/// value and store the resulting symbol ID.
 pub struct StaticSymbol {
-    cell: UnsafeCell<Symbol>,
+    id: AtomicU32,
+    value: &'static str,
 }
 
 impl StaticSymbol {
-    pub const fn new() -> Self {
+    pub const fn new(value: &'static str) -> Self {
         Self {
-            cell: UnsafeCell::new(Symbol::uninitialized()),
+            id: AtomicU32::new(UNINITIALIZED_ID),
+            value,
         }
     }
 
-    pub fn initialize(&self, value: &str) {
-        let cell = self.cell.get();
-        unsafe {
-            *cell = symbolicate(value);
+    /// If this static symbol hasn't been initialized it will symbolicate the
+    /// value and store it in the `id` field.
+    #[inline]
+    pub fn get(&self) -> Symbol {
+        let mut id = self.id.load(Ordering::Relaxed);
+        if id == UNINITIALIZED_ID {
+            let symbol = symbolicate(self.value);
+            id = symbol.id();
+            self.id.store(id, Ordering::Relaxed);
         }
+        Symbol::new(id)
     }
 }
-
-impl Deref for StaticSymbol {
-    type Target = Symbol;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.cell.get() }
-    }
-}
-
-// Mark it as safe to share between threads.
-unsafe impl Sync for StaticSymbol {}
 
 /// Takes the result of `stringify!` on a pattern and returns just the variant.
 ///
@@ -102,15 +94,15 @@ pub fn expect_builtin_object(value: Value) -> Result<BuiltinObject, VmError> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::super::symbol::{symbolicate, Symbol};
+    use std::sync::atomic::Ordering;
+
+    use super::super::super::super::symbol::{symbolicate, UNINITIALIZED_ID};
     use super::StaticSymbol;
 
     #[test]
     fn it_begins_uninitialized_and_can_be_initialized() {
-        let static_symbol = StaticSymbol::new();
-        assert_eq!(*static_symbol, Symbol::uninitialized());
-
-        static_symbol.initialize("initialized");
-        assert_eq!(*static_symbol, symbolicate("initialized"));
+        let static_symbol = StaticSymbol::new("initialized");
+        assert_eq!(static_symbol.id.load(Ordering::SeqCst), UNINITIALIZED_ID);
+        assert_eq!(static_symbol.get(), symbolicate("initialized"));
     }
 }

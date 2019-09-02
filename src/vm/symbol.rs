@@ -58,14 +58,18 @@ impl Symbolicator {
 
 type SymbolId = u32;
 
-const UNINITIALIZED_ID: SymbolId = std::u32::MAX;
+pub const UNINITIALIZED_ID: SymbolId = std::u32::MAX;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Symbol(SymbolId);
 
 impl Symbol {
-    pub const fn uninitialized() -> Symbol {
-        Symbol(UNINITIALIZED_ID)
+    pub const fn uninitialized() -> Self {
+        Self(UNINITIALIZED_ID)
+    }
+
+    pub fn new(id: SymbolId) -> Self {
+        Self(id)
     }
 
     pub fn id(&self) -> SymbolId {

@@ -8,11 +8,9 @@ use super::super::super::symbol::Symbol;
 use super::super::super::value::{BuiltinMethodFn, BuiltinObject, Value};
 use super::support::*;
 
-static READ: StaticSymbol = StaticSymbol::new();
+static READ: StaticSymbol = StaticSymbol::new("read");
 
 pub fn load() -> LoadedModule {
-    READ.initialize("read");
-
     let module = LoadedModule::builtin("file".to_string());
     module.set_export("open", Value::make_builtin_function(open));
     module
@@ -30,7 +28,7 @@ fn open(arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
 }
 
 fn method_lut(_this: &GcPtr<File>, value: Symbol) -> Option<BuiltinMethodFn> {
-    if value == *READ {
+    if value == READ.get() {
         Some(method_read)
     } else {
         None
