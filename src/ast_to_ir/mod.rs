@@ -206,7 +206,9 @@ impl Compiler {
 
     fn compile_anonymous_block(&mut self, block: &Block, scope: &mut dyn Scope) -> SharedValue {
         // Push a new basic block and branch to it.
-        self.current.borrow_mut().push_basic_block(true);
+        self.current
+            .borrow_mut()
+            .push_basic_block("anonymous", true);
 
         let mut implicit_return = self.null_value();
         for node in block.nodes.iter() {
@@ -214,7 +216,9 @@ impl Compiler {
         }
 
         // Exit from the current block to the new block.
-        self.current.borrow_mut().push_basic_block(true);
+        self.current
+            .borrow_mut()
+            .push_basic_block("anonymous", true);
 
         implicit_return
     }
@@ -243,7 +247,19 @@ impl Compiler {
         let slot = name.map(|name| scope.add_local(&name));
         let mut function_scope = FunctionScope::new(scope, self.current.clone());
         let body = &*function.body;
-        let lval = self.compile_node(body, &mut function_scope);
+        let lval = match body {
+            // If it's a block then compile all the nodes ourselves. This
+            // avoids creating the additional inner and successor blocks that
+            // `compile_anonymous_block` generates.
+            Node::Block(block) => {
+                let mut implicit_return = self.null_value();
+                for node in block.nodes.iter() {
+                    implicit_return = self.compile_node(node, &mut function_scope);
+                }
+                implicit_return
+            }
+            other @ _ => self.compile_node(other, &mut function_scope),
+        };
         self.build_return(lval);
         // Save the bindings so that we know how to build the closure.
         Compiler::finalize_function(new_function.clone(), &function_scope, ScopeFlags::None);
@@ -438,11 +454,20 @@ impl Compiler {
 
     fn compile_while(&mut self, while_: &While, scope: &mut dyn Scope) -> SharedValue {
         // Make a block for the condition and branch to it.
-        let condition_block = self.current.borrow_mut().push_basic_block(true);
+        let condition_block = self
+            .current
+            .borrow_mut()
+            .push_basic_block("while.condition", true);
         // The block for the loop to run in.
-        let loop_block = self.current.borrow_mut().push_basic_block(false);
+        let loop_block = self
+            .current
+            .borrow_mut()
+            .push_basic_block("while.loop", false);
         // The block after the while.
-        let successor_block = self.current.borrow_mut().push_basic_block(false);
+        let successor_block = self
+            .current
+            .borrow_mut()
+            .push_basic_block("while.successor", false);
 
         self.current
             .borrow_mut()

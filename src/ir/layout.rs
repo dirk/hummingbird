@@ -181,11 +181,15 @@ impl Function {
         self.source_mappings.push((address, span));
     }
 
-    pub fn push_basic_block(&mut self, build_branch: bool) -> SharedBasicBlock {
+    pub fn push_basic_block<N: AsRef<str>>(
+        &mut self,
+        name: N,
+        build_branch: bool,
+    ) -> SharedBasicBlock {
         let id = self.basic_blocks.len();
         let basic_block = Rc::new(RefCell::new(BasicBlock::new(
             id as u16,
-            format!("anonymous.{}", id),
+            format!("{}.{}", name.as_ref(), id),
         )));
         self.basic_blocks.push(basic_block.clone());
         // If requested to, automatically build the branch from the current
