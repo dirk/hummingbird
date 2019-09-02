@@ -7,7 +7,7 @@ use super::errors::VmError;
 use super::frame::Closure;
 use super::gc::{GcAllocator, GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
-use super::symbol::{desymbolicate, symbolicate, Symbol};
+use super::symbol::{desymbolicate, Symbol};
 
 #[derive(Clone)]
 pub struct Function {
@@ -69,7 +69,7 @@ pub enum BuiltinObject {
 }
 
 impl BuiltinObject {
-    pub fn get_property(&self, value: &str) -> Option<Value> {
+    pub fn get_property(&self, value: Symbol) -> Option<Value> {
         match self {
             BuiltinObject::File(this, method_lut) => {
                 self.execute_method_lut(method_lut, this, value)
@@ -84,9 +84,8 @@ impl BuiltinObject {
         &self,
         method_lut: &BuiltinObjectMethodLUT<T>,
         this: &T,
-        value: &str,
+        value: Symbol,
     ) -> Option<Value> {
-        let value = symbolicate(value);
         match method_lut(this, value) {
             Some(method) => {
                 // Convert ourselves back into a value to be the receiver

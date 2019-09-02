@@ -20,7 +20,7 @@ pub enum Instruction {
     OpAdd(Reg, Reg, Reg),         // $1 = $2 + $3
     OpEquality(Reg, Reg, Reg),    // $1 = $2 == $3
     OpLessThan(Reg, Reg, Reg),    // $1 = $2 < $3
-    OpProperty(Reg, Reg, String), // $1 = $2.$3
+    OpProperty(Reg, Reg, Symbol), // $1 = $2.$3
     Branch(u8),
     BranchIf(u8, Reg),
     Call(Reg, Reg, Vec<Reg>), // $1 = $2($3[])

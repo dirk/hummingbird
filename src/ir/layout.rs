@@ -308,7 +308,7 @@ pub enum Instruction {
     OpAdd(SharedValue, SharedValue, SharedValue), // $1 = $2 + $3
     OpEquality(SharedValue, SharedValue, SharedValue), // $1 = $2 == $3
     OpLessThan(SharedValue, SharedValue, SharedValue), // $1 = $2 < $3
-    OpProperty(SharedValue, SharedValue, String), // $1 = $2.$3
+    OpProperty(SharedValue, SharedValue, Symbol), // $1 = $2.$3
     Branch(SharedBasicBlock),
     BranchIf(SharedBasicBlock, SharedValue),
     Call(SharedValue, SharedValue, Vec<SharedValue>),
@@ -424,6 +424,7 @@ pub trait InstructionBuilder {
 
     fn build_op_property(&mut self, target: SharedValue, value: String) -> SharedValue {
         let lval = self.new_value();
+        let value = symbolicate(value);
         let address = self.push(Instruction::OpProperty(lval.clone(), target.clone(), value));
         self.track(target, address);
         lval

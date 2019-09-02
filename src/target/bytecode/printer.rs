@@ -1,5 +1,6 @@
 use std::io::{Result, Write};
 
+use super::super::super::vm::desymbolicate;
 use super::layout::*;
 
 pub struct Printer<O: Write> {
@@ -73,9 +74,12 @@ impl<O: Write> Printer<O> {
             Instruction::OpLessThan(lval, lhs, rhs) => {
                 format!("{} = OpLessThan({}, {})", reg(lval), reg(lhs), reg(rhs))
             }
-            Instruction::OpProperty(lval, target, value) => {
-                format!("{} = OpProperty({}, {})", reg(lval), reg(target), value)
-            }
+            Instruction::OpProperty(lval, target, value) => format!(
+                "{} = OpProperty({}, {})",
+                reg(lval),
+                reg(target),
+                desymbolicate(value).unwrap()
+            ),
             Instruction::Branch(destination) => format!("Branch({:04})", destination),
             Instruction::BranchIf(destination, condition) => {
                 format!("BranchIf({:04}, {})", destination, reg(condition))

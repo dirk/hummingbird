@@ -1,6 +1,7 @@
 use std::cell::Ref;
 use std::io::{Result, Write};
 
+use super::super::vm::desymbolicate;
 use super::layout::*;
 
 pub struct Printer<O: Write> {
@@ -107,9 +108,12 @@ impl<O: Write> Printer<O> {
             Instruction::OpLessThan(lval, lhs, rhs) => {
                 format!("{} = OpLessThan({}, {})", id(lval), id(lhs), id(rhs))
             }
-            Instruction::OpProperty(lval, target, value) => {
-                format!("{} = OpProperty({}, {})", id(lval), id(target), value)
-            }
+            Instruction::OpProperty(lval, target, value) => format!(
+                "{} = OpProperty({}, {})",
+                id(lval),
+                id(target),
+                desymbolicate(value).unwrap()
+            ),
             Instruction::Branch(destination) => format!("Branch({})", destination.borrow().name),
             Instruction::BranchIf(destination, condition) => {
                 format!("BranchIf({}, {})", destination.borrow().name, id(condition))

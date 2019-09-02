@@ -1,5 +1,6 @@
 use super::errors::VmError;
 use super::gc::GcAllocator;
+use super::symbol::{desymbolicate, Symbol};
 use super::value::Value;
 
 #[inline]
@@ -40,14 +41,15 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, VmError> {
 }
 
 #[inline]
-pub fn op_property(target: Value, value: String) -> Result<Value, VmError> {
+pub fn op_property(target: Value, value: Symbol) -> Result<Value, VmError> {
     match &target {
-        Value::BuiltinObject(object) => match object.get_property(&value) {
+        Value::BuiltinObject(object) => match object.get_property(value) {
             Some(found) => Ok(found),
             None => Err(VmError::new_property_not_found(target, value)),
         },
         Value::Module(module) => {
-            if let Some(found) = module.get_export(&value) {
+            let stringified = desymbolicate(&value).expect("Couldn't desymbolicate");
+            if let Some(found) = module.get_export(&stringified) {
                 Ok(found)
             } else {
                 Err(VmError::new_property_not_found(target, value))

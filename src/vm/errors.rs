@@ -8,6 +8,7 @@ use termcolor::{ColorChoice, StandardStream};
 
 use super::super::parser::Span;
 use super::loader::LoadedModule;
+use super::symbol::{desymbolicate, Symbol};
 use super::value::Value;
 use super::vm::StackSnapshot;
 
@@ -72,7 +73,8 @@ impl VmError {
         Self::new(Kind::LoadFile(path, wrapped))
     }
 
-    pub fn new_property_not_found(target: Value, value: String) -> Self {
+    pub fn new_property_not_found(target: Value, value: Symbol) -> Self {
+        let value = desymbolicate(&value).unwrap_or("?".to_string());
         Self::new(Kind::PropertyNotFound(target, value))
     }
 
