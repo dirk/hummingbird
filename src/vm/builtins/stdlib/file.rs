@@ -4,10 +4,15 @@ use std::io::Read;
 use super::super::super::errors::VmError;
 use super::super::super::gc::{GcAllocator, GcPtr};
 use super::super::super::loader::LoadedModule;
+use super::super::super::symbol::Symbol;
 use super::super::super::value::{BuiltinMethodFn, BuiltinObject, Value};
-use super::expect::*;
+use super::support::*;
+
+static READ: StaticSymbol = StaticSymbol::new();
 
 pub fn load() -> LoadedModule {
+    READ.initialize("read");
+
     let module = LoadedModule::builtin("file".to_string());
     module.set_export("open", Value::make_builtin_function(open));
     module
@@ -24,10 +29,11 @@ fn open(arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
     ))))
 }
 
-fn method_lut(_this: &GcPtr<File>, value: &str) -> Option<BuiltinMethodFn> {
-    match value {
-        "read" => Some(method_read),
-        _ => None,
+fn method_lut(_this: &GcPtr<File>, value: Symbol) -> Option<BuiltinMethodFn> {
+    if value == *READ {
+        Some(method_read)
+    } else {
+        None
     }
 }
 

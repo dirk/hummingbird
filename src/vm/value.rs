@@ -7,7 +7,7 @@ use super::errors::VmError;
 use super::frame::Closure;
 use super::gc::{GcAllocator, GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
-use super::symbol::{desymbolicate, Symbol};
+use super::symbol::{desymbolicate, symbolicate, Symbol};
 
 #[derive(Clone)]
 pub struct Function {
@@ -59,7 +59,7 @@ type BuiltinObjectPropertyLUT<T> = fn(&T, &str) -> Option<Value>;
 
 /// Similar to the property LUT but more concise to make method LUT functions
 /// shorter to write.
-type BuiltinObjectMethodLUT<T> = fn(&T, &str) -> Option<BuiltinMethodFn>;
+pub type BuiltinObjectMethodLUT<T> = fn(&T, Symbol) -> Option<BuiltinMethodFn>;
 
 /// Specialized container for builtin objects used by the native stdlib
 /// (see `builtins::stdlib`).
@@ -86,6 +86,7 @@ impl BuiltinObject {
         this: &T,
         value: &str,
     ) -> Option<Value> {
+        let value = symbolicate(value);
         match method_lut(this, value) {
             Some(method) => {
                 // Convert ourselves back into a value to be the receiver

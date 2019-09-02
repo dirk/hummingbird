@@ -1,5 +1,5 @@
-// Internal macros and utilities for expectations on arguments.
+// Internal utility functions and macros.
 #[macro_use]
-mod expect;
+mod support;
 
 pub mod file;
