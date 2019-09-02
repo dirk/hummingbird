@@ -328,11 +328,17 @@ impl Compiler {
 
     fn compile_if(&mut self, if_: &If, scope: &mut dyn Scope) -> SharedValue {
         // Make a block for the condition and branch to it.
-        let condition_block = self.current.borrow_mut().push_basic_block(true);
+        let condition_block = self
+            .current
+            .borrow_mut()
+            .push_basic_block("if.condition", true);
         // The block to evaluate if the condition is true.
-        let true_block = self.current.borrow_mut().push_basic_block(false);
+        let true_block = self.current.borrow_mut().push_basic_block("if.then", false);
         // The block after the statement.
-        let successor_block = self.current.borrow_mut().push_basic_block(false);
+        let successor_block = self
+            .current
+            .borrow_mut()
+            .push_basic_block("if.successor", false);
 
         // Temporary local variable to hold the result of the branches.
         let lval = scope.add_local(&format!(".{}", condition_block.borrow().name));
