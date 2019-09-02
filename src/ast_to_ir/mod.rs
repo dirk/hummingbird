@@ -170,6 +170,7 @@ impl Compiler {
             &Node::Export(ref export) => self.compile_export(export, scope),
             &Node::Function(ref function) => self.compile_function(function, scope),
             &Node::Identifier(ref identifier) => self.compile_identifier(identifier, scope),
+            &Node::If(ref if_) => self.compile_if(if_, scope),
             &Node::Import(ref import) => self.compile_import(import, scope),
             &Node::Infix(ref infix) => self.compile_infix(infix, scope),
             &Node::Integer(ref integer) => self.compile_integer(integer, scope),
@@ -307,6 +308,36 @@ impl Compiler {
             let local = &identifier.value;
             this.build_get(scope.resolve(local))
         })
+    }
+
+    fn compile_if(&mut self, if_: &If, scope: &mut dyn Scope) -> SharedValue {
+        // Make a block for the condition and branch to it.
+        let condition_block = self.current.borrow_mut().push_basic_block(true);
+        // The block to evaluate if the condition is true.
+        let true_block = self.current.borrow_mut().push_basic_block(false);
+        // The block after the statement.
+        let successor_block = self.current.borrow_mut().push_basic_block(false);
+
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(condition_block.clone());
+        let condition_value = self.compile_node(&if_.condition, scope);
+        self.build_branch_if(true_block.clone(), condition_value);
+        self.build_branch(successor_block.clone());
+
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(true_block.clone());
+        for node in if_.block.nodes.iter() {
+            self.compile_node(node, scope);
+        }
+        // After executing the block go to the successor.
+        self.build_branch(successor_block.clone());
+
+        self.current
+            .borrow_mut()
+            .set_current_basic_block(successor_block.clone());
+        self.null_value()
     }
 
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
