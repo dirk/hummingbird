@@ -122,7 +122,6 @@ mod tests {
     use std::thread;
 
     use super::{Symbol, Symbolicator};
-    use std::io::Write;
 
     #[test]
     fn it_symbolicates_and_desymbolicates() {
