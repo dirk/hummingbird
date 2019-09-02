@@ -102,8 +102,6 @@ pub struct Function {
     pub locals: Vec<String>,
     pub bindings: HashSet<String>,
     pub parent_bindings: bool,
-    // TODO: Make this precise instead of just grabbing everything.
-    pub lexical_captures: bool,
 
     // Always keep track of where we entered.
     entry: SharedBasicBlock,
@@ -131,7 +129,6 @@ impl Function {
             locals: vec![],
             bindings: HashSet::new(),
             parent_bindings: false,
-            lexical_captures: false,
             entry: entry.clone(),
             current: entry.clone(),
             basic_blocks: vec![entry],
