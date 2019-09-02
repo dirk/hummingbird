@@ -42,6 +42,10 @@ pub fn op_less_than(lhs: Value, rhs: Value) -> Result<Value, VmError> {
 #[inline]
 pub fn op_property(target: Value, value: String) -> Result<Value, VmError> {
     match &target {
+        Value::BuiltinObject(object) => match object.get_property(&value) {
+            Some(found) => Ok(found),
+            None => Err(VmError::new_property_not_found(target, value)),
+        },
         Value::Module(module) => {
             if let Some(found) = module.get_export(&value) {
                 Ok(found)
@@ -49,7 +53,10 @@ pub fn op_property(target: Value, value: String) -> Result<Value, VmError> {
                 Err(VmError::new_property_not_found(target, value))
             }
         }
-        _ => panic!("Cannot get property of {:?}", target),
+        _ => Err(VmError::new_argument_error(format!(
+            "Cannot get a property of {:?}",
+            target.type_name(),
+        ))),
     }
 }
 

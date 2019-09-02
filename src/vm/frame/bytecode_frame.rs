@@ -6,7 +6,7 @@ use super::super::errors::{DebugSource, VmError};
 use super::super::gc::{GcAllocator, GcTrace};
 use super::super::loader::{BytecodeFunction, LoadedFunction, LoadedModule};
 use super::super::operators;
-use super::super::value::Value;
+use super::super::value::{BoundMethod, Value};
 use super::{Action, Closure, Frame, FrameApi};
 
 /// Frame evaluating a bytecode function.
@@ -181,8 +181,7 @@ impl BytecodeFrame {
                     self.advance();
                 }
                 Instruction::MakeString(lval, value) => {
-                    let value = gc.allocate(value.clone());
-                    self.write_register(*lval, Value::String(value));
+                    self.write_register(*lval, Value::make_string(value.clone(), gc));
                     self.advance();
                 }
                 Instruction::MakeSymbol(lval, symbol) => {
@@ -233,20 +232,30 @@ impl BytecodeFrame {
                         .iter()
                         .map(|argument| self.read_register(*argument))
                         .collect::<Vec<Value>>();
-                    match target {
+                    match &target {
                         Value::Function(function) => {
                             // Save the return register for when the VM calls `receive_return`.
                             self.return_register = Some(*lval);
-                            let loaded_function = function.loaded_function;
-                            let closure = loaded_function.build_closure_for_call(function.parent);
-                            let frame =
-                                Frame::Bytecode(BytecodeFrame::new(loaded_function, closure));
+                            let loaded_function = &function.loaded_function;
+                            let closure =
+                                loaded_function.build_closure_for_call(function.parent.clone());
+                            let frame = Frame::Bytecode(BytecodeFrame::new(
+                                loaded_function.clone(),
+                                closure,
+                            ));
                             // Be at the next instruction when control flow returns to us.
                             self.advance();
                             return Ok(Action::Call(frame));
                         }
+                        Value::BoundMethod(method) => match &**method {
+                            BoundMethod::Builtin(receiver, call_target) => {
+                                let result = call_target(receiver.clone(), arguments, gc)?;
+                                self.write_register(*lval, result);
+                                self.advance();
+                            }
+                        },
                         Value::BuiltinFunction(native_function) => {
-                            let result = native_function.call(arguments);
+                            let result = native_function.call(arguments, gc)?;
                             self.write_register(*lval, result);
                             self.advance();
                         }

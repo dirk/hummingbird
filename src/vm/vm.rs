@@ -17,7 +17,7 @@ pub struct Vm {
 
 impl Vm {
     pub fn new() -> Self {
-        let builtins_closure = builtins::build();
+        let builtins_closure = builtins::build_closure();
         Self {
             loader: Loader::new(builtins_closure.clone()),
             builtins_closure,

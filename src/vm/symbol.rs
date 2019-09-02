@@ -33,13 +33,20 @@ impl Symbolicator {
         }
         let mut writer = self.0.write().unwrap();
         let next_id = writer.symbols.len() as u32;
+        if next_id == UNINITIALIZED_ID {
+            panic!("Exhausted symbol space");
+        }
         writer.symbols.insert(string, next_id);
         Symbol(next_id)
     }
 
     pub fn desymbolicate<S: AsRef<Symbol>>(&self, symbol: &S) -> Option<String> {
         let reader = self.0.read().unwrap();
-        let id = symbol.as_ref().0;
+        let symbol = symbol.as_ref();
+        if *symbol == Symbol::uninitialized() {
+            panic!("Attempting to desymbolicate uninitialized symbol");
+        }
+        let id = symbol.0;
         for (key, value) in reader.symbols.iter() {
             if *value == id {
                 return Some(key.clone());
@@ -51,10 +58,20 @@ impl Symbolicator {
 
 type SymbolId = u32;
 
+pub const UNINITIALIZED_ID: SymbolId = std::u32::MAX;
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct Symbol(SymbolId);
 
 impl Symbol {
+    pub const fn uninitialized() -> Self {
+        Self(UNINITIALIZED_ID)
+    }
+
+    pub fn new(id: SymbolId) -> Self {
+        Self(id)
+    }
+
     pub fn id(&self) -> SymbolId {
         self.0
     }
@@ -147,5 +164,13 @@ mod tests {
             })
             .map(|handle| handle.join().unwrap())
             .for_each(drop);
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_doesnt_desymbolicate_unitialized() {
+        let symbol = Symbol::uninitialized();
+        let symbolicator = Symbolicator::new();
+        symbolicator.desymbolicate(&symbol);
     }
 }

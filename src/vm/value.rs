@@ -1,11 +1,13 @@
 use std::fmt::{Debug, Error, Formatter};
-use std::ops::Deref;
+use std::fs::File;
+use std::mem;
 use std::rc::Rc;
 
+use super::errors::VmError;
 use super::frame::Closure;
-use super::gc::{GcManaged, GcPtr, GcTrace};
+use super::gc::{GcAllocator, GcManaged, GcPtr, GcTrace};
 use super::loader::{LoadedFunction, LoadedModule};
-use super::symbol::{desymbolicate, Symbol};
+use super::symbol::{desymbolicate, symbolicate, Symbol};
 
 #[derive(Clone)]
 pub struct Function {
@@ -28,18 +30,20 @@ impl PartialEq for Function {
     }
 }
 
+type BuiltinFunctionFn = fn(Vec<Value>, &mut GcAllocator) -> Result<Value, VmError>;
+
 #[derive(Clone)]
 pub struct BuiltinFunction {
-    call_target: Rc<dyn Fn(Vec<Value>) -> Value>,
+    call_target: Rc<BuiltinFunctionFn>,
 }
 
 impl BuiltinFunction {
-    pub fn new(call_target: Rc<dyn Fn(Vec<Value>) -> Value>) -> Self {
+    pub fn new(call_target: Rc<BuiltinFunctionFn>) -> Self {
         Self { call_target }
     }
 
-    pub fn call(&self, arguments: Vec<Value>) -> Value {
-        self.call_target.deref()(arguments)
+    pub fn call(&self, arguments: Vec<Value>, gc: &mut GcAllocator) -> Result<Value, VmError> {
+        (self.call_target)(arguments, gc)
     }
 }
 
@@ -47,13 +51,88 @@ impl BuiltinFunction {
 //     properties: HashMap<String, Value>,
 // }
 
+/// If a builtin object supports properties then it will include a static
+/// function to look up a property. Using generics here since we know the LUT
+/// will receive the variant of the object (eg. a file if it's the LUT for
+/// a file builtin object).
+type BuiltinObjectPropertyLUT<T> = fn(&T, &str) -> Option<Value>;
+
+/// Similar to the property LUT but more concise to make method LUT functions
+/// shorter to write.
+pub type BuiltinObjectMethodLUT<T> = fn(&T, Symbol) -> Option<BuiltinMethodFn>;
+
+/// Specialized container for builtin objects used by the native stdlib
+/// (see `builtins::stdlib`).
+#[derive(Clone)]
+pub enum BuiltinObject {
+    File(GcPtr<File>, BuiltinObjectMethodLUT<GcPtr<File>>),
+}
+
+impl BuiltinObject {
+    pub fn get_property(&self, value: &str) -> Option<Value> {
+        match self {
+            BuiltinObject::File(this, method_lut) => {
+                self.execute_method_lut(method_lut, this, value)
+            }
+        }
+    }
+
+    /// Calls the given method LUT. If it returns a method function pointer
+    /// then it builds a bound method and returns that.
+    #[inline]
+    fn execute_method_lut<T>(
+        &self,
+        method_lut: &BuiltinObjectMethodLUT<T>,
+        this: &T,
+        value: &str,
+    ) -> Option<Value> {
+        let value = symbolicate(value);
+        match method_lut(this, value) {
+            Some(method) => {
+                // Convert ourselves back into a value to be the receiver
+                // of the method.
+                let receiver = Value::BuiltinObject(Box::new(self.clone()));
+                Some(Value::make_builtin_bound_method(receiver, method))
+            }
+            None => None,
+        }
+    }
+}
+
+impl Debug for BuiltinObject {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "BuiltinObject(")?;
+        match self {
+            BuiltinObject::File(_, _) => write!(f, "File")?,
+        }
+        write!(f, ")")
+    }
+}
+
+impl GcTrace for BuiltinObject {
+    fn trace(&self) {
+        match self {
+            BuiltinObject::File(file, _) => file.mark(),
+        }
+    }
+}
+
+pub type BuiltinMethodFn = fn(Value, Vec<Value>, &mut GcAllocator) -> Result<Value, VmError>;
+
+#[derive(Clone)]
+pub enum BoundMethod {
+    Builtin(Value, BuiltinMethodFn),
+}
+
 #[derive(Clone)]
 pub enum Value {
     Null,
     Boolean(bool),
+    BoundMethod(Box<BoundMethod>),
     BuiltinFunction(BuiltinFunction),
+    BuiltinObject(Box<BuiltinObject>),
     // DynamicObject(Gc<GcCell<DynamicObject>>),
-    Function(Function),
+    Function(Box<Function>),
     Integer(i64),
     Module(LoadedModule),
     String(GcPtr<String>),
@@ -62,36 +141,72 @@ pub enum Value {
 
 impl Value {
     pub fn make_function(loaded_function: LoadedFunction, parent: Option<Closure>) -> Self {
-        Value::Function(Function {
+        Value::Function(Box::new(Function {
             loaded_function,
             parent,
-        })
+        }))
     }
 
-    pub fn make_builtin_function<V: Fn(Vec<Value>) -> Value + 'static>(call_target: V) -> Self {
+    pub fn make_builtin_bound_method(receiver: Value, call_target: BuiltinMethodFn) -> Self {
+        let method = BoundMethod::Builtin(receiver, call_target);
+        Value::BoundMethod(Box::new(method))
+    }
+
+    pub fn make_builtin_function(call_target: BuiltinFunctionFn) -> Self {
         let builtin_function = BuiltinFunction::new(Rc::new(call_target));
         Value::BuiltinFunction(builtin_function)
     }
+
+    pub fn make_string(string: String, gc: &mut GcAllocator) -> Self {
+        let allocated = gc.allocate(string);
+        Value::String(allocated)
+    }
+
+    pub fn type_name(&self) -> &str {
+        match self {
+            Value::Null => "Null",
+            Value::Boolean(_) => "Boolean",
+            Value::BoundMethod(_) => "BoundMethod",
+            Value::BuiltinFunction(_) => "BuiltinFunction",
+            Value::BuiltinObject(_) => "BuiltinObject",
+            Value::Function(_) => "Function",
+            Value::Integer(_) => "Integer",
+            Value::Module(_) => "Module",
+            Value::String(_) => "String",
+            Value::Symbol(_) => "Symbol",
+        }
+    }
+}
+
+/// On 64-bit platforms the `Value` should be 2 words in size.
+#[cfg(target_pointer_width = "64")]
+const BYTE_SIZE_OF_VALUE: usize = 16;
+
+/// Hack to statically check the size of the `Value`.
+#[allow(dead_code, unreachable_code)]
+fn static_assert_value_size() {
+    unsafe { mem::transmute::<Value, [u8; BYTE_SIZE_OF_VALUE]>(unreachable!()) };
 }
 
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        use Value::*;
         match self {
-            Null => write!(f, "null"),
-            Boolean(value) => write!(f, "{:?}", value),
-            BuiltinFunction(_) => write!(f, "BuiltinFunction"),
-            Function(function) => {
+            Value::Null => write!(f, "null"),
+            Value::Boolean(value) => write!(f, "{:?}", value),
+            Value::BoundMethod(_) => write!(f, "BoundMethod"),
+            Value::BuiltinFunction(_) => write!(f, "BuiltinFunction"),
+            Value::BuiltinObject(object) => write!(f, "{:?}", object),
+            Value::Function(function) => {
                 let name = function.loaded_function.qualified_name();
                 write!(f, "Function({})", name)
             }
-            Integer(value) => write!(f, "{}", value),
-            Module(module) => write!(f, "Module({})", module.name()),
-            String(value) => {
+            Value::Integer(value) => write!(f, "{}", value),
+            Value::Module(module) => write!(f, "Module({})", module.name()),
+            Value::String(value) => {
                 let string = &**value;
                 write!(f, "{:?}", string)
             }
-            Symbol(symbol) => {
+            Value::Symbol(symbol) => {
                 let string = desymbolicate(symbol).unwrap_or("?".to_string());
                 write!(f, "Symbol({}:{})", symbol.id(), string)
             }
@@ -103,18 +218,22 @@ impl GcManaged for Value {}
 
 impl GcTrace for Value {
     fn trace(&self) {
-        use Value::*;
         match self {
-            Function(function) => {
+            Value::BuiltinObject(object) => {
+                object.trace();
+            }
+            Value::Function(function) => {
                 if let Some(parent) = &function.parent {
                     parent.trace();
                 }
             }
-            String(value) => value.mark(),
+            Value::String(value) => value.mark(),
             _ => (),
         }
     }
 }
+
+impl GcManaged for File {}
 
 impl GcManaged for String {}
 
