@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use super::super::ast::nodes::{
-    Assignment, Block, Export, Function, Identifier, Infix, Integer, Let, Module, Node,
+    Assignment, Block, Export, Function, Identifier, If, Infix, Integer, Let, Module, Node,
     PostfixCall, PostfixProperty, Return, Var, While,
 };
 
@@ -78,7 +78,6 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
             Token::Let(_) => parse_let_and_var(input),
             Token::Return => parse_return(input, terminator.clone()),
             Token::Var(_) => parse_let_and_var(input),
-            Token::While(_) => parse_while(input),
             _ => parse_expression(input),
         }
     };
@@ -196,7 +195,20 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     }
 }
 
-fn parse_while(input: &mut TokenStream) -> Node {
+fn expect_if(input: &mut TokenStream) -> Node {
+    match input.read() {
+        Token::If(_) => (),
+        other @ _ => {
+            panic_unexpected_names(other, "While");
+            unreachable!()
+        }
+    }
+    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
+    let block = expect_block(input);
+    Node::If(If::new(condition, block))
+}
+
+fn expect_while(input: &mut TokenStream) -> Node {
     match input.read() {
         Token::While(_) => (),
         other @ _ => {
@@ -225,7 +237,11 @@ fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
 }
 
 fn parse_expression(input: &mut TokenStream) -> Node {
-    parse_infix(input)
+    match input.peek() {
+        Token::If(_) => expect_if(input),
+        Token::While(_) => expect_while(input),
+        _ => parse_infix(input),
+    }
 }
 
 fn parse_infix(input: &mut TokenStream) -> Node {
@@ -529,8 +545,9 @@ impl From<Token> for Identifier {
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
-        Assignment, Block, Export, Function, Identifier, Import, ImportBindings, Infix, Integer,
-        Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral, SymbolLiteral,
+        Assignment, Block, Export, Function, Identifier, If, Import, ImportBindings, Infix,
+        Integer, Let, Module, Node, PostfixCall, PostfixProperty, Return, StringLiteral,
+        SymbolLiteral, While,
     };
 
     use super::super::lexer::{Token, TokenStream};
@@ -863,6 +880,31 @@ mod tests {
     }
 
     #[test]
+    fn it_parses_if() {
+        assert_eq!(
+            parse_complete("if 1 { 2 }"),
+            vec![Node::If(If::new(
+                Node::Integer(Integer { value: 1 }),
+                Block {
+                    nodes: vec![Node::Integer(Integer { value: 2 })],
+                },
+            ))],
+        );
+        assert_eq!(
+            parse_complete("let a = if 1 { 2 }"),
+            vec![Node::Let(Let::new(
+                Identifier::new("a", Span::unknown()),
+                Some(Node::If(If::new(
+                    Node::Integer(Integer { value: 1 }),
+                    Block {
+                        nodes: vec![Node::Integer(Integer { value: 2 })],
+                    },
+                ))),
+            ))],
+        );
+    }
+
+    #[test]
     fn it_parses_infix() {
         assert_eq!(
             parse_infix(&mut input("1 + 2")),
@@ -1022,6 +1064,19 @@ mod tests {
         assert_eq!(
             parse_complete(":foo"),
             vec![Node::Symbol(SymbolLiteral::new("foo".to_string()))],
+        );
+    }
+
+    #[test]
+    fn it_parses_while() {
+        assert_eq!(
+            parse_complete("while 1 { 2 }"),
+            vec![Node::While(While::new(
+                Node::Integer(Integer { value: 1 }),
+                Block {
+                    nodes: vec![Node::Integer(Integer { value: 2 })],
+                },
+            ))],
         );
     }
 }

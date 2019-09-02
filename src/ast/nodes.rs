@@ -10,6 +10,7 @@ pub enum Node {
     Function(Function),
     Export(Export),
     Identifier(Identifier),
+    If(If),
     Import(Import),
     Infix(Infix),
     Integer(Integer),
@@ -97,6 +98,21 @@ impl Identifier {
         Self {
             value: value.into(),
             span,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct If {
+    pub condition: Box<Node>,
+    pub block: Block,
+}
+
+impl If {
+    pub fn new(condition: Node, block: Block) -> Self {
+        Self {
+            condition: Box::new(condition),
+            block,
         }
     }
 }

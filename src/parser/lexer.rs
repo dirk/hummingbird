@@ -82,6 +82,7 @@ pub enum Token {
     Equal,
     Export,
     Identifier(String, Span),
+    If(Location),
     Import(Location),
     Integer(i64),
     Let(Location),
@@ -232,6 +233,7 @@ impl TokenStream {
         match identifier_string.as_str() {
             "export" => Token::Export,
             "let" => Token::Let(start),
+            "if" => Token::If(start),
             "import" => Token::Import(start),
             "return" => Token::Return,
             "var" => Token::Var(start),
