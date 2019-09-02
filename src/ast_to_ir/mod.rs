@@ -318,26 +318,34 @@ impl Compiler {
         // The block after the statement.
         let successor_block = self.current.borrow_mut().push_basic_block(false);
 
+        // Temporary local variable to hold the result of the branches.
+        let lval = scope.add_local(&format!(".{}", condition_block.borrow().name));
+
         self.current
             .borrow_mut()
             .set_current_basic_block(condition_block.clone());
         let condition_value = self.compile_node(&if_.condition, scope);
         self.build_branch_if(true_block.clone(), condition_value);
+        // TODO: Implement else and else-if.
+        let rhs = self.null_value();
+        self.build_set(lval.clone(), rhs);
         self.build_branch(successor_block.clone());
 
         self.current
             .borrow_mut()
             .set_current_basic_block(true_block.clone());
+        let mut lhs = self.null_value();
         for node in if_.block.nodes.iter() {
-            self.compile_node(node, scope);
+            lhs = self.compile_node(node, scope);
         }
+        self.build_set(lval.clone(), lhs);
         // After executing the block go to the successor.
         self.build_branch(successor_block.clone());
 
         self.current
             .borrow_mut()
             .set_current_basic_block(successor_block.clone());
-        self.null_value()
+        self.build_get(lval)
     }
 
     fn compile_import(&mut self, import: &Import, _scope: &mut dyn Scope) -> SharedValue {
