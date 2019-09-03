@@ -10,6 +10,47 @@ use super::lexer::{Token, TokenStream};
 use super::location::Span;
 use crate::ast::SymbolLiteral;
 
+/// Takes a string from:
+///   - `stringify!` on a pattern
+///   - A debug-formatted struct or enum
+///
+/// And returns just the relevant name portion.
+///
+/// ```
+/// base_name("Value::String(string)") // => "String"
+/// base_name("Integer(1)") // => "Integer"
+/// base_name("Export") // => "Exports"
+/// ```
+pub fn base_name(name: &str) -> &str {
+    let left = name.rfind("::").map(|index| index + 2);
+    let right = name.find("(");
+    match (left, right) {
+        (Some(left), Some(right)) => &name[left..right],
+        (None, Some(right)) => &name[..right],
+        (Some(left), None) => &name[left..],
+        (None, None) => name,
+    }
+}
+
+/// Using a macro instead of a method so that we can stringify the pattern.
+macro_rules! expect_to_read2 {
+    ($i:ident, $p:pat => $m:expr) => {
+        match $i.read() {
+            $p => $m,
+            got @ _ => {
+                let got = &format!("{:?}", got);
+                let expected = stringify!($p);
+                panic!(
+                    "Unexpected token: got {}, expected {}",
+                    base_name(got),
+                    base_name(expected)
+                );
+            }
+        }
+    };
+}
+
+/// Parsing entry point.
 pub fn parse_module(input: &mut TokenStream) -> Module {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
@@ -140,13 +181,7 @@ fn expect_export(input: &mut TokenStream) -> Node {
 }
 
 fn expect_import(input: &mut TokenStream) -> Node {
-    let start = match input.read() {
-        Token::Import(location) => location,
-        other @ _ => {
-            panic_unexpected_names(other, "Import");
-            unreachable!()
-        }
-    };
+    let start = expect_to_read2!(input, Token::Import(location) => location);
     let bindings = match input.peek() {
         Token::Star => {
             input.read();
@@ -155,13 +190,9 @@ fn expect_import(input: &mut TokenStream) -> Node {
         Token::String(_, _) => ImportBindings::Module,
         other @ _ => unreachable!("Cannot yet parse in import: {:?}", other),
     };
-    let (name, end) = match input.read() {
-        Token::String(value, span) => (value, span.end),
-        other @ _ => {
-            panic_unexpected_names(other, "String");
-            unreachable!()
-        }
-    };
+    let (name, end) = expect_to_read2!(input, Token::String(value, span) => {
+        (value, span.end)
+    });
     Node::Import(Import::new(name, bindings, Span::new(start, end)))
 }
 
@@ -169,7 +200,7 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     // Consume the `let` or `var`.
     let keyword = input.read();
 
-    let lhs: Identifier = input.read().into();
+    let lhs = expect_identifier(input);
 
     let mut rhs = None;
     if input.peek() == Token::Equal {
@@ -196,26 +227,14 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
 }
 
 fn expect_if(input: &mut TokenStream) -> Node {
-    match input.read() {
-        Token::If(_) => (),
-        other @ _ => {
-            panic_unexpected_names(other, "While");
-            unreachable!()
-        }
-    }
+    expect_to_read2!(input, Token::If(_) => ());
     let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
     let block = expect_block(input);
     Node::If(If::new(condition, block))
 }
 
 fn expect_while(input: &mut TokenStream) -> Node {
-    match input.read() {
-        Token::While(_) => (),
-        other @ _ => {
-            panic_unexpected_names(other, "While");
-            unreachable!()
-        }
-    }
+    expect_to_read2!(input, Token::While(_) => ());
     let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
     let block = expect_block(input);
     Node::While(While::new(condition, block))
@@ -492,13 +511,9 @@ fn parse_atom(input: &mut TokenStream) -> Node {
 }
 
 fn expect_identifier(input: &mut TokenStream) -> Identifier {
-    match input.read() {
-        Token::Identifier(value, span) => Identifier::new(value, span),
-        other @ _ => {
-            panic_unexpected_names(other, "Identifier");
-            unreachable!()
-        }
-    }
+    expect_to_read2!(input, Token::Identifier(value, span) => {
+        Identifier::new(value, span)
+    })
 }
 
 fn consume_terminals(input: &mut TokenStream) {
@@ -530,18 +545,6 @@ fn panic_unexpected_names<T: Debug>(token: T, expected_names: &str) {
     )
 }
 
-impl From<Token> for Identifier {
-    fn from(token: Token) -> Identifier {
-        match token {
-            Token::Identifier(value, span) => Identifier::new(value, span),
-            _ => {
-                panic_unexpected_names(token, "Identifier");
-                unreachable!()
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::super::ast::nodes::{
@@ -553,7 +556,7 @@ mod tests {
     use super::super::lexer::{Token, TokenStream};
     use super::super::{Location, Span};
 
-    use super::{parse_block, parse_infix, parse_module, parse_postfix};
+    use super::{base_name, parse_block, parse_infix, parse_module, parse_postfix};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
@@ -1078,5 +1081,12 @@ mod tests {
                 },
             ))],
         );
+    }
+
+    #[test]
+    fn it_base_names_formatted_strings() {
+        assert_eq!(base_name("Value::String(string)"), "String");
+        assert_eq!(base_name("Integer(1)"), "Integer");
+        assert_eq!(base_name("Export"), "Export");
     }
 }
