@@ -79,7 +79,7 @@ pub fn base_name(name: &str) -> &str {
 }
 
 /// Using a macro instead of a method so that we can stringify the pattern.
-macro_rules! expect_to_read2 {
+macro_rules! expect_to_read {
     ($i:ident, $p:pat => $m:expr) => {
         match $i.read() {
             $p => $m,
@@ -187,6 +187,8 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     let name = match input.read() {
         Token::Identifier(name, _) => name.clone(),
         other @ _ => {
+            // Panicking here because this should only be called if the next
+            // token is an `Identifier`.
             panic_unexpected_names(other, "Identifier");
             unreachable!()
         }
@@ -203,8 +205,8 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
 }
 
 fn expect_export(input: &mut TokenStream) -> Result<Node, ParseError> {
-    expect_to_read(input, Token::Export);
-    expect_to_read(input, Token::BraceLeft);
+    expect_to_read!(input, Token::Export => ());
+    expect_to_read!(input, Token::BraceLeft => ());
     let mut identifiers: Vec<Identifier> = vec![];
     loop {
         if input.peek() == Token::BraceRight {
@@ -217,8 +219,10 @@ fn expect_export(input: &mut TokenStream) -> Result<Node, ParseError> {
             Token::BraceRight => break,
             Token::Comma => continue,
             other @ _ => {
-                panic_unexpected_names(other, "BraceRight or Comma");
-                unreachable!()
+                return Err(ParseError::new_unexpected(
+                    vec!["BraceRight".to_string(), "Comma".to_string()],
+                    other,
+                ))
             }
         }
     }
@@ -226,7 +230,7 @@ fn expect_export(input: &mut TokenStream) -> Result<Node, ParseError> {
 }
 
 fn expect_import(input: &mut TokenStream) -> Result<Node, ParseError> {
-    let start = expect_to_read2!(input, Token::Import(location) => location);
+    let start = expect_to_read!(input, Token::Import(location) => location);
     let bindings = match input.peek() {
         Token::Star => {
             input.read();
@@ -235,7 +239,7 @@ fn expect_import(input: &mut TokenStream) -> Result<Node, ParseError> {
         Token::String(_, _) => ImportBindings::Module,
         other @ _ => unreachable!("Cannot yet parse in import: {:?}", other),
     };
-    let (name, end) = expect_to_read2!(input, Token::String(value, span) => {
+    let (name, end) = expect_to_read!(input, Token::String(value, span) => {
         (value, span.end)
     });
     Ok(Node::Import(Import::new(
@@ -253,7 +257,7 @@ fn parse_let_and_var(input: &mut TokenStream) -> Result<Node, ParseError> {
 
     let mut rhs = None;
     if input.peek() == Token::Equal {
-        expect_to_read(input, Token::Equal);
+        expect_to_read!(input, Token::Equal => ());
         rhs = Some(parse_expression(input)?);
     }
 
@@ -268,29 +272,29 @@ fn parse_let_and_var(input: &mut TokenStream) -> Result<Node, ParseError> {
             var.location = Some(location);
             Ok(Node::Var(var))
         }
-        _ => {
-            panic_unexpected_names(keyword, "Let or Var");
-            unreachable!()
-        }
+        other @ _ => Err(ParseError::new_unexpected(
+            vec!["Let".to_string(), "Var".to_string()],
+            other,
+        )),
     }
 }
 
 fn expect_if(input: &mut TokenStream) -> Result<Node, ParseError> {
-    expect_to_read2!(input, Token::If(_) => ());
+    expect_to_read!(input, Token::If(_) => ());
     let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block)?;
     let block = expect_block(input)?;
     Ok(Node::If(If::new(condition, block)))
 }
 
 fn expect_while(input: &mut TokenStream) -> Result<Node, ParseError> {
-    expect_to_read2!(input, Token::While(_) => ());
+    expect_to_read!(input, Token::While(_) => ());
     let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block)?;
     let block = expect_block(input)?;
     Ok(Node::While(While::new(condition, block)))
 }
 
 fn parse_return(input: &mut TokenStream, terminator: Token) -> Result<Node, ParseError> {
-    expect_to_read(input, Token::Return);
+    expect_to_read!(input, Token::Return => ());
     let mut rhs = None;
     let next = input.peek();
     if let Token::Terminal(_) = next {
@@ -394,9 +398,9 @@ fn parse_block(input: &mut TokenStream) -> Result<Node, ParseError> {
 }
 
 fn expect_block(input: &mut TokenStream) -> Result<Block, ParseError> {
-    expect_to_read(input, Token::BraceLeft); // Opening brace
+    expect_to_read!(input, Token::BraceLeft => ()); // Opening brace
     let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block)?;
-    expect_to_read(input, Token::BraceRight); // Closing brace
+    expect_to_read!(input, Token::BraceRight => ()); // Closing brace
     Ok(Block { nodes })
 }
 
@@ -502,7 +506,7 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
 }
 
 fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Result<Node, ParseError> {
-    expect_to_read(input, Token::ParenthesesLeft);
+    expect_to_read!(input, Token::ParenthesesLeft => ());
     let mut arguments = vec![];
     if input.peek() != Token::ParenthesesRight {
         loop {
@@ -510,7 +514,7 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Result<Node, Par
             arguments.push(argument);
             let next = input.peek();
             if next == Token::Comma {
-                expect_to_read(input, Token::Comma);
+                expect_to_read!(input, Token::Comma => ());
                 // Allow a trailing comma before the closing parentheses.
                 if input.peek() == Token::ParenthesesRight {
                     break;
@@ -520,11 +524,14 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Result<Node, Par
             } else if next == Token::ParenthesesRight {
                 break;
             } else {
-                panic_unexpected(next, Some(vec![Token::Comma, Token::ParenthesesRight]));
+                return Err(ParseError::new_unexpected(
+                    vec!["Comma".to_string(), "ParenthesesRight".to_string()],
+                    next,
+                ));
             }
         }
     }
-    expect_to_read(input, Token::ParenthesesRight);
+    expect_to_read!(input, Token::ParenthesesRight => ());
     Ok(Node::PostfixCall(PostfixCall::new(target, arguments)))
 }
 
@@ -532,7 +539,7 @@ fn parse_parentheses(input: &mut TokenStream) -> Result<Node, ParseError> {
     if let Token::ParenthesesLeft = input.peek() {
         input.read(); // Opening parentheses
         let node = parse_expression(input);
-        expect_to_read(input, Token::ParenthesesRight); // Closing parentheses
+        expect_to_read!(input, Token::ParenthesesRight => ()); // Closing parentheses
         node
     } else {
         parse_atom(input)
@@ -563,7 +570,7 @@ fn parse_atom(input: &mut TokenStream) -> Result<Node, ParseError> {
 }
 
 fn expect_identifier(input: &mut TokenStream) -> Result<Identifier, ParseError> {
-    Ok(expect_to_read2!(input, Token::Identifier(value, span) => {
+    Ok(expect_to_read!(input, Token::Identifier(value, span) => {
         Identifier::new(value, span)
     }))
 }
@@ -572,14 +579,6 @@ fn consume_terminals(input: &mut TokenStream) {
     while let Token::Terminal(_) = input.peek() {
         input.read();
     }
-}
-
-fn expect_to_read(input: &mut TokenStream, token: Token) -> Token {
-    let next = input.read();
-    if next != token {
-        panic_unexpected(next.clone(), Some(vec![token]));
-    }
-    next
 }
 
 fn panic_unexpected(token: Token, expected_tokens: Option<Vec<Token>>) {
