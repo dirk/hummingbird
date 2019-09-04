@@ -9,8 +9,8 @@ use super::super::ast::{Import, ImportBindings, StringLiteral, SymbolLiteral};
 use super::lexer::{Token, TokenStream};
 use super::location::{Location, Span};
 
-#[derive(Debug)]
-enum ParseError {
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
     Unexpected {
         expected: Vec<String>,
         got: String,
@@ -86,29 +86,23 @@ macro_rules! expect_to_read2 {
         match $i.read() {
             $p => $m,
             got @ _ => {
-                let got = &format!("{:?}", got);
-                let expected = stringify!($p);
-                panic!(
-                    "Unexpected token: got {}, expected {}",
-                    base_name(got),
-                    base_name(expected)
-                );
+                return Err(ParseError::new_unexpected(
+                    vec![stringify!($p).to_string()],
+                    got,
+                ));
             }
         }
     };
 }
 
 /// Parsing entry point.
-pub fn parse_module(input: &mut TokenStream) -> Module {
+pub fn parse_module(input: &mut TokenStream) -> Result<Module, ParseError> {
     let mut nodes: Vec<Node> = Vec::new();
     while input.peek() != Token::EOF {
-        nodes.append(&mut parse_statements(
-            input,
-            Token::EOF,
-            StatementContext::Module,
-        ))
+        let mut statements = parse_statements(input, Token::EOF, StatementContext::Module)?;
+        nodes.append(&mut statements);
     }
-    Module::new(nodes)
+    Ok(Module::new(nodes))
 }
 
 // `import` and `export` statements are allowed at the module-level but not at
@@ -123,7 +117,7 @@ fn parse_statements(
     input: &mut TokenStream,
     terminator: Token,
     ctx: StatementContext,
-) -> Vec<Node> {
+) -> Result<Vec<Node>, ParseError> {
     let mut nodes = vec![];
     loop {
         consume_terminals(input);
@@ -131,20 +125,25 @@ fn parse_statements(
             break;
         }
 
-        nodes.push(parse_statement(input, terminator.clone(), ctx));
+        let node = parse_statement(input, terminator.clone(), ctx)?;
+        nodes.push(node);
 
         consume_terminals(input);
         if input.peek() == terminator {
             break;
         }
     }
-    nodes
+    Ok(nodes)
 }
 
 // `terminator` is a pseudo-terminal (eg. a closing brace) that can act like a
 // terminal. However, when it is encountered it will be peeked, not read, from
 // the input.
-fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementContext) -> Node {
+fn parse_statement(
+    input: &mut TokenStream,
+    terminator: Token,
+    ctx: StatementContext,
+) -> Result<Node, ParseError> {
     let next = input.peek();
     let maybe_named_function = match next {
         Token::Identifier(_, _) => try_parse_named_function(input),
@@ -157,27 +156,27 @@ fn parse_statement(input: &mut TokenStream, terminator: Token, ctx: StatementCon
     } else {
         match next {
             Token::Export => match ctx {
-                StatementContext::Module => expect_export(input),
+                StatementContext::Module => expect_export(input)?,
                 other @ _ => unreachable!("Cannot parse export in {:?}", other),
             },
             Token::Import(_) => match ctx {
-                StatementContext::Module => expect_import(input),
+                StatementContext::Module => expect_import(input)?,
                 other @ _ => unreachable!("Cannot parse import in {:?}", other),
             },
-            Token::Let(_) => parse_let_and_var(input),
-            Token::Return => parse_return(input, terminator.clone()),
-            Token::Var(_) => parse_let_and_var(input),
-            _ => parse_expression(input),
+            Token::Let(_) => parse_let_and_var(input)?,
+            Token::Return => parse_return(input, terminator.clone())?,
+            Token::Var(_) => parse_let_and_var(input)?,
+            _ => parse_expression(input)?,
         }
     };
     // Treat the statement as terminated if we encounter the terminator (but
     // don't try to consume it).
     if input.peek() == terminator {
-        return node;
+        return Ok(node);
     }
     let next = input.peek();
     if let Token::Terminal(_) = next {
-        return node;
+        return Ok(node);
     }
     panic_unexpected(
         next,
@@ -206,7 +205,7 @@ fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
     None
 }
 
-fn expect_export(input: &mut TokenStream) -> Node {
+fn expect_export(input: &mut TokenStream) -> Result<Node, ParseError> {
     expect_to_read(input, Token::Export);
     expect_to_read(input, Token::BraceLeft);
     let mut identifiers: Vec<Identifier> = vec![];
@@ -215,7 +214,8 @@ fn expect_export(input: &mut TokenStream) -> Node {
             input.read();
             break;
         }
-        identifiers.push(expect_identifier(input));
+        let identifier = expect_identifier(input)?;
+        identifiers.push(identifier);
         match input.read() {
             Token::BraceRight => break,
             Token::Comma => continue,
@@ -225,10 +225,10 @@ fn expect_export(input: &mut TokenStream) -> Node {
             }
         }
     }
-    Node::Export(Export::new(identifiers))
+    Ok(Node::Export(Export::new(identifiers)))
 }
 
-fn expect_import(input: &mut TokenStream) -> Node {
+fn expect_import(input: &mut TokenStream) -> Result<Node, ParseError> {
     let start = expect_to_read2!(input, Token::Import(location) => location);
     let bindings = match input.peek() {
         Token::Star => {
@@ -241,31 +241,35 @@ fn expect_import(input: &mut TokenStream) -> Node {
     let (name, end) = expect_to_read2!(input, Token::String(value, span) => {
         (value, span.end)
     });
-    Node::Import(Import::new(name, bindings, Span::new(start, end)))
+    Ok(Node::Import(Import::new(
+        name,
+        bindings,
+        Span::new(start, end),
+    )))
 }
 
-fn parse_let_and_var(input: &mut TokenStream) -> Node {
+fn parse_let_and_var(input: &mut TokenStream) -> Result<Node, ParseError> {
     // Consume the `let` or `var`.
     let keyword = input.read();
 
-    let lhs = expect_identifier(input);
+    let lhs = expect_identifier(input)?;
 
     let mut rhs = None;
     if input.peek() == Token::Equal {
         expect_to_read(input, Token::Equal);
-        rhs = Some(parse_expression(input));
+        rhs = Some(parse_expression(input)?);
     }
 
     match keyword {
         Token::Let(location) => {
             let mut let_ = Let::new(lhs, rhs);
             let_.location = Some(location);
-            Node::Let(let_)
+            Ok(Node::Let(let_))
         }
         Token::Var(location) => {
             let mut var = Var::new(lhs, rhs);
             var.location = Some(location);
-            Node::Var(var)
+            Ok(Node::Var(var))
         }
         _ => {
             panic_unexpected_names(keyword, "Let or Var");
@@ -274,21 +278,21 @@ fn parse_let_and_var(input: &mut TokenStream) -> Node {
     }
 }
 
-fn expect_if(input: &mut TokenStream) -> Node {
+fn expect_if(input: &mut TokenStream) -> Result<Node, ParseError> {
     expect_to_read2!(input, Token::If(_) => ());
-    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
-    let block = expect_block(input);
-    Node::If(If::new(condition, block))
+    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block)?;
+    let block = expect_block(input)?;
+    Ok(Node::If(If::new(condition, block)))
 }
 
-fn expect_while(input: &mut TokenStream) -> Node {
+fn expect_while(input: &mut TokenStream) -> Result<Node, ParseError> {
     expect_to_read2!(input, Token::While(_) => ());
-    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block);
-    let block = expect_block(input);
-    Node::While(While::new(condition, block))
+    let condition = parse_statement(input, Token::BraceLeft, StatementContext::Block)?;
+    let block = expect_block(input)?;
+    Ok(Node::While(While::new(condition, block)))
 }
 
-fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
+fn parse_return(input: &mut TokenStream, terminator: Token) -> Result<Node, ParseError> {
     expect_to_read(input, Token::Return);
     let mut rhs = None;
     let next = input.peek();
@@ -298,12 +302,12 @@ fn parse_return(input: &mut TokenStream, terminator: Token) -> Node {
         // Also do nothing.
     } else {
         // We got an expression!
-        rhs = Some(parse_expression(input));
+        rhs = Some(parse_expression(input)?);
     }
-    Node::Return(Return::new(rhs))
+    Ok(Node::Return(Return::new(rhs)))
 }
 
-fn parse_expression(input: &mut TokenStream) -> Node {
+fn parse_expression(input: &mut TokenStream) -> Result<Node, ParseError> {
     match input.peek() {
         Token::If(_) => expect_if(input),
         Token::While(_) => expect_while(input),
@@ -311,7 +315,7 @@ fn parse_expression(input: &mut TokenStream) -> Node {
     }
 }
 
-fn parse_infix(input: &mut TokenStream) -> Node {
+fn parse_infix(input: &mut TokenStream) -> Result<Node, ParseError> {
     #[derive(Debug)]
     enum Subnode {
         Node(Node),
@@ -360,10 +364,10 @@ fn parse_infix(input: &mut TokenStream) -> Node {
         }
     }
 
-    let mut subnodes = vec![Subnode::Node(parse_block(input))];
+    let mut subnodes = vec![Subnode::Node(parse_block(input)?)];
     while infix(input.peek()) {
         subnodes.push(Subnode::Op(input.read()));
-        subnodes.push(Subnode::Node(parse_block(input)));
+        subnodes.push(Subnode::Node(parse_block(input)?));
     }
     // Implement associativity by reducing around operators. The earlier
     // reductions have higher associativity than later ones.
@@ -374,7 +378,7 @@ fn parse_infix(input: &mut TokenStream) -> Node {
     reduce_subnodes(&mut subnodes, Token::DoubleEqual);
     // It better have fully reduced!
     assert_eq!(subnodes.len(), 1);
-    subnodes.remove(0).into()
+    Ok(subnodes.remove(0).into())
 }
 
 fn infix(token: Token) -> bool {
@@ -384,24 +388,24 @@ fn infix(token: Token) -> bool {
     }
 }
 
-fn parse_block(input: &mut TokenStream) -> Node {
+fn parse_block(input: &mut TokenStream) -> Result<Node, ParseError> {
     if let Token::BraceLeft = input.peek() {
-        Node::Block(expect_block(input))
+        Ok(Node::Block(expect_block(input)?))
     } else {
         parse_anonymous_function(input)
     }
 }
 
-fn expect_block(input: &mut TokenStream) -> Block {
+fn expect_block(input: &mut TokenStream) -> Result<Block, ParseError> {
     expect_to_read(input, Token::BraceLeft); // Opening brace
-    let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block);
+    let nodes = parse_statements(input, Token::BraceRight, StatementContext::Block)?;
     expect_to_read(input, Token::BraceRight); // Closing brace
-    Block { nodes }
+    Ok(Block { nodes })
 }
 
-fn parse_anonymous_function(input: &mut TokenStream) -> Node {
+fn parse_anonymous_function(input: &mut TokenStream) -> Result<Node, ParseError> {
     if let Some((_, body)) = try_parse_function(input) {
-        return Node::Function(Function::new_anonymous(body));
+        return Ok(Node::Function(Function::new_anonymous(body)));
     }
     parse_assignment(input)
 }
@@ -423,7 +427,10 @@ fn try_parse_function(input: &mut TokenStream) -> Option<((), Box<Node>)> {
         input.read_if(Token::ParenthesesRight)?;
         // TODO: Parse return type if present.
         input.read_if(Token::Arrow)?;
-        Some(((), Box::new(parse_expression(input))))
+        // FIXME: At this point we know it's a function so failure to parse
+        //   the expression should be returned as an error.
+        let body = parse_expression(input).ok()?;
+        Some(((), Box::new(body)))
     };
     match inner() {
         None => {
@@ -434,32 +441,32 @@ fn try_parse_function(input: &mut TokenStream) -> Option<((), Box<Node>)> {
     }
 }
 
-fn parse_assignment(input: &mut TokenStream) -> Node {
-    let lhs = parse_postfix(input);
+fn parse_assignment(input: &mut TokenStream) -> Result<Node, ParseError> {
+    let lhs = parse_postfix(input)?;
     if input.peek() == Token::Equal {
         input.read(); // Equals sign
-        let rhs = parse_expression(input);
+        let rhs = parse_expression(input)?;
         // FIXME: Check that assignment left-hand-side doesn't end with a call.
-        Node::Assignment(Assignment::new(lhs, rhs))
+        Ok(Node::Assignment(Assignment::new(lhs, rhs)))
     } else {
-        lhs
+        Ok(lhs)
     }
 }
 
-fn parse_postfix(input: &mut TokenStream) -> Node {
-    let mut target = parse_parentheses(input);
+fn parse_postfix(input: &mut TokenStream) -> Result<Node, ParseError> {
+    let mut target = parse_parentheses(input)?;
     loop {
         if let Some(new_target) = try_parse_postfix_property(input, &target) {
             target = new_target;
             continue;
         }
         if input.peek() == Token::ParenthesesLeft {
-            target = parse_postfix_call(input, target);
+            target = parse_postfix_call(input, target)?;
             continue;
         }
         break;
     }
-    target
+    Ok(target)
 }
 
 fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<Node> {
@@ -497,12 +504,12 @@ fn try_parse_postfix_property(input: &mut TokenStream, target: &Node) -> Option<
     None
 }
 
-fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
+fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Result<Node, ParseError> {
     expect_to_read(input, Token::ParenthesesLeft);
     let mut arguments = vec![];
     if input.peek() != Token::ParenthesesRight {
         loop {
-            let argument = parse_expression(input);
+            let argument = parse_expression(input)?;
             arguments.push(argument);
             let next = input.peek();
             if next == Token::Comma {
@@ -521,10 +528,10 @@ fn parse_postfix_call(input: &mut TokenStream, target: Node) -> Node {
         }
     }
     expect_to_read(input, Token::ParenthesesRight);
-    Node::PostfixCall(PostfixCall::new(target, arguments))
+    Ok(Node::PostfixCall(PostfixCall::new(target, arguments)))
 }
 
-fn parse_parentheses(input: &mut TokenStream) -> Node {
+fn parse_parentheses(input: &mut TokenStream) -> Result<Node, ParseError> {
     if let Token::ParenthesesLeft = input.peek() {
         input.read(); // Opening parentheses
         let node = parse_expression(input);
@@ -535,21 +542,24 @@ fn parse_parentheses(input: &mut TokenStream) -> Node {
     }
 }
 
-fn parse_atom(input: &mut TokenStream) -> Node {
+fn parse_atom(input: &mut TokenStream) -> Result<Node, ParseError> {
     let next = input.peek();
     match next {
-        Token::Identifier(_, _) => Node::Identifier(expect_identifier(input)),
+        Token::Identifier(_, _) => {
+            let identifier = expect_identifier(input)?;
+            Ok(Node::Identifier(identifier))
+        }
         Token::Integer(value) => {
             input.read();
-            Node::Integer(Integer { value })
+            Ok(Node::Integer(Integer { value }))
         }
         Token::String(value, _) => {
             input.read();
-            Node::String(StringLiteral { value })
+            Ok(Node::String(StringLiteral { value }))
         }
         Token::Symbol(value, _) => {
             input.read();
-            Node::Symbol(SymbolLiteral::new(value))
+            Ok(Node::Symbol(SymbolLiteral::new(value)))
         }
         _ => {
             panic_unexpected(next, None);
@@ -558,10 +568,10 @@ fn parse_atom(input: &mut TokenStream) -> Node {
     }
 }
 
-fn expect_identifier(input: &mut TokenStream) -> Identifier {
-    expect_to_read2!(input, Token::Identifier(value, span) => {
+fn expect_identifier(input: &mut TokenStream) -> Result<Identifier, ParseError> {
+    Ok(expect_to_read2!(input, Token::Identifier(value, span) => {
         Identifier::new(value, span)
-    })
+    }))
 }
 
 fn consume_terminals(input: &mut TokenStream) {
@@ -612,8 +622,8 @@ mod tests {
 
     fn parse_complete(program: &str) -> Vec<Node> {
         let mut token_stream = input(program);
-        let program = parse_module(&mut token_stream);
-        program.nodes
+        let module = parse_module(&mut token_stream);
+        module.unwrap().nodes
     }
 
     #[test]
@@ -628,10 +638,10 @@ mod tests {
 
             "
             )),
-            Module::new(vec![
+            Ok(Module::new(vec![
                 Node::Integer(Integer { value: 1 }),
                 Node::Integer(Integer { value: 2 }),
-            ]),
+            ])),
         );
     }
 
@@ -887,46 +897,46 @@ mod tests {
     fn it_parses_block() {
         assert_eq!(
             parse_block(&mut input("{}")),
-            Node::Block(Block { nodes: vec![] }),
+            Ok(Node::Block(Block { nodes: vec![] })),
         );
         assert_eq!(
             parse_block(&mut input("{ 1 }")),
-            Node::Block(Block {
+            Ok(Node::Block(Block {
                 nodes: vec![Node::Integer(Integer { value: 1 })],
-            }),
+            })),
         );
         assert_eq!(
             parse_block(&mut input("{ 1; }")),
-            Node::Block(Block {
+            Ok(Node::Block(Block {
                 nodes: vec![Node::Integer(Integer { value: 1 })],
-            }),
+            })),
         );
         assert_eq!(
             parse_block(&mut input("{ 1; 2 }")),
-            Node::Block(Block {
+            Ok(Node::Block(Block {
                 nodes: vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            }),
+            })),
         );
         assert_eq!(
             parse_block(&mut input("{ 1; 2; }")),
-            Node::Block(Block {
+            Ok(Node::Block(Block {
                 nodes: vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            }),
+            })),
         );
         assert_eq!(
             parse_block(&mut input("{\n  1\n  2;\n}")),
-            Node::Block(Block {
+            Ok(Node::Block(Block {
                 nodes: vec![
                     Node::Integer(Integer { value: 1 }),
                     Node::Integer(Integer { value: 2 }),
                 ],
-            }),
+            })),
         );
     }
 
@@ -959,15 +969,15 @@ mod tests {
     fn it_parses_infix() {
         assert_eq!(
             parse_infix(&mut input("1 + 2")),
-            Node::Infix(Infix::new(
+            Ok(Node::Infix(Infix::new(
                 Node::Integer(Integer { value: 1 }),
                 Token::Plus,
                 Node::Integer(Integer { value: 2 }),
-            )),
+            ))),
         );
         assert_eq!(
             parse_infix(&mut input("1 * 2 * 3")),
-            Node::Infix(Infix::new(
+            Ok(Node::Infix(Infix::new(
                 Node::Infix(Infix::new(
                     Node::Integer(Integer { value: 1 }),
                     Token::Star,
@@ -975,11 +985,11 @@ mod tests {
                 )),
                 Token::Star,
                 Node::Integer(Integer { value: 3 }),
-            )),
+            ))),
         );
         assert_eq!(
             parse_infix(&mut input("1 + 3 == 2 * 2")),
-            Node::Infix(Infix::new(
+            Ok(Node::Infix(Infix::new(
                 Node::Infix(Infix::new(
                     Node::Integer(Integer { value: 1 }),
                     Token::Plus,
@@ -991,12 +1001,12 @@ mod tests {
                     Token::Star,
                     Node::Integer(Integer { value: 2 }),
                 )),
-            )),
+            ))),
         );
         // Now with associativity!
         assert_eq!(
             parse_infix(&mut input("1 * 2 + 3 * 4")),
-            Node::Infix(Infix::new(
+            Ok(Node::Infix(Infix::new(
                 Node::Infix(Infix::new(
                     Node::Integer(Integer { value: 1 }),
                     Token::Star,
@@ -1008,12 +1018,12 @@ mod tests {
                     Token::Star,
                     Node::Integer(Integer { value: 4 }),
                 )),
-            )),
+            ))),
         );
         // Now with parentheses!
         assert_eq!(
             parse_infix(&mut input("1 * (2 + 3) * 4")),
-            Node::Infix(Infix::new(
+            Ok(Node::Infix(Infix::new(
                 Node::Infix(Infix::new(
                     Node::Integer(Integer { value: 1 }),
                     Token::Star,
@@ -1025,7 +1035,7 @@ mod tests {
                 )),
                 Token::Star,
                 Node::Integer(Integer { value: 4 }),
-            )),
+            ))),
         );
     }
 
@@ -1033,11 +1043,11 @@ mod tests {
     fn it_parses_postfix_property() {
         assert_eq!(
             parse_postfix(&mut input("foo.bar")),
-            Node::PostfixProperty(PostfixProperty::new(
+            Ok(Node::PostfixProperty(PostfixProperty::new(
                 Node::Identifier(Identifier::new("foo", Span::unknown())),
                 "bar".to_string(),
                 Span::unknown(),
-            ))
+            ))),
         );
     }
 
