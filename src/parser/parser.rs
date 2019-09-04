@@ -1,14 +1,62 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Error, Formatter};
 
 use super::super::ast::nodes::{
     Assignment, Block, Export, Function, Identifier, If, Infix, Integer, Let, Module, Node,
     PostfixCall, PostfixProperty, Return, Var, While,
 };
 
-use super::super::ast::{Import, ImportBindings, StringLiteral};
+use super::super::ast::{Import, ImportBindings, StringLiteral, SymbolLiteral};
 use super::lexer::{Token, TokenStream};
-use super::location::Span;
-use crate::ast::SymbolLiteral;
+use super::location::{Location, Span};
+
+#[derive(Debug)]
+enum ParseError {
+    Unexpected {
+        expected: Vec<String>,
+        got: String,
+        location: Option<Location>,
+    },
+}
+
+impl ParseError {
+    fn new_unexpected(expected: Vec<String>, got: Token) -> Self {
+        let location = got.location();
+        Self::Unexpected {
+            expected: expected
+                .into_iter()
+                .map(|name| base_name(&name).to_string())
+                .collect::<Vec<_>>(),
+            got: base_name(&format!("{:?}", got)).to_string(),
+            location,
+        }
+    }
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        use ParseError::*;
+        match self {
+            Unexpected {
+                expected,
+                got,
+                location,
+            } => {
+                write!(
+                    f,
+                    "Unexpected token: got {}, expected {}",
+                    got,
+                    expected.join(" or "),
+                )?;
+                if let Some(location) = location {
+                    write!(f, " at line {} column {}", location.line, location.column)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
 
 /// Takes a string from:
 ///   - `stringify!` on a pattern
