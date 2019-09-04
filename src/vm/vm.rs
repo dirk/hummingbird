@@ -88,14 +88,12 @@ impl Vm {
                 let result = match self.loader.load_file_by_name(name, relative_import_path) {
                     Ok(loaded) => Ok(loaded),
                     Err(mut error) => {
-                        println!("Load error!");
                         // Annotate the error with its source. Imports happen
                         // outside of the normal frame fetch-execute loop, so
                         // they instead include the source of the import with
                         // the `Action` so that it can be automatically
                         // embedded in the load error if one occurs.
                         if let Some(source) = source {
-                            println!("Have source!");
                             error.set_source(source);
                         }
                         Err(error)
