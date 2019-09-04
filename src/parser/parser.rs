@@ -41,12 +41,10 @@ impl Display for ParseError {
                 got,
                 location,
             } => {
-                write!(
-                    f,
-                    "Unexpected token: got {}, expected {}",
-                    got,
-                    expected.join(" or "),
-                )?;
+                write!(f, "Unexpected token: got {}", got,)?;
+                if !expected.is_empty() {
+                    write!(f, ", expected {}", expected.join(" or "))?;
+                }
                 if let Some(location) = location {
                     write!(f, " at line {} column {}", location.line, location.column)?;
                 }
@@ -178,11 +176,10 @@ fn parse_statement(
     if let Token::Terminal(_) = next {
         return Ok(node);
     }
-    panic_unexpected(
+    Err(ParseError::new_unexpected(
+        vec!["Terminal".to_string()],
         next,
-        Some(vec![Token::Terminal('\n'), Token::Terminal(';')]),
-    );
-    unreachable!()
+    ))
 }
 
 fn try_parse_named_function(input: &mut TokenStream) -> Option<Node> {
@@ -561,10 +558,7 @@ fn parse_atom(input: &mut TokenStream) -> Result<Node, ParseError> {
             input.read();
             Ok(Node::Symbol(SymbolLiteral::new(value)))
         }
-        _ => {
-            panic_unexpected(next, None);
-            unreachable!()
-        }
+        _ => Err(ParseError::new_unexpected(vec![], next)),
     }
 }
 

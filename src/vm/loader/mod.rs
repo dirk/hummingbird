@@ -140,7 +140,8 @@ impl Loader {
 
 fn read_and_parse_file<P: AsRef<Path>>(path: P) -> Result<(ast::Module, String), Box<dyn Error>> {
     let source = fs::read_to_string(path)?;
-    Ok((parser::parse(source.clone()), source))
+    let module = parser::parse(source.clone())?;
+    Ok((module, source))
 }
 
 pub fn compile_ast_into_module(

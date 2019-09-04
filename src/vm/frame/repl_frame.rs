@@ -35,10 +35,14 @@ impl ReplFrame {
         self.static_closure.clone()
     }
 
-    fn compile_line(&mut self, line: String, counter: u16) -> LoadedModule {
+    fn compile_line(
+        &mut self,
+        line: String,
+        counter: u16,
+    ) -> Result<LoadedModule, parser::ParseError> {
         let name = format!("repl[{}]", counter);
 
-        let ast_module = parser::parse(line.clone());
+        let ast_module = parser::parse(line.clone())?;
         let loaded_module = loader::compile_ast_into_module(
             &ast_module,
             name,
@@ -52,7 +56,7 @@ impl ReplFrame {
         // Make all the loaded modules share the same static closure so that
         // they see all the same defined variables.
         loaded_module.override_static_closure(self.static_closure.clone());
-        loaded_module
+        Ok(loaded_module)
     }
 }
 
@@ -85,7 +89,14 @@ impl FrameApi for ReplFrame {
                     continue;
                 }
                 _ => {
-                    let module = self.compile_line(buffer, counter);
+                    let module = match self.compile_line(buffer, counter) {
+                        Ok(module) => module,
+                        Err(parse_error) => {
+                            let error = VmError::new_parse(parse_error);
+                            self.catch_error(error);
+                            continue;
+                        }
+                    };
                     // TODO: Extract and process the module's imports; that way one can do
                     //   `import` in the REPL.
                     let function = module.main();

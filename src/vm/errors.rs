@@ -6,7 +6,7 @@ use codespan::{Files, Span as CodespanSpan};
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use termcolor::{ColorChoice, StandardStream};
 
-use super::super::parser::Span;
+use super::super::parser::{ParseError, Span};
 use super::loader::LoadedModule;
 use super::symbol::{desymbolicate, Symbol};
 use super::value::Value;
@@ -19,6 +19,7 @@ enum Kind {
     /// An error loading a file.
     /// (name, wrapped)
     LoadFile(String, Box<dyn error::Error>),
+    Parse(ParseError),
     /// (target, value)
     PropertyNotFound(Value, String),
     /// (name)
@@ -32,6 +33,7 @@ impl Kind {
         let label = match self {
             Argument(_) => "Argument",
             LoadFile(_, _) => "Import occurred here",
+            Parse(_) => "Parsing failed here",
             PropertyNotFound(_, _) => "Missing property",
             UndefinedName(_) => "Undefined name",
         };
@@ -45,8 +47,9 @@ impl Display for Kind {
         match self {
             Argument(message) => write!(f, "ArgumentError: {}", message),
             LoadFile(name, wrapped) => {
-                write!(f, "LoadFileError: could not load `{}': {:?}", name, wrapped)
+                write!(f, "LoadFileError: could not load `{}': {}", name, wrapped)
             }
+            Parse(parse_error) => write!(f, "ParseError: {}", parse_error),
             PropertyNotFound(target, value) => write!(
                 f,
                 "PropertyNotFoundError: `{}' not found on {:?}",
@@ -71,6 +74,10 @@ impl VmError {
 
     pub fn new_load_file(path: String, wrapped: Box<dyn error::Error>) -> Self {
         Self::new(Kind::LoadFile(path, wrapped))
+    }
+
+    pub fn new_parse(parse_error: ParseError) -> Self {
+        Self::new(Kind::Parse(parse_error))
     }
 
     pub fn new_property_not_found(target: Value, value: Symbol) -> Self {

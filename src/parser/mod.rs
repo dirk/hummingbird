@@ -6,8 +6,9 @@ mod parser;
 
 pub use self::lexer::Token;
 pub use self::location::{Location, Span};
+pub use self::parser::ParseError;
 
-pub fn parse<I: ToString>(input: I) -> Module {
+pub fn parse<I: ToString>(input: I) -> Result<Module, ParseError> {
     let mut token_stream = lexer::TokenStream::from_string(input.to_string());
-    parser::parse_module(&mut token_stream).unwrap()
+    parser::parse_module(&mut token_stream)
 }
