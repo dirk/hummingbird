@@ -49,7 +49,9 @@ impl PartialEq for Location {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span {
+    // Inclusive
     pub start: Location,
+    // Exclusive
     pub end: Location,
 }
 
