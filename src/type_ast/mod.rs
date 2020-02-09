@@ -82,7 +82,7 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
     // Build a forward declaration for the recursive call and add it to
     // the function's scope.
     let typ = Type::new_func(Some(name.clone()), arguments.clone(), retrn.clone());
-    func_scope.add_local(&name, typ.clone());
+    func_scope.add_local(&name, typ.clone())?;
 
     let body = match pfunc.body {
         past::FuncBody::Block(block) => {

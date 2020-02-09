@@ -19,7 +19,7 @@ pub enum Type {
     // A callable function.
     Func(Rc<Func>),
     // A generic defined by the user; it is fixed and cannot be mutated.
-    Generic(Generic),
+    Generic(Rc<Generic>),
     Object(Rc<Object>),
     // Used to make writing tests easier.
     Phantom { id: usize },
@@ -83,7 +83,14 @@ impl Type {
         }
     }
 
-    pub fn close_func(&self) -> TypeResult<Self> {
+    pub fn is_unbound(&self) -> bool {
+        if let Type::Variable(variable) = self {
+            return variable.borrow().is_unbound()
+        }
+        false
+    }
+
+    pub fn close_func(self) -> TypeResult<Self> {
         match self {
             Type::Func(func) => {
                 let func = &*func;
@@ -92,11 +99,17 @@ impl Type {
                 // generics. We need to do this in one pass in case earlier
                 // arguments depend on later ones.
                 for argument in func.arguments.iter() {
-                    // Convert any unbound (ie. unused) arguments into open generics.
+                    // Convert any unbound (ie. unused) arguments into open
+                    // generics.
                     if let Type::Variable(variable) = argument {
                         if variable.borrow().is_unbound() {
                             let mut inner = variable.borrow_mut();
-                            *inner = Variable::Generic(Generic::new());
+                            // Use a substitution so that any substitutions of
+                            // this variable are followed to the *same*
+                            // generic. We should never have multiple generics
+                            // (or any type for that matter) with the same ID.
+                            let generic = Type::Generic(Rc::new(Generic::new()));
+                            *inner = Variable::Substitute(Box::new(generic));
                         }
                     }
                 }
@@ -126,14 +139,16 @@ impl Closable for Type {
         match self {
             Type::Func(_) => self.close_func(),
             Type::Variable(variable) => {
+                // Uncomment to see types pre-closing:
+                //   return Ok(Type::Variable(variable));
                 match &*variable.borrow() {
-                    Variable::Generic(generic) => Ok(Type::Generic(generic.clone())),
+                    Variable::Generic(generic) => Ok(Type::Generic(Rc::new(generic.clone()))),
                     // Substitutions can be unboxed into the underlying type.
                     // Note the `close()` to recursively resolve nested
                     // substitutions.
                     Variable::Substitute(typ) => Ok(typ.clone().close()?),
                     Variable::Unbound { id } => {
-                        panic!("Unexpected unbound: {}", id);
+                        // panic!("Unexpected unbound: {}", id);
                         Err(TypeError::UnexpectedUnbound { id: *id })
                     }
                 }
@@ -252,7 +267,7 @@ pub struct IntrinsicClass {
 
 /// A user-defined class.
 #[derive(Clone, Debug, PartialEq)]
-struct DerivedClass {
+pub struct DerivedClass {
     pub id: usize,
     pub name: String,
     // TODO: Parameters

@@ -55,7 +55,7 @@ impl<O: Write> Printer<O> {
             self.indented(|this| {
                 for argument in func.arguments.iter() {
                     this.iwrite(format!("{}: ", argument.name))?;
-                    this.print_type(&argument.typ)?;
+                    this.write_type(&argument.typ)?;
                     this.write(",\n")?;
                 }
                 Ok(())
@@ -67,10 +67,26 @@ impl<O: Write> Printer<O> {
         }
     }
 
-    fn print_type(&self, typ: &Type) -> Result<()> {
+    fn write_type(&self, typ: &Type) -> Result<()> {
         match typ {
             Type::Object(object) => self.write(format!("{}", object.class.name())),
-            Type::Generic(generic) => self.write(format!("${}({:p})", generic.id, generic)),
+            Type::Generic(generic) => self.write(format!("${} @ {:p}", generic.id, *generic)),
+            Type::Variable(variable) => {
+                let variable = &*variable.borrow();
+                match variable {
+                    Variable::Substitute(substitution) => {
+                        self.write("S(")?;
+                        self.write_type(&*substitution)?;
+                        self.write(format!(") @ {:p}", substitution))
+                    }
+                    Variable::Unbound { id } => self.write(format!("U({}) @ {:p}", id, variable)),
+                    Variable::Generic(generic) => {
+                        self.write("G(")?;
+                        self.write(format!("{}", generic.id))?;
+                        self.write(format!(") @ {:p}", generic))
+                    }
+                }
+            }
             _ => unreachable!("Cannot print type: {:?}", typ),
         }
     }
@@ -107,18 +123,27 @@ impl<O: Write> Printer<O> {
     fn print_expression(&self, expression: &Expression) -> Result<()> {
         use Expression::*;
         match expression {
-            Identifier(identifier) => self.lnwrite(format!("{}", identifier.name.name)),
+            Identifier(identifier) => self.print_identifier(identifier),
             Infix(infix) => self.print_infix(infix),
             LiteralInt(literal) => self.lnwrite(format!("{}", literal.value)),
         }
     }
 
+    fn print_identifier(&self, identifier: &Identifier) -> Result<()> {
+        self.lnwrite(format!("Identifier({}): ", identifier.name.name))?;
+        self.write_type(&identifier.typ)
+    }
+
     fn print_infix(&self, infix: &Infix) -> Result<()> {
-        self.print_expression(&infix.lhs)?;
+        self.lnwrite("Infix(")?;
         self.indented(|this1| {
-            this1.lnwrite(infix.op.to_string())?;
+            this1.lnwrite("lhs:")?;
+            this1.indented(|this2| this2.print_expression(&infix.lhs))?;
+            this1.lnwrite(format!("op: {}", infix.op.to_string()))?;
+            this1.lnwrite(format!("rhs:"))?;
             this1.indented(|this2| this2.print_expression(&infix.rhs))
-        })
+        })?;
+        self.write(")")
     }
 
     /// Write a string.

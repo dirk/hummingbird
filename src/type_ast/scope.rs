@@ -85,7 +85,7 @@ impl Closable for Scope {
 /// When getting locals from parent scopes we need to know if it was a local
 /// that was ultimately read (need to set up closures) or if it was a static
 /// (no need for closures).
-enum ParentResolution {
+pub enum ParentResolution {
     Local,
     Static,
 }

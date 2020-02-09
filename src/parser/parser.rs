@@ -113,7 +113,7 @@ fn expect_block(input: &mut TokenStream) -> ParseResult<Block> {
 fn parse_block_statement(input: &mut TokenStream) -> ParseResult<Option<BlockStatement>> {
     // TODO: If, else, etc.
     Ok(match input.peek() {
-        token @ Token::CommentLine(_, _) => Some(BlockStatement::CommentLine(
+        Token::CommentLine(_, _) => Some(BlockStatement::CommentLine(
             token_to_comment_line(input.read()),
         )),
         Token::Newline(_) => None,

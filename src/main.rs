@@ -1,3 +1,6 @@
+#![allow(unused_imports)]
+#![allow(unused_macros)]
+
 extern crate codespan;
 extern crate codespan_reporting;
 #[macro_use]
