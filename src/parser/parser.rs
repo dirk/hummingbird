@@ -87,7 +87,7 @@ fn parse_module_statement(input: &mut TokenStream) -> ParseResult<Option<ModuleS
         token @ Token::CommentLine(_, _) => {
             Some(ModuleStatement::CommentLine(token_to_comment_line(token)))
         }
-        Token::Func(_) => Some(expect_func(input)?),
+        Token::Func(_) => Some(ModuleStatement::Func(expect_func(input)?)),
         Token::Import(_) => Some(expect_import(input)?),
         Token::Newline(_) => None,
         _ => return Err(ParseError::new_unexpected(vec!["None".to_string()], next)),
@@ -117,6 +117,7 @@ fn parse_block_statement(input: &mut TokenStream) -> ParseResult<Option<BlockSta
             token_to_comment_line(input.read()),
         )),
         Token::Newline(_) => None,
+        Token::Func(_) => Some(BlockStatement::Func(expect_func(input)?)),
         _ => Some(BlockStatement::Expression(parse_expression(input)?)),
     })
 }
@@ -253,7 +254,7 @@ fn expect_atom(input: &mut TokenStream) -> ParseResult<Expression> {
     }))
 }
 
-fn expect_func(input: &mut TokenStream) -> ParseResult<ModuleStatement> {
+fn expect_func(input: &mut TokenStream) -> ParseResult<Func> {
     let start = expect_to_read!(input, { Token::Func(start) => start });
     let name = expect_to_read!(input, { Token::Word(word) => word });
     expect_to_read!(input, { Token::ParenthesesLeft(_) => () });
@@ -275,12 +276,12 @@ fn expect_func(input: &mut TokenStream) -> ParseResult<ModuleStatement> {
     expect_to_read!(input, { Token::ParenthesesRight(_) => () });
     let block = expect_block(input)?;
     let end = block.span.end.clone();
-    Ok(ModuleStatement::Func(Func {
+    Ok(Func {
         name,
         arguments,
         body: FuncBody::Block(block),
         span: Span::new(start, end),
-    }))
+    })
 }
 
 fn expect_import(input: &mut TokenStream) -> ParseResult<ModuleStatement> {
