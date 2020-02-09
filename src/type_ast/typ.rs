@@ -70,11 +70,18 @@ impl Type {
     }
 
     pub fn new_empty_tuple() -> Self {
-        Type::Tuple(Tuple { id: next_uid(), members: vec![] })
+        Type::Tuple(Tuple {
+            id: next_uid(),
+            members: vec![],
+        })
     }
 
     pub fn new_unbound() -> Self {
         let variable = Variable::Unbound { id: next_uid() };
+        Self::new_variable(variable)
+    }
+
+    pub fn new_variable(variable: Variable) -> Self {
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
@@ -92,9 +99,40 @@ impl Type {
 
     pub fn is_unbound(&self) -> bool {
         if let Type::Variable(variable) = self {
-            return variable.borrow().is_unbound()
+            return variable.borrow().is_unbound();
         }
         false
+    }
+
+    /// Called on a function's arguments to recursively convert any unbound
+    /// types into open generics. Also does some checks for unbounds being
+    /// where they're not supposed to be.
+    fn genericize(&self) -> TypeResult<()> {
+        match self {
+            Type::Variable(variable) => {
+                let replacement = match &*variable.borrow() {
+                    Variable::Substitute(substitute) => {
+                        substitute.genericize()?;
+                        None
+                    }
+                    Variable::Unbound { .. } => {
+                        let generic = Type::Generic(Rc::new(Generic::new()));
+                        // Use a substitution so that any substitutions of this
+                        // variable are followed to the *same* generic. We
+                        // should never have multiple generics (or any type for
+                        // that matter) with the same ID.
+                        Some(Type::new_variable(Variable::Substitute(Box::new(generic))))
+                    }
+                    _ => None,
+                };
+                if let Some(replacement) = replacement {
+                    let mut inner = variable.borrow_mut();
+                    *inner = Variable::Substitute(Box::new(replacement));
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
     }
 
     pub fn close_func(self) -> TypeResult<Self> {
@@ -102,28 +140,19 @@ impl Type {
             Type::Func(func) => {
                 let func = &*func;
                 let mut arguments = vec![];
+                let retrn = *func.retrn.clone();
                 // First convert any unbound (ie. unused) arguments into open
                 // generics. We need to do this in one pass in case earlier
                 // arguments depend on later ones.
                 for argument in func.arguments.iter() {
-                    // Convert any unbound (ie. unused) arguments into open
-                    // generics.
-                    if let Type::Variable(variable) = argument {
-                        if variable.borrow().is_unbound() {
-                            let mut inner = variable.borrow_mut();
-                            // Use a substitution so that any substitutions of
-                            // this variable are followed to the *same*
-                            // generic. We should never have multiple generics
-                            // (or any type for that matter) with the same ID.
-                            let generic = Type::Generic(Rc::new(Generic::new()));
-                            *inner = Variable::Substitute(Box::new(generic));
-                        }
-                    }
+                    argument.genericize()?;
                 }
+                retrn.genericize()?;
+                // Then close the arguments and return.
                 for argument in func.arguments.iter() {
                     arguments.push(argument.clone().close()?);
                 }
-                let retrn = func.retrn.clone().close()?;
+                let retrn = retrn.close()?;
                 Ok(Type::Func(Rc::new(Func {
                     id: func.id,
                     name: func.name.clone(),
@@ -148,8 +177,33 @@ impl Closable for Type {
             Type::Variable(variable) => {
                 // Uncomment to see types pre-closing:
                 //   return Ok(Type::Variable(variable));
+                let replacement = match &*variable.borrow() {
+                    Variable::Generic(open) => {
+                        let mut constraints = vec![];
+                        for constraint in open.constraints.iter() {
+                            use GenericConstraint::*;
+                            constraints.push(match constraint {
+                                Property { name, typ } => Property {
+                                    name: name.clone(),
+                                    typ: typ.clone().close()?,
+                                },
+                                other @ _ => unreachable!("Cannot close constraint: {:?}", other),
+                            })
+                        }
+                        let closed = Generic::new_with_constraints(constraints);
+                        // Use substitution so that other uses will be updated.
+                        Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
+                            closed,
+                        )))))
+                    }
+                    _ => None,
+                };
+                if let Some(replacement) = replacement {
+                    let mut mutable = variable.borrow_mut();
+                    *mutable = replacement;
+                }
                 match &*variable.borrow() {
-                    Variable::Generic(generic) => Ok(Type::Generic(Rc::new(generic.clone()))),
+                    Variable::Generic(_) => unreachable!("Generic should have been replaced"),
                     // Substitutions can be unboxed into the underlying type.
                     // Note the `close()` to recursively resolve nested
                     // substitutions.
@@ -214,6 +268,18 @@ impl Generic {
             id: next_uid(),
             constraints: vec![],
         }
+    }
+
+    pub fn new_with_constraints(constraints: Vec<GenericConstraint>) -> Self {
+        Self {
+            id: next_uid(),
+            constraints,
+        }
+    }
+
+    pub fn add_property_constraint(&mut self, name: String, typ: Type) {
+        self.constraints
+            .push(GenericConstraint::Property { name, typ })
     }
 }
 

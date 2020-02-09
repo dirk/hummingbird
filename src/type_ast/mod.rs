@@ -23,7 +23,7 @@ pub use builtins::Builtins;
 pub use nodes::*;
 pub use printer::Printer;
 pub use scope::{FuncScope, ModuleScope, Scope, ScopeLike};
-pub use typ::{Func as TFunc, Type, Variable};
+pub use typ::{Func as TFunc, Generic, Type, Variable};
 
 type TypeResult<T> = Result<T, TypeError>;
 
@@ -158,7 +158,35 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
                 typ: Type::new_object(class),
             })
         }
+        past::Expression::PostfixProperty(pproperty) => {
+            Expression::PostfixProperty(translate_postfix_property(pproperty, scope)?)
+        }
         _ => unreachable!("Cannot translate {:?}", pexpression),
+    })
+}
+
+fn translate_postfix_property(
+    pproperty: &past::PostfixProperty,
+    scope: Scope,
+) -> TypeResult<PostfixProperty> {
+    let target = translate_expression(&*pproperty.target, scope.clone())?;
+
+    // The ultimate type of getting the target's property.
+    let typ = Type::new_unbound();
+
+    // Set up a variable generic with a property constraint.
+    let mut generic = Generic::new();
+    generic.add_property_constraint(pproperty.property.name.clone(), typ.clone());
+    // Apply unification to ensure the target supports having the
+    // given property.
+    let intermediary = Type::new_variable(Variable::Generic(generic));
+    unify(target.typ(), &intermediary)?;
+
+    Ok(PostfixProperty {
+        target: Box::new(target),
+        property: pproperty.property.clone(),
+        span: pproperty.span.clone(),
+        typ,
     })
 }
 

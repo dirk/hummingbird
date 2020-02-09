@@ -1,6 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
-use std::io::{Result, Write};
+use std::io::{BufWriter, Bytes, Result, Write};
 
 use super::nodes::{self, *};
 use super::typ::*;
@@ -31,8 +31,12 @@ impl<O: Write> Printer<O> {
     }
 
     fn indented<F: FnOnce(&Self) -> Result<()>>(&self, inner: F) -> Result<()> {
+        self.indented_steps(1, inner)
+    }
+
+    fn indented_steps<F: FnOnce(&Self) -> Result<()>>(&self, steps: u8, inner: F) -> Result<()> {
         let previous = self.indent.take();
-        self.indent.set(previous + 2);
+        self.indent.set(previous + (2 * steps));
         let result = inner(self);
         self.indent.set(previous);
         result
@@ -60,7 +64,7 @@ impl<O: Write> Printer<O> {
             self.indented(|this| {
                 for argument in func.arguments.iter() {
                     this.iwrite(format!("{}: ", argument.name))?;
-                    this.write_type(&argument.typ)?;
+                    this.write_type(&argument.typ, true)?;
                     this.write(",\n")?;
                 }
                 Ok(())
@@ -71,35 +75,65 @@ impl<O: Write> Printer<O> {
             Type::Func(func) => &**func,
             other @ _ => unreachable!("Func node has non-Func type: {:?}", other),
         };
-        self.write_type(&*typ.retrn)?;
+        self.write_type(&*typ.retrn, false)?;
         self.write(" ")?;
         match &func.body {
             FuncBody::Block(block) => self.print_block(block, false),
         }
     }
 
-    fn write_type(&self, typ: &Type) -> Result<()> {
+    fn write_type(&self, typ: &Type, with_constraints: bool) -> Result<()> {
         match typ {
             Type::Object(object) => self.write(format!("{}", object.class.name())),
-            Type::Generic(generic) => self.write(format!("${} @ {:p}", generic.id, *generic)),
+            Type::Generic(generic) => {
+                self.write(format!("${} @ {:p}", generic.id, *generic))?;
+                if with_constraints {
+                    self.indented(|this| this.write_constraints(&generic.constraints))?;
+                }
+                Ok(())
+            }
             Type::Variable(variable) => {
                 let variable = &*variable.borrow();
                 match variable {
                     Variable::Substitute(substitution) => {
                         self.write("S(")?;
-                        self.write_type(&*substitution)?;
+                        self.write_type(&*substitution, with_constraints)?;
                         self.write(format!(") @ {:p}", substitution))
                     }
                     Variable::Unbound { id } => self.write(format!("U({}) @ {:p}", id, variable)),
                     Variable::Generic(generic) => {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
-                        self.write(format!(") @ {:p}", generic))
+                        self.write(format!(") @ {:p}", generic))?;
+                        if with_constraints {
+                            self.indented(|this| this.write_constraints(&generic.constraints))?;
+                        }
+                        Ok(())
                     }
                 }
             }
             _ => unreachable!("Cannot print type: {:?}", typ),
         }
+    }
+
+    fn write_constraints(&self, constraints: &Vec<GenericConstraint>) -> Result<()> {
+        if constraints.is_empty() {
+            return Ok(());
+        }
+        self.lnwrite("where")?;
+        self.indented(|this| {
+            for constraint in constraints {
+                use GenericConstraint::*;
+                match constraint {
+                    Property { name, typ } => {
+                        this.lnwrite(format!("{}: ", name))?;
+                        this.write_type(typ, true)?;
+                    }
+                    other @ _ => unreachable!("Cannot write constraint: {:?}", other),
+                }
+            }
+            Ok(())
+        })
     }
 
     fn print_block(&self, block: &Block, initial_indent: bool) -> Result<()> {
@@ -132,12 +166,13 @@ impl<O: Write> Printer<O> {
             Identifier(identifier) => self.print_identifier(identifier),
             Infix(infix) => self.print_infix(infix),
             LiteralInt(literal) => self.lnwrite(format!("{}", literal.value)),
+            PostfixProperty(property) => self.print_postfix_property(property, 0).map(|_| ()),
         }
     }
 
     fn print_identifier(&self, identifier: &Identifier) -> Result<()> {
         self.lnwrite(format!("Identifier({}): ", identifier.name.name))?;
-        self.write_type(&identifier.typ)
+        self.write_type(&identifier.typ, false)
     }
 
     fn print_infix(&self, infix: &Infix) -> Result<()> {
@@ -152,30 +187,77 @@ impl<O: Write> Printer<O> {
         self.write(")")
     }
 
+    fn is_postfix(&self, expression: &Expression) -> bool {
+        use Expression::*;
+        match expression {
+            PostfixProperty(_) => true,
+            _ => false,
+        }
+    }
+
+    fn print_postfix_property(&self, property: &PostfixProperty, current: u8) -> Result<u8> {
+        let max = match &*property.target {
+            // Links in the chain
+            Expression::PostfixProperty(target) => {
+                self.print_postfix_property(target, current + 1)?
+            },
+            // Tail of the chain
+            other @ _ => {
+                self.print_expression(other)?;
+                current
+            },
+        };
+        // Have a +1 so that we always indent at least one step.
+        self.indented_steps(max - current + 1, |this| {
+            this.lnwrite(format!("Property({}): ", property.property.name))?;
+            this.write_type(&property.typ, false)
+        })?;
+        Ok(max)
+    }
+
     /// Write a string.
     fn write<S: AsRef<str>>(&self, string: S) -> Result<()> {
-        let mut output = self.output.borrow_mut();
-        output.write(string.as_ref().as_bytes()).map(|_| ())
+        self.write_output(string.as_ref().as_bytes())
     }
 
     /// Write indentation and then a string.
     fn iwrite<S: AsRef<str>>(&self, string: S) -> Result<()> {
         let indented = " ".repeat(self.indent.get() as usize);
-        let mut output = self.output.borrow_mut();
-        output
-            .write(indented.as_bytes())
-            .and_then(|_| output.write(string.as_ref().as_bytes()))
+        self.write_output(indented.as_bytes())
+            .and_then(|_| self.write_output(string.as_ref().as_bytes()))
             .map(|_| ())
     }
 
     /// Write a newline, indentation, and then a string.
     fn lnwrite<S: AsRef<str>>(&self, string: S) -> Result<()> {
         let indented = " ".repeat(self.indent.get() as usize);
-        let mut output = self.output.borrow_mut();
-        output
-            .write("\n".as_bytes())
-            .and_then(|_| output.write(indented.as_bytes()))
-            .and_then(|_| output.write(string.as_ref().as_bytes()))
-            .map(|_| ())
+        self.write_output("\n".as_bytes())
+            .and_then(|_| self.write_output(indented.as_bytes()))
+            .and_then(|_| self.write_output(string.as_ref().as_bytes()))
     }
+
+    fn write_output(&self, bytes: &[u8]) -> Result<()> {
+        let mut output = self.output.borrow_mut();
+        output.write(bytes).map(|_| ())
+    }
+
+    // fn write_output(&self, bytes: &[u8]) -> Result<()> {
+    //     let result = if let Some(buffer) = &mut *self.buffer.borrow_mut() {
+    //         buffer.write(bytes)
+    //     } else {
+    //         let mut output = self.output.borrow_mut();
+    //         output.write(bytes)
+    //     };
+    //     result.map(|_| ())
+    // }
+    //
+    // fn buffer<F: FnOnce(&Self) -> Result<()>>(&self, inner: F) -> Result<Vec<u8>> {
+    //     {
+    //         let mut buffer = self.buffer.borrow_mut();
+    //         *buffer = Some(vec![]);
+    //     }
+    //     inner(self)?;
+    //     let buffer = self.buffer.replace(None);
+    //     Ok(buffer.unwrap())
+    // }
 }

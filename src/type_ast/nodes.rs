@@ -135,6 +135,7 @@ pub enum Expression {
     Identifier(Identifier),
     Infix(Infix),
     LiteralInt(LiteralInt),
+    PostfixProperty(PostfixProperty),
 }
 
 impl Expression {
@@ -144,6 +145,7 @@ impl Expression {
             Identifier(identifier) => &identifier.typ,
             Infix(infix) => &infix.typ,
             LiteralInt(literal) => &literal.typ,
+            PostfixProperty(property) => &property.typ,
         }
     }
 }
@@ -155,6 +157,7 @@ impl Closable for Expression {
             Identifier(identifier) => Identifier(identifier.close()?),
             Infix(infix) => Infix(infix.close()?),
             literal @ LiteralInt(_) => literal,
+            PostfixProperty(property) => PostfixProperty(property.close()?),
         })
     }
 }
@@ -197,4 +200,24 @@ impl Closable for Infix {
 pub struct LiteralInt {
     pub value: i64,
     pub typ: Type,
+}
+
+#[derive(Debug)]
+pub struct PostfixProperty {
+    pub target: Box<Expression>,
+    pub property: Word,
+    pub span: Span,
+    pub typ: Type,
+}
+
+impl Closable for PostfixProperty {
+    fn close(self) -> TypeResult<Self> {
+        let typ = self.typ.close()?;
+        Ok(PostfixProperty {
+            target: Box::new(self.target.close()?),
+            property: self.property,
+            span: self.span,
+            typ,
+        })
+    }
 }
