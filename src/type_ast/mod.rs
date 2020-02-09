@@ -90,9 +90,10 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
         }
     };
 
-    // There should be no more inference necessary at this point so close the
-    // function and add it to its defining scope.
-    let typ = typ.close()?;
+    let implicit_retrn = body.typ();
+    unify(&retrn, &implicit_retrn)?;
+
+    // Add the function to its defining scope.
     scope.add_local(&name, typ.clone())?;
 
     Ok(Func {
@@ -118,9 +119,15 @@ fn translate_block(pblock: past::Block, scope: Scope) -> TypeResult<Block> {
         };
         statements.push(statement);
     }
+    let typ = if statements.is_empty() {
+        Type::new_empty_tuple()
+    } else {
+        statements.last().unwrap().typ()
+    };
     Ok(Block {
         statements,
         span: pblock.span.clone(),
+        typ,
     })
 }
 
@@ -440,7 +447,7 @@ mod tests {
         };
 
         let scope = FuncScope::new(None).into_scope();
-        let func = translate_func(pfunc, scope)?.close()?;
+        let func = translate_func(pfunc, scope)?;
 
         println!("{:?}", func);
 

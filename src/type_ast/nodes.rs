@@ -33,6 +33,9 @@ pub struct Func {
 
 impl Closable for Func {
     fn close(self) -> TypeResult<Self> {
+        // Close the type first since that does important unbound-to-generic
+        // auto-conversion.
+        let typ = self.typ.close()?;
         let mut arguments = vec![];
         for argument in self.arguments {
             arguments.push(FuncArgument {
@@ -45,7 +48,7 @@ impl Closable for Func {
             arguments,
             body: self.body.close()?,
             scope: self.scope.close()?,
-            typ: self.typ.close()?,
+            typ,
         })
     }
 }
@@ -61,6 +64,15 @@ pub enum FuncBody {
     Block(Block),
 }
 
+impl FuncBody {
+    pub fn typ(&self) -> Type {
+        use FuncBody::*;
+        match self {
+            Block(block) => block.typ.clone(),
+        }
+    }
+}
+
 impl Closable for FuncBody {
     fn close(self) -> TypeResult<FuncBody> {
         use FuncBody::*;
@@ -74,6 +86,8 @@ impl Closable for FuncBody {
 pub struct Block {
     pub statements: Vec<BlockStatement>,
     pub span: Span,
+    /// The implicit return of the block.
+    pub typ: Type,
 }
 
 impl Closable for Block {
@@ -85,6 +99,7 @@ impl Closable for Block {
         Ok(Block {
             statements,
             span: self.span,
+            typ: self.typ.close()?,
         })
     }
 }
@@ -93,6 +108,16 @@ impl Closable for Block {
 pub enum BlockStatement {
     Expression(Expression),
     Func(Func),
+}
+
+impl BlockStatement {
+    pub fn typ(&self) -> Type {
+        use BlockStatement::*;
+        match self {
+            Expression(expression) => expression.typ().clone(),
+            Func(func) => func.typ.clone(),
+        }
+    }
 }
 
 impl Closable for BlockStatement {

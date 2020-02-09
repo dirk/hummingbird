@@ -39,17 +39,22 @@ impl<O: Write> Printer<O> {
     }
 
     pub fn print_module(&self, module: Module) -> Result<()> {
-        for statement in module.statements.iter() {
+        for (index, statement) in module.statements.iter().enumerate() {
             use ModuleStatement::*;
             match statement {
-                Func(func) => self.print_func(func)?,
+                Func(func) => self.print_func(func, index == 0)?,
             }
         }
         Ok(())
     }
 
-    fn print_func(&self, func: &nodes::Func) -> Result<()> {
-        self.iwrite(format!("func {}(", func.name))?;
+    fn print_func(&self, func: &nodes::Func, first: bool) -> Result<()> {
+        let opener = format!("func {}(", func.name);
+        if first {
+            self.iwrite(opener)?;
+        } else {
+            self.lnwrite(opener)?;
+        }
         if !func.arguments.is_empty() {
             self.write("\n")?;
             self.indented(|this| {
@@ -61,7 +66,13 @@ impl<O: Write> Printer<O> {
                 Ok(())
             })?;
         }
-        self.write(") ")?;
+        self.iwrite("): ")?;
+        let typ = match &func.typ {
+            Type::Func(func) => &**func,
+            other @ _ => unreachable!("Func node has non-Func type: {:?}", other),
+        };
+        self.write_type(&*typ.retrn)?;
+        self.write(" ")?;
         match &func.body {
             FuncBody::Block(block) => self.print_block(block, false),
         }
@@ -100,24 +111,19 @@ impl<O: Write> Printer<O> {
         }
 
         self.indented(|this| {
-            for statement in block.statements.iter() {
-                this.print_block_statement(statement)?;
+            for (_, statement) in block.statements.iter().enumerate() {
+                use BlockStatement::*;
+                match statement {
+                    Expression(expression) => {
+                        self.print_expression(expression)?;
+                    }
+                    Func(func) => self.print_func(func, false)?,
+                }
             }
             Ok(())
         })?;
         self.write("\n")?;
         self.iwrite("}\n")
-    }
-
-    fn print_block_statement(&self, statement: &BlockStatement) -> Result<()> {
-        use BlockStatement::*;
-        match statement {
-            Expression(expression) => {
-                self.print_expression(expression)?;
-            }
-            Func(func) => self.print_func(func)?,
-        }
-        Ok(())
     }
 
     fn print_expression(&self, expression: &Expression) -> Result<()> {

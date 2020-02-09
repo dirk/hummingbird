@@ -23,6 +23,7 @@ pub enum Type {
     Object(Rc<Object>),
     // Used to make writing tests easier.
     Phantom { id: usize },
+    Tuple(Tuple),
     // A type whose entire identity can change.
     Variable(Rc<RefCell<Variable>>),
 }
@@ -35,6 +36,7 @@ impl PartialEq for Type {
             (Generic(self_generic), Generic(other_generic)) => self_generic == other_generic,
             (Object(self_object), Object(other_object)) => self_object == other_object,
             (Phantom { id: self_id }, Phantom { id: other_id }) => self_id == other_id,
+            (Tuple(self_tuple), Tuple(other_tuple)) => self_tuple == other_tuple,
             (Variable(self_variable), Variable(other_variable)) => self_variable == other_variable,
             _ => false,
         }
@@ -67,6 +69,10 @@ impl Type {
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
+    pub fn new_empty_tuple() -> Self {
+        Type::Tuple(Tuple { id: next_uid(), members: vec![] })
+    }
+
     pub fn new_unbound() -> Self {
         let variable = Variable::Unbound { id: next_uid() };
         Type::Variable(Rc::new(RefCell::new(variable)))
@@ -79,6 +85,7 @@ impl Type {
             Generic(generic) => generic.id,
             Object(object) => object.id,
             Phantom { id } => *id,
+            Tuple(tuple) => tuple.id,
             Variable(variable) => variable.borrow().id(),
         }
     }
@@ -116,12 +123,12 @@ impl Type {
                 for argument in func.arguments.iter() {
                     arguments.push(argument.clone().close()?);
                 }
+                let retrn = func.retrn.clone().close()?;
                 Ok(Type::Func(Rc::new(Func {
                     id: func.id,
                     name: func.name.clone(),
                     arguments,
-                    retrn: func.retrn.clone(),
-                    // retrn: func.retrn.clone().close()?,
+                    retrn: Box::new(retrn),
                 })))
             }
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
@@ -271,6 +278,29 @@ pub struct DerivedClass {
     pub id: usize,
     pub name: String,
     // TODO: Parameters
+}
+
+#[derive(Clone, Debug)]
+pub struct Tuple {
+    pub id: usize,
+    pub members: Vec<Type>,
+}
+
+impl PartialEq for Tuple {
+    fn eq(&self, other: &Self) -> bool {
+        if self.id == other.id {
+            return true;
+        }
+        if self.members.len() != other.members.len() {
+            return false;
+        }
+        for (self_member, other_member) in self.members.iter().zip(other.members.iter()) {
+            if self_member != other_member {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// A type which can change during unification.
