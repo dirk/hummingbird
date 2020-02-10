@@ -125,9 +125,9 @@ impl<O: Write> Printer<O> {
             for constraint in constraints {
                 use GenericConstraint::*;
                 match constraint {
-                    Property { name, typ } => {
-                        this.lnwrite(format!("{}: ", name))?;
-                        this.write_type(typ, true)?;
+                    Property(property) => {
+                        this.lnwrite(format!("{}: ", property.name))?;
+                        this.write_type(&property.typ, true)?;
                     }
                     other @ _ => unreachable!("Cannot write constraint: {:?}", other),
                 }
@@ -200,12 +200,12 @@ impl<O: Write> Printer<O> {
             // Links in the chain
             Expression::PostfixProperty(target) => {
                 self.print_postfix_property(target, current + 1)?
-            },
+            }
             // Tail of the chain
             other @ _ => {
                 self.print_expression(other)?;
                 current
-            },
+            }
         };
         // Have a +1 so that we always indent at least one step.
         self.indented_steps(max - current + 1, |this| {

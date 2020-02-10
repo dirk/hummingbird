@@ -183,10 +183,10 @@ impl Closable for Type {
                         for constraint in open.constraints.iter() {
                             use GenericConstraint::*;
                             constraints.push(match constraint {
-                                Property { name, typ } => Property {
-                                    name: name.clone(),
-                                    typ: typ.clone().close()?,
-                                },
+                                Property(property) => Property(PropertyConstraint {
+                                    name: property.name.clone(),
+                                    typ: property.typ.clone().close()?,
+                                }),
                                 other @ _ => unreachable!("Cannot close constraint: {:?}", other),
                             })
                         }
@@ -279,8 +279,32 @@ impl Generic {
 
     pub fn add_property_constraint(&mut self, name: String, typ: Type) {
         self.constraints
-            .push(GenericConstraint::Property { name, typ })
+            .push(GenericConstraint::Property(PropertyConstraint {
+                name,
+                typ,
+            }))
     }
+
+    pub fn get_property<S: AsRef<str>>(&self, name: S) -> Option<&PropertyConstraint> {
+        use GenericConstraint::*;
+        for constraint in self.constraints.iter() {
+            match constraint {
+                Property(property) => {
+                    if &property.name == name.as_ref() {
+                        return Some(property);
+                    }
+                }
+                _ => (),
+            }
+        }
+        None
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PropertyConstraint {
+    pub name: String,
+    pub typ: Type,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -290,10 +314,7 @@ pub enum GenericConstraint {
         arguments: Vec<Type>,
         retrn: Type,
     },
-    Property {
-        name: String,
-        typ: Type,
-    },
+    Property(PropertyConstraint),
 }
 
 #[derive(Clone, Debug)]
@@ -389,6 +410,13 @@ impl Variable {
             Generic(generic) => generic.id,
             Substitute(typ) => typ.id(),
             Unbound { id } => *id,
+        }
+    }
+
+    pub fn is_generic(&self) -> bool {
+        match self {
+            Variable::Generic(_) => true,
+            _ => false,
         }
     }
 

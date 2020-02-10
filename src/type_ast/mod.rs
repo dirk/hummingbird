@@ -4,7 +4,7 @@
 ///
 /// At the end of the process there should be no `Type::Variable` variants
 /// remaining in the AST.
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -23,7 +23,7 @@ pub use builtins::Builtins;
 pub use nodes::*;
 pub use printer::Printer;
 pub use scope::{FuncScope, ModuleScope, Scope, ScopeLike};
-pub use typ::{Func as TFunc, Generic, Type, Variable};
+pub use typ::{Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, Variable};
 
 type TypeResult<T> = Result<T, TypeError>;
 
@@ -180,7 +180,7 @@ fn translate_postfix_property(
     // Apply unification to ensure the target supports having the
     // given property.
     let intermediary = Type::new_variable(Variable::Generic(generic));
-    unify(target.typ(), &intermediary)?;
+    unify(target.typ(), &intermediary).map_err(|err| err.with_span(pproperty.span.clone()))?;
 
     Ok(PostfixProperty {
         target: Box::new(target),
@@ -190,7 +190,7 @@ fn translate_postfix_property(
     })
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypeError {
     LocalAlreadyDefined {
         name: String,
@@ -198,6 +198,9 @@ pub enum TypeError {
     LocalNotFound {
         name: String,
     },
+    // PropertyAlreadyDefined {
+    //     name: String,
+    // },
     CannotUnify {
         first: Type,
         second: Type,
@@ -232,11 +235,111 @@ impl TypeError {
             other @ _ => other,
         }
     }
+
+    pub fn short_message(&self) -> String {
+        use TypeError::*;
+        let message = match self.unwrap() {
+            LocalAlreadyDefined { .. } => "LocalAlreadyDefined",
+            LocalNotFound { .. } => "LocalNotFound",
+            // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
+            CannotUnify { .. } => "CannotUnify",
+            TypeMismatch { .. } => "TypeMismatch",
+            UnexpectedUnbound { .. } => "UnexpectedUnbound",
+            WithSpan { .. } => unreachable!(),
+        };
+        message.to_string()
+    }
+
+    pub fn label_message(&self) -> String {
+        use TypeError::*;
+        let message = match self.unwrap() {
+            CannotUnify { .. } => "Trying to unify here",
+            TypeMismatch { .. } => "Mismatch occurred here",
+            WithSpan { .. } => unreachable!(),
+            _ => "Here",
+        };
+        message.to_string()
+    }
+
+    pub fn span(&self) -> Option<Span> {
+        use TypeError::*;
+        match self {
+            WithSpan { span, .. } => Some(span.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns the underlying error with all metadata layers peeled off.
+    pub fn unwrap(&self) -> TypeError {
+        use TypeError::*;
+        match self {
+            WithSpan { wrapped, .. } => wrapped.unwrap(),
+            other @ _ => other.clone(),
+        }
+    }
+
+    /// Add a span to mark the location of the error. If it already has a span
+    /// it does *not* overwrite the span.
+    pub fn with_span(self, span: Span) -> Self {
+        if self.span().is_some() {
+            return self;
+        }
+        TypeError::WithSpan {
+            wrapped: Box::new(self),
+            span,
+        }
+    }
 }
 
-pub fn unify(typ1: &Type, typ2: &Type) -> Result<(), TypeError> {
+// Extract the variable type within a type.
+fn unwrap_variable(typ: &Type) -> &Rc<RefCell<Variable>> {
+    match typ {
+        Type::Variable(variable) => variable,
+        other @ _ => unreachable!("Not a variable type: {:?}", other),
+    }
+}
+
+/// Unify a variable (mutable) generic with another generic.
+pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic) -> TypeResult<()> {
+    let destination =
+        &mut *RefMut::map(
+            unwrap_variable(destination).borrow_mut(),
+            |variable| match variable {
+                Variable::Generic(generic) => generic,
+                other @ _ => unreachable!("Not a generic type: {:?}", other),
+            },
+        );
+    for constraint in source.constraints.iter() {
+        use GenericConstraint::*;
+        match constraint {
+            Property(source_property) => {
+                // If the property already exists then unify their types,
+                // otherwise add it to the left side.
+                if let Some(destination_property) = destination.get_property(&source_property.name)
+                {
+                    unify(&destination_property.typ, &source_property.typ)?;
+                } else {
+                    destination.add_property_constraint(
+                        source_property.name.clone(),
+                        source_property.typ.clone(),
+                    );
+                }
+            }
+            other @ Callable { .. } => unreachable!("Don't know how to unify: {:?}", other),
+        }
+    }
+    Ok(())
+}
+
+pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
     if typ1 == typ2 {
         return Ok(());
+    }
+
+    if let Type::Variable(var2) = typ2 {
+        if let Variable::Substitute(substitute) = &*var2.borrow() {
+            return unify(typ1, substitute);
+        }
     }
 
     if let Type::Variable(var1) = typ1 {
@@ -245,28 +348,42 @@ pub fn unify(typ1: &Type, typ2: &Type) -> Result<(), TypeError> {
             Substitute(Type),
             // Used to unify a different type with `typ2` (eg. if `typ1` is a
             // substitute).
-            Unify(Type),
+            Reunify(Type),
+            // Unify both variable generics.
+            UnifyGenerics,
         }
         use Action::*;
 
         let action = match &*var1.borrow() {
-            // If this is a generic and the other type is unbound then
-            // update the other type to also be unbound.
             generic @ Variable::Generic(_) => {
+                // WARNING: These if-elses rely on implicit returns and
+                //   therefore *must* stay exhaustive.
                 if let Type::Variable(var2) = typ2 {
+                    // If this is a generic and the other type is unbound then
+                    // update the other type to be a substitute for this type.
                     if var2.borrow().is_unbound() {
-                        *var2.borrow_mut() = generic.clone();
+                        *var2.borrow_mut() = Variable::Substitute(Box::new(typ1.clone()));
                         return Ok(());
+                    // If it's also a variable generic then we can attempt to
+                    // union the two sets of generic constraints.
+                    } else if var2.borrow().is_generic() {
+                        UnifyGenerics
+                    } else {
+                        return Err(TypeError::TypeMismatch {
+                            expected: typ1.clone(),
+                            got: typ2.clone(),
+                        });
                     }
+                } else {
+                    return Err(TypeError::TypeMismatch {
+                        expected: typ1.clone(),
+                        got: typ2.clone(),
+                    });
                 }
-                return Err(TypeError::TypeMismatch {
-                    expected: typ1.clone(),
-                    got: typ2.clone(),
-                });
             }
             // If we're a substitute then unify whatever we're substituted with
             // with `typ2`.
-            Variable::Substitute(substitute) => Unify(*substitute.clone()),
+            Variable::Substitute(substitute) => Reunify(*substitute.clone()),
             // If we're unbound then inherit whatever the other type is.
             Variable::Unbound { .. } => Substitute(typ2.clone()),
         };
@@ -276,7 +393,22 @@ pub fn unify(typ1: &Type, typ2: &Type) -> Result<(), TypeError> {
                 *var1.borrow_mut() = Variable::Substitute(Box::new(typ));
                 Ok(())
             }
-            Unify(typ) => unify(&typ, typ2),
+            Reunify(typ) => unify(&typ, typ2),
+            UnifyGenerics => {
+                let var2 = unwrap_variable(typ2);
+                // If both types are variable generics then first merge the
+                // right into the left.
+                {
+                    let generic = Ref::map(var2.borrow(), |variable| match variable {
+                        Variable::Generic(generic) => generic,
+                        _ => unreachable!(),
+                    });
+                    unify_variable_generic_with_generic(typ1, &generic)?;
+                }
+                // Then make the right a substitute for the left.
+                *var2.borrow_mut() = Variable::Substitute(Box::new(typ1.clone()));
+                Ok(())
+            }
         };
     }
 
