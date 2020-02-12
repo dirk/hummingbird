@@ -187,10 +187,29 @@ impl Closable for Type {
                                     name: property.name.clone(),
                                     typ: property.typ.clone().close()?,
                                 }),
+                                Callable(callable) => {
+                                    let mut arguments = vec![];
+                                    for argument in callable.arguments.iter() {
+                                        arguments.push(argument.clone().close()?);
+                                    }
+                                    Callable(CallableConstraint {
+                                        arguments,
+                                        retrn: callable.retrn.clone().close()?,
+                                    })
+                                }
                                 other @ _ => unreachable!("Cannot close constraint: {:?}", other),
                             })
                         }
                         let closed = Generic::new_with_constraints(constraints);
+                        // Use substitution so that other uses will be updated.
+                        Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
+                            closed,
+                        )))))
+                    }
+                    // Turn unbounds into closed-but-unconstrained generics.
+                    // If that's incorrect it will be caught by codegen.
+                    Variable::Unbound { .. } => {
+                        let closed = Generic::new();
                         // Use substitution so that other uses will be updated.
                         Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
                             closed,
@@ -210,7 +229,8 @@ impl Closable for Type {
                     Variable::Substitute(typ) => Ok(typ.clone().close()?),
                     Variable::Unbound { id } => {
                         // panic!("Unexpected unbound: {}", id);
-                        Err(TypeError::UnexpectedUnbound { id: *id })
+                        // Err(TypeError::UnexpectedUnbound { id: *id })
+                        unreachable!("Unbound should have been replaced: {}", id)
                     }
                 }
             }
@@ -277,6 +297,25 @@ impl Generic {
         }
     }
 
+    pub fn add_callable_constraint(&mut self, arguments: Vec<Type>, retrn: Type) {
+        self.constraints
+            .push(GenericConstraint::Callable(CallableConstraint {
+                arguments,
+                retrn,
+            }))
+    }
+
+    pub fn get_callable(&self) -> Option<&CallableConstraint> {
+        use GenericConstraint::*;
+        for constraint in self.constraints.iter() {
+            match constraint {
+                Callable(callable) => return Some(callable),
+                _ => (),
+            }
+        }
+        None
+    }
+
     pub fn add_property_constraint(&mut self, name: String, typ: Type) {
         self.constraints
             .push(GenericConstraint::Property(PropertyConstraint {
@@ -301,6 +340,13 @@ impl Generic {
     }
 }
 
+/// The type can be called with the given arguments and return type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CallableConstraint {
+    pub arguments: Vec<Type>,
+    pub retrn: Type,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PropertyConstraint {
     pub name: String,
@@ -309,11 +355,7 @@ pub struct PropertyConstraint {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum GenericConstraint {
-    /// The type can be called with the given arguments and return type.
-    Callable {
-        arguments: Vec<Type>,
-        retrn: Type,
-    },
+    Callable(CallableConstraint),
     Property(PropertyConstraint),
 }
 

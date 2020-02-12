@@ -158,10 +158,44 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
                 typ: Type::new_object(class),
             })
         }
+        past::Expression::PostfixCall(pcall) => {
+            Expression::PostfixCall(translate_postfix_call(pcall, scope)?)
+        }
         past::Expression::PostfixProperty(pproperty) => {
             Expression::PostfixProperty(translate_postfix_property(pproperty, scope)?)
         }
         _ => unreachable!("Cannot translate {:?}", pexpression),
+    })
+}
+
+fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult<PostfixCall> {
+    let target = translate_expression(&*pcall.target, scope.clone())?;
+
+    let mut arguments = vec![];
+    for argument in pcall.arguments.iter() {
+        arguments.push(translate_expression(argument, scope.clone())?);
+    }
+
+    // The return type of the callable.
+    let retrn = Type::new_unbound();
+
+    let mut generic = Generic::new();
+    generic.add_callable_constraint(
+        arguments
+            .iter()
+            .map(|argument| argument.typ().clone())
+            .collect::<Vec<_>>(),
+        retrn.clone(),
+    );
+    // Unify to ensure target supports being called with the arguments and
+    // return types.
+    let intermediary = Type::new_variable(Variable::Generic(generic));
+    unify(target.typ(), &intermediary).map_err(|err| err.with_span(pcall.span.clone()))?;
+
+    Ok(PostfixCall {
+        target: Box::new(target),
+        arguments,
+        typ: retrn,
     })
 }
 
@@ -185,7 +219,6 @@ fn translate_postfix_property(
     Ok(PostfixProperty {
         target: Box::new(target),
         property: pproperty.property.clone(),
-        span: pproperty.span.clone(),
         typ,
     })
 }
@@ -325,7 +358,16 @@ pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic)
                     );
                 }
             }
-            other @ Callable { .. } => unreachable!("Don't know how to unify: {:?}", other),
+            Callable(source_callable) => {
+                if let Some(destination_callable) = destination.get_callable() {
+                    unreachable!("Cannot unify Callables")
+                } else {
+                    destination.add_callable_constraint(
+                        source_callable.arguments.clone(),
+                        source_callable.retrn.clone(),
+                    );
+                }
+            }
         }
     }
     Ok(())

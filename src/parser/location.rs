@@ -25,6 +25,12 @@ impl Location {
     pub fn is_unknown(&self) -> bool {
         self.index == 0 && self.line == -1 && self.column == -1
     }
+
+    /// Return a location move forward by one "character". Useful for making
+    /// closing delimiters inclusive.
+    pub fn plus_one(&self) -> Self {
+        Self::new(self.index + 1, self.line, self.column + 1)
+    }
 }
 
 #[cfg(test)]

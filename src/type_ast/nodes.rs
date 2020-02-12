@@ -135,6 +135,7 @@ pub enum Expression {
     Identifier(Identifier),
     Infix(Infix),
     LiteralInt(LiteralInt),
+    PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
 }
 
@@ -145,6 +146,7 @@ impl Expression {
             Identifier(identifier) => &identifier.typ,
             Infix(infix) => &infix.typ,
             LiteralInt(literal) => &literal.typ,
+            PostfixCall(call) => &call.typ,
             PostfixProperty(property) => &property.typ,
         }
     }
@@ -157,6 +159,7 @@ impl Closable for Expression {
             Identifier(identifier) => Identifier(identifier.close()?),
             Infix(infix) => Infix(infix.close()?),
             literal @ LiteralInt(_) => literal,
+            PostfixCall(call) => PostfixCall(call.close()?),
             PostfixProperty(property) => PostfixProperty(property.close()?),
         })
     }
@@ -203,10 +206,32 @@ pub struct LiteralInt {
 }
 
 #[derive(Debug)]
+pub struct PostfixCall {
+    pub target: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub typ: Type,
+}
+
+impl Closable for PostfixCall {
+    fn close(self) -> TypeResult<Self> {
+        let target = self.target.close()?;
+        let mut arguments = vec![];
+        for argument in self.arguments.into_iter() {
+            arguments.push(argument.close()?);
+        }
+        let typ = self.typ.close()?;
+        Ok(PostfixCall {
+            target: Box::new(target),
+            arguments,
+            typ,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct PostfixProperty {
     pub target: Box<Expression>,
     pub property: Word,
-    pub span: Span,
     pub typ: Type,
 }
 
@@ -216,7 +241,6 @@ impl Closable for PostfixProperty {
         Ok(PostfixProperty {
             target: Box::new(self.target.close()?),
             property: self.property,
-            span: self.span,
             typ,
         })
     }

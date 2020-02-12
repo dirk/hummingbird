@@ -220,10 +220,40 @@ fn parse_postfix(input: &mut TokenStream) -> ParseResult<Expression> {
                     span: Span::new(start, property.span.end),
                 })
             }
+            Token::ParenthesesLeft(_) => target = expect_postfix_call(input, target)?,
             _ => break,
         }
     }
     Ok(target)
+}
+
+fn expect_postfix_call(input: &mut TokenStream, target: Expression) -> ParseResult<Expression> {
+    let start = expect_to_read!(input, { Token::ParenthesesLeft(location) => location, });
+    let mut end: Option<Location> = None;
+    let mut arguments = vec![];
+    loop {
+        match input.peek() {
+            Token::ParenthesesRight(location) => {
+                input.read();
+                end = Some(location);
+                break;
+            }
+            _ => {
+                arguments.push(parse_expression(input)?);
+                match input.peek() {
+                    Token::Comma(_) => {
+                        input.read();
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+    Ok(Expression::PostfixCall(PostfixCall {
+        target: Box::new(target),
+        arguments,
+        span: Span::new(start, end.unwrap().plus_one()),
+    }))
 }
 
 fn parse_group(input: &mut TokenStream) -> ParseResult<Expression> {
@@ -457,6 +487,19 @@ mod tests {
                     name: "bar".to_string(),
                     span: Span::unknown(),
                 },
+                span: Span::unknown(),
+            }))
+        );
+        assert_eq!(
+            parse_postfix(&mut input("foo()")),
+            Ok(Expression::PostfixCall(PostfixCall {
+                target: Box::new(Expression::Identifier(Identifier {
+                    name: Word {
+                        name: "foo".to_string(),
+                        span: Span::unknown(),
+                    }
+                })),
+                arguments: vec![],
                 span: Span::unknown(),
             }))
         );

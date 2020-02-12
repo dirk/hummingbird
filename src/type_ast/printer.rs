@@ -121,15 +121,30 @@ impl<O: Write> Printer<O> {
             return Ok(());
         }
         self.lnwrite("where")?;
-        self.indented(|this| {
+        self.indented(|this1| {
             for constraint in constraints {
                 use GenericConstraint::*;
                 match constraint {
                     Property(property) => {
-                        this.lnwrite(format!("{}: ", property.name))?;
-                        this.write_type(&property.typ, true)?;
+                        this1.lnwrite(format!("{}: ", property.name))?;
+                        this1.write_type(&property.typ, true)?;
                     }
-                    other @ _ => unreachable!("Cannot write constraint: {:?}", other),
+                    Callable(callable) => {
+                        if callable.arguments.is_empty() {
+                            this1.lnwrite("(...): ")?;
+                        } else {
+                            this1.lnwrite("(\n")?;
+                            for argument in callable.arguments.iter() {
+                                this1.indented(|this2| {
+                                    this2.iwrite("")?;
+                                    this2.write_type(argument, true)?;
+                                    this2.write(",")
+                                })?;
+                            }
+                            this1.lnwrite("): ")?;
+                        }
+                        this1.write_type(&callable.retrn, true)?;
+                    }
                 }
             }
             Ok(())
@@ -166,6 +181,7 @@ impl<O: Write> Printer<O> {
             Identifier(identifier) => self.print_identifier(identifier),
             Infix(infix) => self.print_infix(infix),
             LiteralInt(literal) => self.lnwrite(format!("{}", literal.value)),
+            PostfixCall(call) => self.print_postfix_call(call, 0).map(|_| ()),
             PostfixProperty(property) => self.print_postfix_property(property, 0).map(|_| ()),
         }
     }
@@ -195,24 +211,36 @@ impl<O: Write> Printer<O> {
         }
     }
 
-    fn print_postfix_property(&self, property: &PostfixProperty, current: u8) -> Result<u8> {
-        let max = match &*property.target {
-            // Links in the chain
-            Expression::PostfixProperty(target) => {
-                self.print_postfix_property(target, current + 1)?
-            }
-            // Tail of the chain
-            other @ _ => {
-                self.print_expression(other)?;
-                current
-            }
-        };
+    fn print_postfix_call(&self, call: &PostfixCall, current: u8) -> Result<u8> {
+        let max = self.print_postfix_target(&*call.target, current)?;
         // Have a +1 so that we always indent at least one step.
+        self.indented_steps(max - current + 1, |this| {
+            this.lnwrite(format!("Call(...): "))?;
+            this.write_type(&call.typ, false)
+        })?;
+        Ok(max)
+    }
+
+    fn print_postfix_property(&self, property: &PostfixProperty, current: u8) -> Result<u8> {
+        let max = self.print_postfix_target(&*property.target, current)?;
         self.indented_steps(max - current + 1, |this| {
             this.lnwrite(format!("Property({}): ", property.property.name))?;
             this.write_type(&property.typ, false)
         })?;
         Ok(max)
+    }
+
+    fn print_postfix_target(&self, target: &Expression, current: u8) -> Result<u8> {
+        match target {
+            // Links in the chain
+            Expression::PostfixCall(target) => self.print_postfix_call(target, current + 1),
+            Expression::PostfixProperty(target) => self.print_postfix_property(target, current + 1),
+            // Tail of the chain
+            other @ _ => {
+                self.print_expression(other)?;
+                Ok(current)
+            }
+        }
     }
 
     /// Write a string.

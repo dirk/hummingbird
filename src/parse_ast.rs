@@ -71,6 +71,7 @@ pub enum Expression {
     Identifier(Identifier),
     Infix(Infix),
     LiteralInt(LiteralInt),
+    PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
 }
 
@@ -89,6 +90,13 @@ pub struct Infix {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LiteralInt {
     pub value: i64,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PostfixCall {
+    pub target: Box<Expression>,
+    pub arguments: Vec<Expression>,
     pub span: Span,
 }
 
