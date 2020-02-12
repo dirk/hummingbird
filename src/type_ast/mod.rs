@@ -45,7 +45,7 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
     // statements to ensure all types are bound.
     let mut closed_statements = vec![];
     for statement in statements.into_iter() {
-        closed_statements.push(statement.close()?);
+        closed_statements.push(statement.close(&mut RecursionTracker::new())?);
     }
 
     Ok(Module {
@@ -242,6 +242,13 @@ pub enum TypeError {
         expected: Type,
         got: Type,
     },
+    ArgumentsMismatch {
+        expected: Vec<Type>,
+        got: Vec<Type>,
+    },
+    RecursiveType {
+        id: usize,
+    },
     /// When we try to `Type#close` and run into an `Unbound`.
     UnexpectedUnbound {
         id: usize,
@@ -277,6 +284,8 @@ impl TypeError {
             // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
             CannotUnify { .. } => "CannotUnify",
             TypeMismatch { .. } => "TypeMismatch",
+            ArgumentsMismatch { .. } => "ArgumentsMismatch",
+            RecursiveType { .. } => "RecursiveType",
             UnexpectedUnbound { .. } => "UnexpectedUnbound",
             WithSpan { .. } => unreachable!(),
         };
@@ -334,40 +343,72 @@ fn unwrap_variable(typ: &Type) -> &Rc<RefCell<Variable>> {
 
 /// Unify a variable (mutable) generic with another generic.
 pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic) -> TypeResult<()> {
-    let destination =
-        &mut *RefMut::map(
-            unwrap_variable(destination).borrow_mut(),
-            |variable| match variable {
-                Variable::Generic(generic) => generic,
-                other @ _ => unreachable!("Not a generic type: {:?}", other),
-            },
-        );
+    let destination = unwrap_variable(destination);
+
+    enum Action {
+        AddCallableConstraint(Vec<Type>, Type),
+        AddPropertyConstraint(String, Type),
+        None,
+    }
+
     for constraint in source.constraints.iter() {
+        use Action::*;
         use GenericConstraint::*;
-        match constraint {
-            Property(source_property) => {
-                // If the property already exists then unify their types,
-                // otherwise add it to the left side.
-                if let Some(destination_property) = destination.get_property(&source_property.name)
-                {
-                    unify(&destination_property.typ, &source_property.typ)?;
-                } else {
-                    destination.add_property_constraint(
-                        source_property.name.clone(),
-                        source_property.typ.clone(),
-                    );
+
+        let action = {
+            // Get an immutable borrow while we determine what to do.
+            let destination = Ref::map(destination.borrow(), Variable::unwrap_generic);
+
+            match constraint {
+                Property(source_property) => {
+                    // If the property already exists then unify their types,
+                    // otherwise add it to the left side.
+                    if let Some(destination_property) =
+                        destination.get_property(&source_property.name)
+                    {
+                        unify(&destination_property.typ, &source_property.typ)?;
+                        None
+                    } else {
+                        AddPropertyConstraint(
+                            source_property.name.clone(),
+                            source_property.typ.clone(),
+                        )
+                    }
+                }
+                Callable(source_callable) => {
+                    if let Some(destination_callable) = destination.get_callable() {
+                        if destination_callable.arguments.len() != source_callable.arguments.len() {
+                            return Err(TypeError::ArgumentsMismatch {
+                                expected: destination_callable.arguments.clone(),
+                                got: source_callable.arguments.clone(),
+                            });
+                        }
+                        for (destination_argument, source_argument) in destination_callable
+                            .arguments
+                            .iter()
+                            .zip(source_callable.arguments.iter())
+                        {
+                            unify(destination_argument, source_argument)?;
+                        }
+                        unify(&destination_callable.retrn, &source_callable.retrn)?;
+                        None
+                    } else {
+                        AddCallableConstraint(
+                            source_callable.arguments.clone(),
+                            source_callable.retrn.clone(),
+                        )
+                    }
                 }
             }
-            Callable(source_callable) => {
-                if let Some(destination_callable) = destination.get_callable() {
-                    unreachable!("Cannot unify Callables")
-                } else {
-                    destination.add_callable_constraint(
-                        source_callable.arguments.clone(),
-                        source_callable.retrn.clone(),
-                    );
-                }
+        };
+
+        let destination = &mut *RefMut::map(destination.borrow_mut(), Variable::unwrap_mut_generic);
+        match action {
+            AddCallableConstraint(arguments, retrn) => {
+                destination.add_callable_constraint(arguments, retrn)
             }
+            AddPropertyConstraint(name, typ) => destination.add_property_constraint(name, typ),
+            None => (),
         }
     }
     Ok(())
@@ -485,10 +526,30 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
     })
 }
 
+/// We cannot handle types which are directly self-recursive (indirect is
+/// okay since that's handle by substitution at the type-phase and pointers
+/// at the codegen-phase), therefore we need to keep track of which types
+/// we've seen when closing to ensure we don't close the same type twice.
+struct RecursionTracker(HashSet<usize>);
+
+impl RecursionTracker {
+    pub fn new() -> Self {
+        Self(HashSet::new())
+    }
+
+    pub fn track(&mut self, id: &usize) -> TypeResult<()> {
+        if self.0.contains(id) {
+            return Err(TypeError::RecursiveType { id: *id });
+        }
+        self.0.insert(*id);
+        Ok(())
+    }
+}
+
 /// Nodes/types which consume themselves to produce a new node/type where all
 /// the types in themselves and their children have been closed.
 trait Closable {
-    fn close(self) -> TypeResult<Self>
+    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self>
     where
         Self: Sized;
 }

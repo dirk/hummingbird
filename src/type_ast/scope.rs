@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::{Closable, Type, TypeError, TypeResult};
+use super::{Closable, RecursionTracker, Type, TypeError, TypeResult};
 
 /// Proxy so that we can share different kinds of scopes.
 #[derive(Clone, Debug)]
@@ -42,7 +42,7 @@ impl Scope {
 }
 
 impl Closable for Scope {
-    fn close(self) -> TypeResult<Self> {
+    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
         use Scope::*;
         Ok(match self {
             Func(shared) => {
@@ -50,7 +50,7 @@ impl Closable for Scope {
                     let func = shared.borrow();
                     let mut locals = HashMap::new();
                     for (name, typ) in func.locals.iter() {
-                        locals.insert(name.clone(), typ.clone().close()?);
+                        locals.insert(name.clone(), typ.clone().close(tracker)?);
                     }
                     FuncScope {
                         locals,
@@ -68,7 +68,7 @@ impl Closable for Scope {
                     let module = shared.borrow();
                     let mut statics = HashMap::new();
                     for (name, typ) in module.statics.iter() {
-                        statics.insert(name.clone(), typ.clone().close()?);
+                        statics.insert(name.clone(), typ.clone().close(tracker)?);
                     }
                     ModuleScope {
                         statics,

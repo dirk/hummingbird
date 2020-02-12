@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use super::{Closable, TypeError, TypeResult};
+use super::{Closable, RecursionTracker, TypeError, TypeResult};
 
 lazy_static! {
     static ref UID: AtomicUsize = AtomicUsize::new(0);
@@ -135,7 +135,7 @@ impl Type {
         }
     }
 
-    pub fn close_func(self) -> TypeResult<Self> {
+    pub fn close_func(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
         match self {
             Type::Func(func) => {
                 let func = &*func;
@@ -150,9 +150,9 @@ impl Type {
                 retrn.genericize()?;
                 // Then close the arguments and return.
                 for argument in func.arguments.iter() {
-                    arguments.push(argument.clone().close()?);
+                    arguments.push(argument.clone().close(tracker)?);
                 }
-                let retrn = retrn.close()?;
+                let retrn = retrn.close(tracker)?;
                 Ok(Type::Func(Rc::new(Func {
                     id: func.id,
                     name: func.name.clone(),
@@ -171,30 +171,33 @@ impl Closable for Type {
     ///
     /// TODO: Make closed types a separate type so that we get compile-time
     ///   guarantees that we're only working with a closed type.
-    fn close(self) -> TypeResult<Self> {
+    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
         match self {
-            Type::Func(_) => self.close_func(),
+            Type::Func(_) => self.close_func(tracker),
             Type::Variable(variable) => {
                 // Uncomment to see types pre-closing:
                 //   return Ok(Type::Variable(variable));
                 let replacement = match &*variable.borrow() {
                     Variable::Generic(open) => {
+                        // Open generics are a hotspot for direct type
+                        // recursion which we cannot handle.
+                        tracker.track(&open.id)?;
                         let mut constraints = vec![];
                         for constraint in open.constraints.iter() {
                             use GenericConstraint::*;
                             constraints.push(match constraint {
                                 Property(property) => Property(PropertyConstraint {
                                     name: property.name.clone(),
-                                    typ: property.typ.clone().close()?,
+                                    typ: property.typ.clone().close(tracker)?,
                                 }),
                                 Callable(callable) => {
                                     let mut arguments = vec![];
                                     for argument in callable.arguments.iter() {
-                                        arguments.push(argument.clone().close()?);
+                                        arguments.push(argument.clone().close(tracker)?);
                                     }
                                     Callable(CallableConstraint {
                                         arguments,
-                                        retrn: callable.retrn.clone().close()?,
+                                        retrn: callable.retrn.clone().close(tracker)?,
                                     })
                                 }
                                 other @ _ => unreachable!("Cannot close constraint: {:?}", other),
@@ -226,7 +229,7 @@ impl Closable for Type {
                     // Substitutions can be unboxed into the underlying type.
                     // Note the `close()` to recursively resolve nested
                     // substitutions.
-                    Variable::Substitute(typ) => Ok(typ.clone().close()?),
+                    Variable::Substitute(typ) => Ok(typ.clone().close(tracker)?),
                     Variable::Unbound { id } => {
                         // panic!("Unexpected unbound: {}", id);
                         // Err(TypeError::UnexpectedUnbound { id: *id })
@@ -466,6 +469,20 @@ impl Variable {
         match self {
             Variable::Unbound { .. } => true,
             _ => false,
+        }
+    }
+
+    pub fn unwrap_generic(&self) -> &Generic {
+        match self {
+            Variable::Generic(generic) => generic,
+            other @ _ => unreachable!("Not a Generic: {:?}", other),
+        }
+    }
+
+    pub fn unwrap_mut_generic(&mut self) -> &mut Generic {
+        match self {
+            Variable::Generic(generic) => generic,
+            other @ _ => unreachable!("Not a Generic: {:?}", other),
         }
     }
 }
