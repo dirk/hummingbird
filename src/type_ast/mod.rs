@@ -526,23 +526,25 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
     })
 }
 
-/// We cannot handle types which are directly self-recursive (indirect is
-/// okay since that's handle by substitution at the type-phase and pointers
-/// at the codegen-phase), therefore we need to keep track of which types
-/// we've seen when closing to ensure we don't close the same type twice.
-struct RecursionTracker(HashSet<usize>);
+/// To safely handle recursive types we must register forward declarations
+/// of types while closing them. That way when reclosing the same type we
+/// return the forward declaration rather than actually closing again.
+struct RecursionTracker(HashMap<usize, Type>);
 
 impl RecursionTracker {
     pub fn new() -> Self {
-        Self(HashSet::new())
+        Self(HashMap::new())
     }
 
-    pub fn track(&mut self, id: &usize) -> TypeResult<()> {
-        if self.0.contains(id) {
-            return Err(TypeError::RecursiveType { id: *id });
+    pub fn check(&self, id: &usize) -> Option<Type> {
+        if let Some(known) = self.0.get(id) {
+            return Some(known.clone());
         }
-        self.0.insert(*id);
-        Ok(())
+        None
+    }
+
+    pub fn add(&mut self, id: usize, typ: Type) {
+        self.0.insert(id, typ);
     }
 }
 

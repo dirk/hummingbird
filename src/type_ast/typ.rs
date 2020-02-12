@@ -16,10 +16,13 @@ pub fn next_uid() -> usize {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    // A callable function.
+    /// A callable function.
     Func(Rc<Func>),
-    // A generic defined by the user; it is fixed and cannot be mutated.
-    Generic(Rc<Generic>),
+    /// A generic defined by the user; it is fixed and cannot be mutated.
+    ///
+    /// It is *only* mutable in order to support forward declaration. We need
+    /// to build a shareable `Rc` before we actually know the closed type.
+    Generic(Rc<RefCell<Generic>>),
     Object(Rc<Object>),
     // Used to make writing tests easier.
     Phantom { id: usize },
@@ -89,7 +92,7 @@ impl Type {
         use Type::*;
         match self {
             Func(func) => func.id,
-            Generic(generic) => generic.id,
+            Generic(generic) => generic.borrow().id,
             Object(object) => object.id,
             Phantom { id } => *id,
             Tuple(tuple) => tuple.id,
@@ -116,7 +119,7 @@ impl Type {
                         None
                     }
                     Variable::Unbound { .. } => {
-                        let generic = Type::Generic(Rc::new(Generic::new()));
+                        let generic = Type::Generic(Rc::new(RefCell::new(Generic::new())));
                         // Use a substitution so that any substitutions of this
                         // variable are followed to the *same* generic. We
                         // should never have multiple generics (or any type for
@@ -135,33 +138,107 @@ impl Type {
         }
     }
 
-    pub fn close_func(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
-        match self {
-            Type::Func(func) => {
-                let func = &*func;
-                let mut arguments = vec![];
-                let retrn = *func.retrn.clone();
-                // First convert any unbound (ie. unused) arguments into open
-                // generics. We need to do this in one pass in case earlier
-                // arguments depend on later ones.
-                for argument in func.arguments.iter() {
-                    argument.genericize()?;
-                }
-                retrn.genericize()?;
-                // Then close the arguments and return.
-                for argument in func.arguments.iter() {
-                    arguments.push(argument.clone().close(tracker)?);
-                }
-                let retrn = retrn.close(tracker)?;
-                Ok(Type::Func(Rc::new(Func {
-                    id: func.id,
-                    name: func.name.clone(),
-                    arguments,
-                    retrn: Box::new(retrn),
-                })))
-            }
+    fn close_func(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+        let func = match self {
+            Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
+        };
+        let mut arguments = vec![];
+        let retrn = *func.retrn.clone();
+        // First convert any unbound (ie. unused) arguments into open
+        // generics. We need to do this in one pass in case earlier
+        // arguments depend on later ones.
+        for argument in func.arguments.iter() {
+            argument.genericize()?;
         }
+        retrn.genericize()?;
+        // Then close the arguments and return.
+        for argument in func.arguments.iter() {
+            arguments.push(argument.clone().close(tracker)?);
+        }
+        let retrn = retrn.close(tracker)?;
+        Ok(Type::Func(Rc::new(Func {
+            id: func.id,
+            name: func.name.clone(),
+            arguments,
+            retrn: Box::new(retrn),
+        })))
+    }
+
+    fn close_variable(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+        let variable = match self {
+            Type::Variable(variable) => variable,
+            other @ _ => unreachable!("Called close_variable on non-Variable: {:?}", other),
+        };
+        // Uncomment to see types pre-closing:
+        //   return Ok(Type::Variable(variable));
+        let replacement = match &*variable.borrow() {
+            Variable::Generic(open) => {
+                // Check if the generic is already being built
+                // (recursive types), otherwise register the forward
+                // declaration.
+                if let Some(known) = tracker.check(&open.id) {
+                    return Ok(known);
+                }
+                let closed = Rc::new(RefCell::new(Generic::new()));
+                // Note that we register with the old open generic's ID
+                // since that's what's going to be in any nested types
+                // that haven't been closed yet.
+                tracker.add(open.id, Type::Generic(closed.clone()));
+
+                // let mut constraints = vec![];
+                for constraint in open.constraints.iter() {
+                    use GenericConstraint::*;
+                    let mut mutable = closed.borrow_mut();
+                    match constraint {
+                        Property(property) => mutable.add_property_constraint(
+                            property.name.clone(),
+                            property.typ.clone().close(tracker)?,
+                        ),
+                        Callable(callable) => {
+                            let mut arguments = vec![];
+                            for argument in callable.arguments.iter() {
+                                arguments.push(argument.clone().close(tracker)?);
+                            }
+                            mutable.add_callable_constraint(
+                                arguments,
+                                callable.retrn.clone().close(tracker)?,
+                            )
+                        }
+                        other @ _ => unreachable!("Cannot close constraint: {:?}", other),
+                    }
+                }
+                // Use substitution so that other uses will be updated.
+                Some(Variable::Substitute(Box::new(Type::Generic(closed))))
+            }
+            // Turn unbounds into closed-but-unconstrained generics.
+            // If that's incorrect it will be caught by codegen.
+            Variable::Unbound { .. } => {
+                let closed = Generic::new();
+                // Use substitution so that other uses will be updated.
+                Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
+                    RefCell::new(closed),
+                )))))
+            }
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            let mut mutable = variable.borrow_mut();
+            *mutable = replacement;
+        }
+        let result = match &*variable.borrow() {
+            Variable::Generic(_) => unreachable!("Generic should have been replaced"),
+            // Substitutions can be unboxed into the underlying type.
+            // Note the `close()` to recursively resolve nested
+            // substitutions.
+            Variable::Substitute(typ) => Ok(typ.clone().close(tracker)?),
+            Variable::Unbound { id } => {
+                // panic!("Unexpected unbound: {}", id);
+                // Err(TypeError::UnexpectedUnbound { id: *id })
+                unreachable!("Unbound should have been replaced: {}", id)
+            }
+        };
+        result
     }
 }
 
@@ -174,69 +251,7 @@ impl Closable for Type {
     fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
         match self {
             Type::Func(_) => self.close_func(tracker),
-            Type::Variable(variable) => {
-                // Uncomment to see types pre-closing:
-                //   return Ok(Type::Variable(variable));
-                let replacement = match &*variable.borrow() {
-                    Variable::Generic(open) => {
-                        // Open generics are a hotspot for direct type
-                        // recursion which we cannot handle.
-                        tracker.track(&open.id)?;
-                        let mut constraints = vec![];
-                        for constraint in open.constraints.iter() {
-                            use GenericConstraint::*;
-                            constraints.push(match constraint {
-                                Property(property) => Property(PropertyConstraint {
-                                    name: property.name.clone(),
-                                    typ: property.typ.clone().close(tracker)?,
-                                }),
-                                Callable(callable) => {
-                                    let mut arguments = vec![];
-                                    for argument in callable.arguments.iter() {
-                                        arguments.push(argument.clone().close(tracker)?);
-                                    }
-                                    Callable(CallableConstraint {
-                                        arguments,
-                                        retrn: callable.retrn.clone().close(tracker)?,
-                                    })
-                                }
-                                other @ _ => unreachable!("Cannot close constraint: {:?}", other),
-                            })
-                        }
-                        let closed = Generic::new_with_constraints(constraints);
-                        // Use substitution so that other uses will be updated.
-                        Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
-                            closed,
-                        )))))
-                    }
-                    // Turn unbounds into closed-but-unconstrained generics.
-                    // If that's incorrect it will be caught by codegen.
-                    Variable::Unbound { .. } => {
-                        let closed = Generic::new();
-                        // Use substitution so that other uses will be updated.
-                        Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
-                            closed,
-                        )))))
-                    }
-                    _ => None,
-                };
-                if let Some(replacement) = replacement {
-                    let mut mutable = variable.borrow_mut();
-                    *mutable = replacement;
-                }
-                match &*variable.borrow() {
-                    Variable::Generic(_) => unreachable!("Generic should have been replaced"),
-                    // Substitutions can be unboxed into the underlying type.
-                    // Note the `close()` to recursively resolve nested
-                    // substitutions.
-                    Variable::Substitute(typ) => Ok(typ.clone().close(tracker)?),
-                    Variable::Unbound { id } => {
-                        // panic!("Unexpected unbound: {}", id);
-                        // Err(TypeError::UnexpectedUnbound { id: *id })
-                        unreachable!("Unbound should have been replaced: {}", id)
-                    }
-                }
-            }
+            Type::Variable(_) => self.close_variable(tracker),
             other @ _ => Ok(other),
         }
     }

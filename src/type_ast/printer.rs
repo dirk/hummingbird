@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::fmt;
 use std::io::{BufWriter, Bytes, Result, Write};
 
@@ -83,12 +84,26 @@ impl<O: Write> Printer<O> {
     }
 
     fn write_type(&self, typ: &Type, with_constraints: bool) -> Result<()> {
+        self.write_recursive_type(typ, with_constraints, &mut HashSet::new())
+    }
+
+    // Write type recursively with guards against infinite recursion.
+    fn write_recursive_type(
+        &self,
+        typ: &Type,
+        with_constraints: bool,
+        tracker: &mut HashSet<usize>,
+    ) -> Result<()> {
+        // True if we're writing a type we've written before.
+        let recursive = !tracker.insert(typ.id());
+
         match typ {
             Type::Object(object) => self.write(format!("{}", object.class.name())),
-            Type::Generic(generic) => {
-                self.write(format!("${} @ {:p}", generic.id, *generic))?;
-                if with_constraints {
-                    self.indented(|this| this.write_constraints(&generic.constraints))?;
+            Type::Generic(outer) => {
+                let generic = outer.borrow();
+                self.write(format!("${} @ {:p}", generic.id, *outer))?;
+                if with_constraints && !recursive {
+                    self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
                 }
                 Ok(())
             }
@@ -97,7 +112,11 @@ impl<O: Write> Printer<O> {
                 match variable {
                     Variable::Substitute(substitution) => {
                         self.write("S(")?;
-                        self.write_type(&*substitution, with_constraints)?;
+                        if recursive {
+                            self.write("...")?;
+                        } else {
+                            self.write_type(&*substitution, with_constraints)?;
+                        }
                         self.write(format!(") @ {:p}", substitution))
                     }
                     Variable::Unbound { id } => self.write(format!("U({}) @ {:p}", id, variable)),
@@ -105,8 +124,10 @@ impl<O: Write> Printer<O> {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
                         self.write(format!(") @ {:p}", generic))?;
-                        if with_constraints {
-                            self.indented(|this| this.write_constraints(&generic.constraints))?;
+                        if with_constraints && !recursive {
+                            self.indented(|this| {
+                                this.write_constraints(&generic.constraints, tracker)
+                            })?;
                         }
                         Ok(())
                     }
@@ -116,7 +137,11 @@ impl<O: Write> Printer<O> {
         }
     }
 
-    fn write_constraints(&self, constraints: &Vec<GenericConstraint>) -> Result<()> {
+    fn write_constraints(
+        &self,
+        constraints: &Vec<GenericConstraint>,
+        tracker: &mut HashSet<usize>,
+    ) -> Result<()> {
         if constraints.is_empty() {
             return Ok(());
         }
@@ -127,7 +152,7 @@ impl<O: Write> Printer<O> {
                 match constraint {
                     Property(property) => {
                         this1.lnwrite(format!("{}: ", property.name))?;
-                        this1.write_type(&property.typ, true)?;
+                        this1.write_recursive_type(&property.typ, true, tracker)?;
                     }
                     Callable(callable) => {
                         if callable.arguments.is_empty() {
@@ -137,13 +162,13 @@ impl<O: Write> Printer<O> {
                             for argument in callable.arguments.iter() {
                                 this1.indented(|this2| {
                                     this2.iwrite("")?;
-                                    this2.write_type(argument, true)?;
+                                    this2.write_recursive_type(argument, true, tracker)?;
                                     this2.write(",")
                                 })?;
                             }
                             this1.lnwrite("): ")?;
                         }
-                        this1.write_type(&callable.retrn, true)?;
+                        this1.write_recursive_type(&callable.retrn, true, tracker)?;
                     }
                 }
             }
