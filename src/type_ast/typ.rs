@@ -16,8 +16,11 @@ pub fn next_uid() -> usize {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    /// A callable function.
-    Func(Rc<Func>),
+    /// A callable function; it is fixed and cannot be mutated.
+    ///
+    /// It is *only* mutable in order to support forward declaration. We need
+    /// a shareable `Rc` before we know the closed argument and return types.
+    Func(Rc<RefCell<Func>>),
     /// A generic defined by the user; it is fixed and cannot be mutated.
     ///
     /// It is *only* mutable in order to support forward declaration. We need
@@ -25,7 +28,9 @@ pub enum Type {
     Generic(Rc<RefCell<Generic>>),
     Object(Rc<Object>),
     // Used to make writing tests easier.
-    Phantom { id: usize },
+    Phantom {
+        id: usize,
+    },
     Tuple(Tuple),
     // A type whose entire identity can change.
     Variable(Rc<RefCell<Variable>>),
@@ -48,12 +53,12 @@ impl PartialEq for Type {
 
 impl Type {
     pub fn new_func(name: Option<String>, arguments: Vec<Type>, retrn: Type) -> Self {
-        Type::Func(Rc::new(Func {
+        Type::Func(Rc::new(RefCell::new(Func {
             id: next_uid(),
             name,
             arguments,
             retrn: Box::new(retrn),
-        }))
+        })))
     }
 
     pub fn new_object(class: Class) -> Self {
@@ -88,10 +93,39 @@ impl Type {
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
+    /// Returns a Some(arguments, retrn) if the type is some kind of callable
+    /// (func or callable generic constraint).
+    pub fn maybe_callable(&self) -> Option<(Vec<Type>, Type)> {
+        fn generic_to_callable(generic: &Generic) -> Option<(Vec<Type>, Type)> {
+            generic
+                .get_callable()
+                .map(|constraint| (constraint.arguments.clone(), constraint.retrn.clone()))
+        }
+
+        match self {
+            Type::Func(func) => {
+                let func = &*func.borrow();
+                Some((func.arguments.clone(), (*func.retrn).clone()))
+            }
+            Type::Generic(generic) => {
+                let generic = &*generic.borrow();
+                generic_to_callable(generic)
+            }
+            Type::Variable(variable) => {
+                let variable = &*variable.borrow();
+                match variable {
+                    Variable::Generic(generic) => generic_to_callable(generic),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn id(&self) -> usize {
         use Type::*;
         match self {
-            Func(func) => func.id,
+            Func(func) => func.borrow().id,
             Generic(generic) => generic.borrow().id,
             Object(object) => object.id,
             Phantom { id } => *id,
@@ -143,26 +177,38 @@ impl Type {
             Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
         };
-        let mut arguments = vec![];
-        let retrn = *func.retrn.clone();
-        // First convert any unbound (ie. unused) arguments into open
-        // generics. We need to do this in one pass in case earlier
-        // arguments depend on later ones.
-        for argument in func.arguments.iter() {
-            argument.genericize()?;
+        let id = func.borrow().id;
+        // Check if the function's already been built.
+        if let Some(known) = tracker.check(&id) {
+            return Ok(known);
         }
-        retrn.genericize()?;
-        // Then close the arguments and return.
-        for argument in func.arguments.iter() {
-            arguments.push(argument.clone().close(tracker)?);
+        tracker.add(id, Type::Func(func.clone()));
+        // Genericize and close the arguments and return types.
+        let (arguments, retrn) = {
+            let func = func.borrow();
+            let mut arguments = vec![];
+            let retrn = *func.retrn.clone();
+            // First convert any unbound (ie. unused) arguments into open
+            // generics. We need to do this in one pass in case earlier
+            // arguments depend on later ones.
+            for argument in func.arguments.iter() {
+                argument.genericize()?;
+            }
+            retrn.genericize()?;
+            // Then close the arguments and return.
+            for argument in func.arguments.iter() {
+                arguments.push(argument.clone().close(tracker)?);
+            }
+            let retrn = retrn.close(tracker)?;
+            (arguments, retrn)
+        };
+        // Then write them back to the function to make it closed.
+        {
+            let mut mutable = func.borrow_mut();
+            mutable.arguments = arguments;
+            mutable.retrn = Box::new(retrn);
         }
-        let retrn = retrn.close(tracker)?;
-        Ok(Type::Func(Rc::new(Func {
-            id: func.id,
-            name: func.name.clone(),
-            arguments,
-            retrn: Box::new(retrn),
-        })))
+        Ok(Type::Func(func))
     }
 
     fn close_variable(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
@@ -174,9 +220,8 @@ impl Type {
         //   return Ok(Type::Variable(variable));
         let replacement = match &*variable.borrow() {
             Variable::Generic(open) => {
-                // Check if the generic is already being built
-                // (recursive types), otherwise register the forward
-                // declaration.
+                // Check if the generic is already being built (dealing with
+                // recursive types), otherwise add the forward declaration.
                 if let Some(known) = tracker.check(&open.id) {
                     return Ok(known);
                 }
@@ -185,8 +230,8 @@ impl Type {
                 // since that's what's going to be in any nested types
                 // that haven't been closed yet.
                 tracker.add(open.id, Type::Generic(closed.clone()));
-
-                // let mut constraints = vec![];
+                // Copy the constraints from the open to the closed generics,
+                // closing their types along the way.
                 for constraint in open.constraints.iter() {
                     use GenericConstraint::*;
                     let mut mutable = closed.borrow_mut();

@@ -176,21 +176,49 @@ fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult
         arguments.push(translate_expression(argument, scope.clone())?);
     }
 
-    // The return type of the callable.
-    let retrn = Type::new_unbound();
+    let retrn = {
+        // If the target is already a callable then unify directly instead of
+        // through a constraint.
+        if let Some((target_arguments, target_retrn)) = target.typ().maybe_callable() {
+            let call_arguments = arguments
+                .iter()
+                .map(|argument| argument.typ().clone())
+                .collect::<Vec<_>>();
+            if target_arguments.len() != call_arguments.len() {
+                return Err(TypeError::ArgumentLengthMismatch {
+                    expected: target_arguments,
+                    got: call_arguments,
+                });
+            }
+            for (target_argument, call_argument) in
+                target_arguments.iter().zip(call_arguments.iter())
+            {
+                unify(target_argument, call_argument)?;
+            }
+            // If the arguments unified then the return type is good.
+            target_retrn
 
-    let mut generic = Generic::new();
-    generic.add_callable_constraint(
-        arguments
-            .iter()
-            .map(|argument| argument.typ().clone())
-            .collect::<Vec<_>>(),
-        retrn.clone(),
-    );
-    // Unify to ensure target supports being called with the arguments and
-    // return types.
-    let intermediary = Type::new_variable(Variable::Generic(generic));
-    unify(target.typ(), &intermediary).map_err(|err| err.with_span(pcall.span.clone()))?;
+        // Otherwise build a callable generic constraint as an intermediary
+        // and unify through that.
+        } else {
+            // The return type of the callable.
+            let retrn = Type::new_unbound();
+
+            let mut generic = Generic::new();
+            generic.add_callable_constraint(
+                arguments
+                    .iter()
+                    .map(|argument| argument.typ().clone())
+                    .collect::<Vec<_>>(),
+                retrn.clone(),
+            );
+            // Unify to ensure target supports being called with the arguments and
+            // return types.
+            let intermediary = Type::new_variable(Variable::Generic(generic));
+            unify(target.typ(), &intermediary).map_err(|err| err.with_span(pcall.span.clone()))?;
+            retrn
+        }
+    };
 
     Ok(PostfixCall {
         target: Box::new(target),
@@ -242,7 +270,7 @@ pub enum TypeError {
         expected: Type,
         got: Type,
     },
-    ArgumentsMismatch {
+    ArgumentLengthMismatch {
         expected: Vec<Type>,
         got: Vec<Type>,
     },
@@ -284,7 +312,7 @@ impl TypeError {
             // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
             CannotUnify { .. } => "CannotUnify",
             TypeMismatch { .. } => "TypeMismatch",
-            ArgumentsMismatch { .. } => "ArgumentsMismatch",
+            ArgumentLengthMismatch { .. } => "ArgumentLengthMismatch",
             RecursiveType { .. } => "RecursiveType",
             UnexpectedUnbound { .. } => "UnexpectedUnbound",
             WithSpan { .. } => unreachable!(),
@@ -378,7 +406,7 @@ pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic)
                 Callable(source_callable) => {
                     if let Some(destination_callable) = destination.get_callable() {
                         if destination_callable.arguments.len() != source_callable.arguments.len() {
-                            return Err(TypeError::ArgumentsMismatch {
+                            return Err(TypeError::ArgumentLengthMismatch {
                                 expected: destination_callable.arguments.clone(),
                                 got: source_callable.arguments.clone(),
                             });
@@ -503,19 +531,28 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
 
     match (typ1, typ2) {
         (Type::Func(func1), Type::Func(func2)) => {
-            if func1.arity() != func2.arity() {
-                return Err(TypeError::TypeMismatch {
-                    expected: typ1.clone(),
-                    got: typ2.clone(),
-                });
-            }
+            let (func1_arguments, func1_return, func2_arguments, func2_return) = {
+                let func1 = func1.borrow();
+                let func2 = func2.borrow();
+                if func1.arity() != func2.arity() {
+                    return Err(TypeError::TypeMismatch {
+                        expected: typ1.clone(),
+                        got: typ2.clone(),
+                    });
+                }
+                (
+                    func1.arguments.clone(),
+                    (*func1.retrn).clone(),
+                    func2.arguments.clone(),
+                    (*func2.retrn).clone(),
+                )
+            };
             for (func1_argument, func2_argument) in
-                func1.arguments.iter().zip(func2.arguments.iter())
+                func1_arguments.iter().zip(func2_arguments.iter())
             {
                 unify(func1_argument, func2_argument)?;
             }
-            // return unify(&*func1.retrn, &*func2.retrn);
-            return Ok(());
+            return unify(&func1_return, &func2_return);
         }
         _ => (),
     }

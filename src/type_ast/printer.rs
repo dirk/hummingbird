@@ -72,41 +72,63 @@ impl<O: Write> Printer<O> {
             })?;
         }
         self.iwrite("): ")?;
-        let typ = match &func.typ {
-            Type::Func(func) => &**func,
+        let retrn = match &func.typ {
+            Type::Func(func) => (*func.borrow().retrn).clone(),
             other @ _ => unreachable!("Func node has non-Func type: {:?}", other),
         };
-        self.write_type(&*typ.retrn, false)?;
+        self.write_type(&retrn, false)?;
         self.write(" ")?;
         match &func.body {
             FuncBody::Block(block) => self.print_block(block, false),
         }
     }
 
-    fn write_type(&self, typ: &Type, with_constraints: bool) -> Result<()> {
-        self.write_recursive_type(typ, with_constraints, &mut HashSet::new())
+    fn write_type(&self, typ: &Type, with_children: bool) -> Result<()> {
+        self.write_recursive_type(typ, with_children, &mut HashSet::new())
     }
 
     // Write type recursively with guards against infinite recursion.
     fn write_recursive_type(
         &self,
         typ: &Type,
-        with_constraints: bool,
+        with_children: bool,
         tracker: &mut HashSet<usize>,
     ) -> Result<()> {
         // True if we're writing a type we've written before.
         let recursive = !tracker.insert(typ.id());
 
         match typ {
+            Type::Func(func) => {
+                let func = func.borrow();
+                self.write(format!("{}(", func.name.clone().unwrap_or("".to_string()),))?;
+                if !func.arguments.is_empty() {
+                    if with_children {
+                        for argument in func.arguments.iter() {
+                            self.indented(|this1| {
+                                this1.lnwrite("")?;
+                                this1.write_recursive_type(argument, true, tracker)?;
+                                this1.write(",")
+                            })?;
+                        }
+                        self.lnwrite(")")?;
+                    } else {
+                        self.write(format!("{})", func.arguments.len()))?;
+                    }
+                } else {
+                    self.write(")")?;
+                }
+                self.write(format!(" @ {}({:p})", func.id, &*func,))
+            }
             Type::Object(object) => self.write(format!("{}", object.class.name())),
             Type::Generic(outer) => {
                 let generic = outer.borrow();
                 self.write(format!("${} @ {:p}", generic.id, *outer))?;
-                if with_constraints && !recursive {
+                if with_children && !recursive {
                     self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
                 }
                 Ok(())
             }
+            Type::Tuple(tuple) => self.write(format!("({})", tuple.members.len())),
             Type::Variable(variable) => {
                 let variable = &*variable.borrow();
                 match variable {
@@ -115,7 +137,7 @@ impl<O: Write> Printer<O> {
                         if recursive {
                             self.write("...")?;
                         } else {
-                            self.write_type(&*substitution, with_constraints)?;
+                            self.write_type(&*substitution, with_children)?;
                         }
                         self.write(format!(") @ {:p}", substitution))
                     }
@@ -124,7 +146,7 @@ impl<O: Write> Printer<O> {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
                         self.write(format!(") @ {:p}", generic))?;
-                        if with_constraints && !recursive {
+                        if with_children && !recursive {
                             self.indented(|this| {
                                 this.write_constraints(&generic.constraints, tracker)
                             })?;
@@ -156,7 +178,7 @@ impl<O: Write> Printer<O> {
                     }
                     Callable(callable) => {
                         if callable.arguments.is_empty() {
-                            this1.lnwrite("(...): ")?;
+                            this1.lnwrite("(): ")?;
                         } else {
                             this1.lnwrite("(\n")?;
                             for argument in callable.arguments.iter() {
@@ -239,9 +261,18 @@ impl<O: Write> Printer<O> {
     fn print_postfix_call(&self, call: &PostfixCall, current: u8) -> Result<u8> {
         let max = self.print_postfix_target(&*call.target, current)?;
         // Have a +1 so that we always indent at least one step.
-        self.indented_steps(max - current + 1, |this| {
-            this.lnwrite(format!("Call(...): "))?;
-            this.write_type(&call.typ, false)
+        self.indented_steps(max - current + 1, |this1| {
+            this1.lnwrite(format!("Call("))?;
+            if !call.arguments.is_empty() {
+                for argument in call.arguments.iter() {
+                    this1.indented(|this2| {
+                        this2.print_expression(argument)?;
+                        this2.write(",")
+                    })?;
+                }
+            }
+            this1.write("): ")?;
+            this1.write_type(&call.typ, false)
         })?;
         Ok(max)
     }
