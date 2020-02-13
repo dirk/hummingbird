@@ -532,6 +532,13 @@ impl Variable {
         }
     }
 
+    pub fn unwrap_substitute(&self) -> &Type {
+        match self {
+            Variable::Substitute(substitute) => &**substitute,
+            other @ _ => unreachable!("Not a Substitute: {:?}", other),
+        }
+    }
+
     pub fn unwrap_generic(&self) -> &Generic {
         match self {
             Variable::Generic(generic) => generic,
