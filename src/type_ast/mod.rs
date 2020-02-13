@@ -61,6 +61,9 @@ pub enum TypeError {
     UnexpectedUnbound {
         id: usize,
     },
+    InternalError {
+        message: String,
+    },
     WithSpan {
         wrapped: Box<TypeError>,
         span: Span,
@@ -95,6 +98,7 @@ impl TypeError {
             ArgumentLengthMismatch { .. } => "ArgumentLengthMismatch",
             RecursiveType { .. } => "RecursiveType",
             UnexpectedUnbound { .. } => "UnexpectedUnbound",
+            InternalError { .. } => "InternalError",
             WithSpan { .. } => unreachable!(),
         };
         message.to_string()
@@ -102,13 +106,13 @@ impl TypeError {
 
     pub fn label_message(&self) -> String {
         use TypeError::*;
-        let message = match self.unwrap() {
-            CannotUnify { .. } => "Trying to unify here",
-            TypeMismatch { .. } => "Mismatch occurred here",
+        match self.unwrap() {
+            CannotUnify { .. } => "Trying to unify here".to_string(),
+            TypeMismatch { .. } => "Mismatch occurred here".to_string(),
+            InternalError { message } => message.clone(),
             WithSpan { .. } => unreachable!(),
-            _ => "Here",
-        };
-        message.to_string()
+            _ => "Here".to_string(),
+        }
     }
 
     pub fn span(&self) -> Option<Span> {
@@ -144,7 +148,7 @@ impl TypeError {
 /// To safely handle recursive types we must register forward declarations
 /// of types while closing them. That way when reclosing the same type we
 /// return the forward declaration rather than actually closing again.
-struct RecursionTracker(HashMap<usize, Type>);
+pub struct RecursionTracker(HashMap<usize, Type>);
 
 impl RecursionTracker {
     pub fn new() -> Self {

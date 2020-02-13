@@ -8,7 +8,7 @@ use super::{TypeError, TypeResult};
 fn unwrap_variable(typ: &Type) -> &Rc<RefCell<Variable>> {
     match typ {
         Type::Variable(variable) => variable,
-        other @ _ => unreachable!("Not a variable type: {:?}", other),
+        other @ _ => unreachable!("Not a Variable: {:?}", other),
     }
 }
 
@@ -153,10 +153,7 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
                 // If both types are variable generics then first merge the
                 // right into the left.
                 {
-                    let generic = Ref::map(var2.borrow(), |variable| match variable {
-                        Variable::Generic(generic) => generic,
-                        _ => unreachable!(),
-                    });
+                    let generic = Ref::map(var2.borrow(), Variable::unwrap_generic);
                     unify_variable_generic_with_generic(typ1, &generic)?;
                 }
                 // Then make the right a substitute for the left.

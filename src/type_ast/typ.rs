@@ -55,6 +55,7 @@ impl Type {
     pub fn new_func(name: Option<String>, arguments: Vec<Type>, retrn: Type) -> Self {
         Type::Func(Rc::new(RefCell::new(Func {
             id: next_uid(),
+            closed: false,
             name,
             arguments,
             retrn: Box::new(retrn),
@@ -163,8 +164,8 @@ impl Type {
                     _ => None,
                 };
                 if let Some(replacement) = replacement {
-                    let mut inner = variable.borrow_mut();
-                    *inner = Variable::Substitute(Box::new(replacement));
+                    let mut mutable = variable.borrow_mut();
+                    *mutable = Variable::Substitute(Box::new(replacement));
                 }
                 Ok(())
             }
@@ -172,12 +173,23 @@ impl Type {
         }
     }
 
-    fn close_func(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
-        let func = match self {
+    /// Functions are a special semi-variable type that should only be closed
+    /// once. To enforce that this checks (and sets) the `closed` field of the
+    /// `Func` it closes.
+    pub fn close_func(typ: Type, tracker: &mut RecursionTracker) -> TypeResult<Type> {
+        let func = match typ {
             Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
         };
-        let id = func.borrow().id;
+        let (id, closed) = {
+            let func = func.borrow();
+            (func.id, func.closed)
+        };
+        if closed {
+            return Err(TypeError::InternalError {
+                message: format!("Func has already been closed: {}", id),
+            });
+        }
         // Check if the function's already been built.
         if let Some(known) = tracker.check(&id) {
             return Ok(known);
@@ -205,14 +217,15 @@ impl Type {
         // Then write them back to the function to make it closed.
         {
             let mut mutable = func.borrow_mut();
+            mutable.closed = true;
             mutable.arguments = arguments;
             mutable.retrn = Box::new(retrn);
         }
         Ok(Type::Func(func))
     }
 
-    fn close_variable(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
-        let variable = match self {
+    fn close_variable(typ: Type, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+        let variable = match typ {
             Type::Variable(variable) => variable,
             other @ _ => unreachable!("Called close_variable on non-Variable: {:?}", other),
         };
@@ -288,15 +301,11 @@ impl Type {
 }
 
 impl Closable for Type {
-    /// When unification is done we need to turn all the `Variable` types into
-    /// closed, fixed types.
-    ///
-    /// TODO: Make closed types a separate type so that we get compile-time
-    ///   guarantees that we're only working with a closed type.
+    /// When translation and unification is done we need to turn all the
+    /// `Variable` types into closed, fixed types.
     fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
         match self {
-            Type::Func(_) => self.close_func(tracker),
-            Type::Variable(_) => self.close_variable(tracker),
+            Type::Variable(_) => Type::close_variable(self, tracker),
             other @ _ => Ok(other),
         }
     }
@@ -305,6 +314,7 @@ impl Closable for Type {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub id: usize,
+    pub closed: bool,
     // Included for debugging.
     pub name: Option<String>,
     pub arguments: Vec<Type>,

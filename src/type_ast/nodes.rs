@@ -32,9 +32,11 @@ pub struct Func {
 
 impl Closable for Func {
     fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
-        // Close the type first since that does important unbound-to-generic
-        // auto-conversion.
-        let typ = self.typ.close(tracker)?;
+        // We call `close_func` directly here since that does extra work:
+        //   - It closes the `Func` type. This should only be closed once so
+        //     there are special checks for it.
+        //   - It does unbound-to-generic auto-conversion.
+        let typ = Type::close_func(self.typ, tracker)?;
         let mut arguments = vec![];
         for argument in self.arguments {
             arguments.push(FuncArgument {
