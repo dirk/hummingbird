@@ -10,12 +10,15 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
     let mut statements = vec![];
     for pstatement in pmodule.statements.into_iter() {
         let statement = match pstatement {
-            past::ModuleStatement::Func(pfunc) => ModuleStatement::Func(
-                translate_func(pfunc, scope.clone())?.close(&mut RecursionTracker::new())?,
-            ),
+            past::ModuleStatement::Func(pfunc) => {
+                ModuleStatement::Func(translate_func(pfunc, scope.clone())?)
+            }
             _ => unreachable!(),
         };
         statements.push(statement);
+        // NOTE: Closing should already be done within the translation of every
+        //   module-level statement:
+        // statements.push(statement.close(&mut RecursionTracker::new(), scope.clone())?);
     }
 
     // Now that we've translated the whole module we can close all of the
@@ -25,13 +28,14 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
     //     closed_statements.push(statement.close(&mut RecursionTracker::new())?);
     // }
 
-    Ok(Module {
-        statements,
-    })
+    Ok(Module { statements })
 }
 
 fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
     let name = pfunc.name.name.clone();
+    // The scope that the function's arguments and body will be evaluated in.
+    let func_scope = FuncScope::new(Some(scope.clone())).into_scope();
+
     // Build the `FuncArgument` nodes ahead of time so that they have types
     // in place.
     let arguments_nodes = pfunc
@@ -40,7 +44,7 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
         .map(|argument| FuncArgument {
             name: argument.name.clone(),
             // TODO: Support argument type definitions.
-            typ: Type::new_unbound(),
+            typ: Type::new_unbound(func_scope.clone()),
         })
         .collect::<Vec<_>>();
 
@@ -50,15 +54,19 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
         .iter()
         .map(|argument| argument.typ.clone())
         .collect::<Vec<_>>();
-    let retrn = Type::new_unbound();
+    let retrn = Type::new_unbound(func_scope.clone());
 
-    let func_scope = FuncScope::new(Some(scope.clone())).into_scope();
     for argument_node in arguments_nodes.iter() {
         func_scope.add_local(&argument_node.name, argument_node.typ.clone())?;
     }
     // Build a forward declaration for the recursive call and add it to
     // the function's scope.
-    let typ = Type::new_func(Some(name.clone()), arguments.clone(), retrn.clone());
+    let typ = Type::new_func(
+        Some(name.clone()),
+        arguments.clone(),
+        retrn.clone(),
+        func_scope.clone(),
+    );
     func_scope.add_local(&name, typ.clone())?;
 
     let body = match pfunc.body {
@@ -68,7 +76,7 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
     };
 
     let implicit_retrn = body.typ();
-    unify(&retrn, &implicit_retrn)?;
+    unify(&retrn, &implicit_retrn, func_scope.clone())?;
 
     // Add the function to its defining scope.
     scope.add_local(&name, typ.clone())?;
@@ -77,9 +85,10 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
         name: name.clone(),
         arguments: arguments_nodes,
         body,
-        scope: func_scope,
+        scope: func_scope.clone(),
         typ,
-    })
+    }
+    .close(&mut RecursionTracker::new(), func_scope)?)
 }
 
 fn translate_block(pblock: past::Block, scope: Scope) -> TypeResult<Block> {
@@ -97,7 +106,7 @@ fn translate_block(pblock: past::Block, scope: Scope) -> TypeResult<Block> {
         statements.push(statement);
     }
     let typ = if statements.is_empty() {
-        Type::new_empty_tuple()
+        Type::new_empty_tuple(scope)
     } else {
         statements.last().unwrap().typ()
     };
@@ -117,9 +126,9 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
         }
         past::Expression::Infix(pinfix) => {
             let lhs = translate_expression(&*pinfix.lhs, scope.clone())?;
-            let rhs = translate_expression(&*pinfix.rhs, scope)?;
+            let rhs = translate_expression(&*pinfix.rhs, scope.clone())?;
             // Left- and right-hand sides must be the same in an infix operation.
-            unify(lhs.typ(), rhs.typ())?;
+            unify(lhs.typ(), rhs.typ(), scope)?;
             let typ = rhs.typ().clone();
             Expression::Infix(Infix {
                 lhs: Box::new(lhs),
@@ -132,7 +141,7 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
             let class = Builtins::get("Int");
             Expression::LiteralInt(LiteralInt {
                 value: pliteral.value,
-                typ: Type::new_object(class),
+                typ: Type::new_object(class, scope),
             })
         }
         past::Expression::PostfixCall(pcall) => {
@@ -167,21 +176,26 @@ fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult
                     got: call_arguments,
                 });
             }
+            let mut tracker = RecursionTracker::new();
             for (target_argument, call_argument) in
                 target_arguments.iter().zip(call_arguments.iter())
             {
-                unify(target_argument, call_argument)?;
+                let open_target_argument =
+                    target_argument.open_duplicate(&mut tracker, scope.clone());
+                unify(call_argument, &open_target_argument, scope.clone())?;
             }
-            // If the arguments unified then the return type is good.
-            target_retrn
+            let call_retrn = Type::new_unbound(scope.clone());
+            let open_target_retrn = target_retrn.open_duplicate(&mut tracker, scope.clone());
+            unify(&call_retrn, &open_target_retrn, scope)?;
+            call_retrn
 
         // Otherwise build a callable generic constraint as an intermediary
         // and unify through that.
         } else {
             // The return type of the callable.
-            let retrn = Type::new_unbound();
+            let retrn = Type::new_unbound(scope.clone());
 
-            let mut generic = Generic::new();
+            let mut generic = Generic::new(scope.clone());
             generic.add_callable_constraint(
                 arguments
                     .iter()
@@ -191,8 +205,12 @@ fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult
             );
             // Unify to ensure target supports being called with the arguments and
             // return types.
-            let intermediary = Type::new_variable(Variable::Generic(generic));
-            unify(target.typ(), &intermediary).map_err(|err| err.with_span(pcall.span.clone()))?;
+            let intermediary = Type::new_variable(Variable::Generic {
+                scope: scope.clone(),
+                generic,
+            });
+            unify(target.typ(), &intermediary, scope)
+                .map_err(|err| err.with_span(pcall.span.clone()))?;
             retrn
         }
     };
@@ -211,15 +229,19 @@ fn translate_postfix_property(
     let target = translate_expression(&*pproperty.target, scope.clone())?;
 
     // The ultimate type of getting the target's property.
-    let typ = Type::new_unbound();
+    let typ = Type::new_unbound(scope.clone());
 
     // Set up a variable generic with a property constraint.
-    let mut generic = Generic::new();
+    let mut generic = Generic::new(scope.clone());
     generic.add_property_constraint(pproperty.property.name.clone(), typ.clone());
     // Apply unification to ensure the target supports having the
     // given property.
-    let intermediary = Type::new_variable(Variable::Generic(generic));
-    unify(target.typ(), &intermediary).map_err(|err| err.with_span(pproperty.span.clone()))?;
+    let intermediary = Type::new_variable(Variable::Generic {
+        scope: scope.clone(),
+        generic,
+    });
+    unify(target.typ(), &intermediary, scope)
+        .map_err(|err| err.with_span(pproperty.span.clone()))?;
 
     Ok(PostfixProperty {
         target: Box::new(target),
@@ -271,13 +293,13 @@ mod tests {
                 span: Span::unknown(),
             })),
         });
-        let foo = Type::new_unbound();
         let scope = FuncScope::new(None).into_scope();
+        let foo = Type::new_unbound(scope.clone());
         scope.add_local("foo", foo.clone())?;
-        translate_expression(&pexpression, scope).map(|_| ())?;
+        translate_expression(&pexpression, scope.clone()).map(|_| ())?;
         assert_eq!(
             foo,
-            Type::new_substitute(Type::new_object(Builtins::get("Int")))
+            Type::new_substitute(Type::new_object(Builtins::get("Int"), scope.clone()), scope)
         );
 
         Ok(())

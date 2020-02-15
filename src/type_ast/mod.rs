@@ -170,7 +170,7 @@ impl RecursionTracker {
 /// Nodes/types which consume themselves to produce a new node/type where all
 /// the types in themselves and their children have been closed.
 trait Closable {
-    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self>
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self>
     where
         Self: Sized;
 }
@@ -182,7 +182,7 @@ mod tests {
 
     use super::super::parse_ast as past;
     use super::super::parser::{Location, Span, Token, Word};
-    use super::scope::FuncScope;
+    use super::scope::{FuncScope, Scope};
     use super::{unify, Builtins, Closable, FuncBody, ScopeLike, Type, TypeError, Variable};
 
     impl Type {
@@ -194,18 +194,24 @@ mod tests {
         }
     }
 
+    fn new_scope() -> Scope {
+        FuncScope::new(None).into_scope()
+    }
+
     #[test]
     fn test_unify_unbound() -> Result<(), TypeError> {
         // Check with unbound on the left.
+        let scope = new_scope();
         let phantom = Type::new_phantom();
-        let unbound = Type::new_unbound();
-        unify(&unbound, &phantom)?;
+        let unbound = Type::new_unbound(scope.clone());
+        unify(&unbound, &phantom, scope)?;
         assert_eq!(&phantom, unbound.unwrap_variable().unwrap_substitute());
 
         // And with unbound on the right.
+        let scope = new_scope();
         let phantom = Type::new_phantom();
-        let unbound = Type::new_unbound();
-        unify(&phantom, &unbound)?;
+        let unbound = Type::new_unbound(scope.clone());
+        unify(&phantom, &unbound, scope)?;
         assert_eq!(&phantom, unbound.unwrap_variable().unwrap_substitute());
 
         Ok(())

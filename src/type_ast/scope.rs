@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Error, Formatter};
 use std::rc::Rc;
 
 use super::{Closable, RecursionTracker, Type, TypeError, TypeResult};
@@ -39,10 +40,36 @@ impl Scope {
             Module(module) => module.borrow_mut().add_local(name, typ),
         }
     }
+
+    fn get_parent(&self) -> Option<Scope> {
+        use Scope::*;
+        match self {
+            Func(func) => func.borrow().get_parent(),
+            Module(module) => module.borrow().get_parent(),
+        }
+    }
+
+    // Returns true if the other scope is a parent (or parent's parent, etc.)
+    // of this scope. Also returns true if they're the same scope.
+    pub fn within(&self, other: &Scope) -> bool {
+        let mut parent = self.clone();
+        // println!("begin within self: {:?} parent: {:?}", self, parent);
+        loop {
+            // println!("within parent: {:?} other: {:?} ==: {:?}", parent, other, &parent == other);
+            if &parent == other {
+                return true;
+            }
+            parent = if let Some(next) = parent.get_parent() {
+                next
+            } else {
+                return false;
+            }
+        }
+    }
 }
 
 impl Closable for Scope {
-    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         use Scope::*;
         Ok(match self {
             Func(shared) => {
@@ -50,7 +77,7 @@ impl Closable for Scope {
                     let func = shared.borrow();
                     let mut locals = HashMap::new();
                     for (name, typ) in func.locals.iter() {
-                        locals.insert(name.clone(), typ.clone().close(tracker)?);
+                        locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
                     FuncScope {
                         locals,
@@ -68,7 +95,7 @@ impl Closable for Scope {
                     let module = shared.borrow();
                     let mut statics = HashMap::new();
                     for (name, typ) in module.statics.iter() {
-                        statics.insert(name.clone(), typ.clone().close(tracker)?);
+                        statics.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
                     ModuleScope {
                         statics,
@@ -79,6 +106,19 @@ impl Closable for Scope {
                 Module(shared)
             }
         })
+    }
+}
+
+impl PartialEq for Scope {
+    fn eq(&self, other: &Self) -> bool {
+        use Scope::*;
+        match (self, other) {
+            (Func(self_func), Func(other_func)) => self_func.as_ptr() == other_func.as_ptr(),
+            (Module(self_module), Module(other_module)) => {
+                self_module.as_ptr() == other_module.as_ptr()
+            }
+            _ => false,
+        }
     }
 }
 
@@ -99,11 +139,12 @@ pub trait ScopeLike {
     fn get_local_as_parent(&mut self, name: &str) -> TypeResult<(Type, ParentResolution)>;
 
     fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()>;
+
+    fn get_parent(&self) -> Option<Scope>;
 }
 
-#[derive(Debug)]
 pub struct FuncScope {
-    locals: HashMap<String, Type>,
+    pub locals: HashMap<String, Type>,
     parent: Option<Scope>,
     /// Whether or not this scope captures its parent scope.
     captures: bool,
@@ -196,11 +237,20 @@ impl ScopeLike for FuncScope {
         self.locals.insert(name.to_string(), typ);
         Ok(())
     }
+
+    fn get_parent(&self) -> Option<Scope> {
+        self.parent.clone()
+    }
 }
 
-#[derive(Debug)]
+impl std::fmt::Debug for FuncScope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "FuncScope({:p})", self)
+    }
+}
+
 pub struct ModuleScope {
-    statics: HashMap<String, Type>,
+    pub statics: HashMap<String, Type>,
     captured_statics: HashSet<String>,
 }
 
@@ -245,5 +295,15 @@ impl ScopeLike for ModuleScope {
         }
         self.statics.insert(name.to_string(), typ);
         Ok(())
+    }
+
+    fn get_parent(&self) -> Option<Scope> {
+        None
+    }
+}
+
+impl std::fmt::Debug for ModuleScope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "ModuleScope({:p})", self)
     }
 }

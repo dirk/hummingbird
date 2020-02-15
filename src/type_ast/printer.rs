@@ -50,6 +50,7 @@ impl<O: Write> Printer<O> {
                 Func(func) => self.print_func(func, index == 0)?,
             }
         }
+        self.lnwrite("");
         Ok(())
     }
 
@@ -132,17 +133,19 @@ impl<O: Write> Printer<O> {
             Type::Variable(variable) => {
                 let variable = &*variable.borrow();
                 match variable {
-                    Variable::Substitute(substitution) => {
+                    Variable::Substitute { substitute, .. } => {
                         self.write("S(")?;
                         if recursive {
                             self.write("...")?;
                         } else {
-                            self.write_type(&*substitution, with_children)?;
+                            self.write_type(&*substitute, with_children)?;
                         }
-                        self.write(format!(") @ {:p}", substitution))
+                        self.write(format!(") @ {:p}", substitute))
                     }
-                    Variable::Unbound { id } => self.write(format!("U({}) @ {:p}", id, variable)),
-                    Variable::Generic(generic) => {
+                    Variable::Unbound { id, .. } => {
+                        self.write(format!("U({}) @ {:p}", id, variable))
+                    }
+                    Variable::Generic { generic, .. } => {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
                         self.write(format!(") @ {:p}", generic))?;
@@ -219,7 +222,7 @@ impl<O: Write> Printer<O> {
             Ok(())
         })?;
         self.write("\n")?;
-        self.iwrite("}\n")
+        self.iwrite("}")
     }
 
     fn print_expression(&self, expression: &Expression) -> Result<()> {

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use super::scope::Scope;
 use super::{Closable, RecursionTracker, TypeError, TypeResult};
 
 lazy_static! {
@@ -30,7 +31,7 @@ pub enum Type {
         id: usize,
     },
     Tuple(Tuple),
-    // A type whose entire identity can change.
+    /// A type whose entire identity can change.
     Variable(Rc<RefCell<Variable>>),
 }
 
@@ -50,9 +51,12 @@ impl PartialEq for Type {
 }
 
 impl Type {
-    pub fn new_func(name: Option<String>, arguments: Vec<Type>, retrn: Type) -> Self {
+    // `scope` is the scope that the function was defined in, not its own
+    // internal scope.
+    pub fn new_func(name: Option<String>, arguments: Vec<Type>, retrn: Type, scope: Scope) -> Self {
         Type::Func(Rc::new(Func {
             id: next_uid(),
+            scope,
             closed: RefCell::new(false),
             name,
             arguments: RefCell::new(arguments),
@@ -60,9 +64,10 @@ impl Type {
         }))
     }
 
-    pub fn new_object(class: Class) -> Self {
+    pub fn new_object(class: Class, scope: Scope) -> Self {
         Type::Object(Rc::new(Object {
             id: next_uid(),
+            scope,
             class,
         }))
     }
@@ -71,20 +76,27 @@ impl Type {
         Type::Phantom { id: next_uid() }
     }
 
-    pub fn new_substitute(typ: Type) -> Self {
-        let variable = Variable::Substitute(Box::new(typ));
+    pub fn new_substitute(typ: Type, scope: Scope) -> Self {
+        let variable = Variable::Substitute {
+            scope,
+            substitute: Box::new(typ),
+        };
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
-    pub fn new_empty_tuple() -> Self {
+    pub fn new_empty_tuple(scope: Scope) -> Self {
         Type::Tuple(Tuple {
             id: next_uid(),
+            scope,
             members: vec![],
         })
     }
 
-    pub fn new_unbound() -> Self {
-        let variable = Variable::Unbound { id: next_uid() };
+    pub fn new_unbound(scope: Scope) -> Self {
+        let variable = Variable::Unbound {
+            id: next_uid(),
+            scope,
+        };
         Self::new_variable(variable)
     }
 
@@ -114,7 +126,7 @@ impl Type {
             Type::Variable(variable) => {
                 let variable = &*variable.borrow();
                 match variable {
-                    Variable::Generic(generic) => generic_to_callable(generic),
+                    Variable::Generic { generic, .. } => generic_to_callable(generic),
                     _ => None,
                 }
             }
@@ -134,6 +146,68 @@ impl Type {
         }
     }
 
+    pub fn scope(&self) -> Scope {
+        use Type::*;
+        match self {
+            Func(func) => func.scope.clone(),
+            Generic(generic) => generic.borrow().scope.clone(),
+            Object(object) => object.scope.clone(),
+            Phantom { id } => unreachable!(),
+            Tuple(tuple) => tuple.scope.clone(),
+            Variable(variable) => variable.borrow().scope(),
+        }
+    }
+
+    /// Return an open (ie. variable) duplicate of oneself. Only really applies
+    /// to generics. We use this when calling functions so that unbounds don't
+    /// become substituted for closed immutable types.
+    ///
+    /// We use a `RecursionTracker` so that we can return the same duplicate
+    /// if we see it multiple times. This way links between argument and return
+    /// types are preserved.
+    pub fn open_duplicate(&self, tracker: &mut RecursionTracker, scope: Scope) -> Type {
+        if let Some(known) = tracker.check(&self.id()) {
+            return known;
+        }
+        match self {
+            Type::Generic(generic) => {
+                let constraints = generic
+                    .borrow()
+                    .constraints
+                    .iter()
+                    .map(|constraint| {
+                        use GenericConstraint::*;
+                        match constraint {
+                            Callable(callable) => {
+                                let mut arguments = vec![];
+                                for argument in callable.arguments.iter() {
+                                    arguments.push(argument.open_duplicate(tracker, scope.clone()));
+                                }
+                                Callable(CallableConstraint {
+                                    arguments,
+                                    retrn: callable.retrn.open_duplicate(tracker, scope.clone()),
+                                })
+                            }
+                            Property(property) => Property(PropertyConstraint {
+                                name: property.name.clone(),
+                                typ: property.typ.open_duplicate(tracker, scope.clone()),
+                            }),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let open = Type::Variable(Rc::new(RefCell::new(Variable::Generic {
+                    scope: scope.clone(),
+                    generic: Generic::new_with_constraints(constraints, scope),
+                })));
+                // Add the opened version to the track with the closed's ID so
+                // that it will be returned if the closed is encountered again.
+                tracker.add(self.id(), open.clone());
+                open
+            }
+            _ => self.clone(),
+        }
+    }
+
     pub fn is_unbound(&self) -> bool {
         if let Type::Variable(variable) = self {
             return variable.borrow().is_unbound();
@@ -142,29 +216,40 @@ impl Type {
     }
 
     /// Called on a function's arguments to recursively convert any unbound
-    /// types into open generics. Also does some checks for unbounds being
-    /// where they're not supposed to be.
-    fn genericize(&self) -> TypeResult<()> {
+    /// types into open generics.
+    fn genericize(&self, scope: Scope) -> TypeResult<()> {
+        // Skip genericizing if this variable wasn't in the scope being closed.
+        if !self.scope().within(&scope) {
+            return Ok(());
+        }
         match self {
             Type::Variable(variable) => {
                 let replacement = match &*variable.borrow() {
-                    Variable::Substitute(substitute) => {
-                        substitute.genericize()?;
+                    Variable::Substitute { substitute, .. } => {
+                        substitute.genericize(scope.clone())?;
                         None
                     }
-                    Variable::Unbound { .. } => {
-                        let generic = Type::Generic(Rc::new(RefCell::new(Generic::new())));
+                    Variable::Unbound {
+                        scope: originating_scope,
+                        ..
+                    } => {
+                        let generic = Type::Generic(Rc::new(RefCell::new(Generic::new(
+                            originating_scope.clone(),
+                        ))));
                         // Use a substitution so that any substitutions of this
                         // variable are followed to the *same* generic. We
                         // should never have multiple generics (or any type for
                         // that matter) with the same ID.
-                        Some(Type::new_variable(Variable::Substitute(Box::new(generic))))
+                        Some(Variable::Substitute {
+                            scope: originating_scope.clone(),
+                            substitute: Box::new(generic),
+                        })
                     }
                     _ => None,
                 };
                 if let Some(replacement) = replacement {
                     let mut mutable = variable.borrow_mut();
-                    *mutable = Variable::Substitute(Box::new(replacement));
+                    *mutable = replacement;
                 }
                 Ok(())
             }
@@ -172,7 +257,7 @@ impl Type {
         }
     }
 
-    pub fn close_func(typ: Type, tracker: &mut RecursionTracker) -> TypeResult<Type> {
+    pub fn close_func(typ: Type, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Type> {
         let func = match typ {
             Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
@@ -194,14 +279,14 @@ impl Type {
             // generics. We need to do this in one pass in case earlier
             // arguments depend on later ones.
             for argument in func.arguments.borrow().iter() {
-                argument.genericize()?;
+                argument.genericize(scope.clone())?;
             }
-            retrn.genericize()?;
+            retrn.genericize(scope.clone())?;
             // Then close the arguments and return.
             for argument in func.arguments.borrow().iter() {
-                arguments.push(argument.clone().close(tracker)?);
+                arguments.push(argument.clone().close(tracker, scope.clone())?);
             }
-            let retrn = retrn.close(tracker)?;
+            let retrn = retrn.close(tracker, scope)?;
             (arguments, retrn)
         };
         // Then write them back to the function to make it closed.
@@ -216,7 +301,7 @@ impl Type {
         Ok(Type::Func(func))
     }
 
-    fn close_variable(typ: Type, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+    fn close_variable(typ: Type, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         let variable = match typ {
             Type::Variable(variable) => variable,
             other @ _ => unreachable!("Called close_variable on non-Variable: {:?}", other),
@@ -224,13 +309,13 @@ impl Type {
         // Uncomment to see types pre-closing:
         //   return Ok(Type::Variable(variable));
         let replacement = match &*variable.borrow() {
-            Variable::Generic(open) => {
+            Variable::Generic { generic: open, .. } => {
                 // Check if the generic is already being built (dealing with
                 // recursive types), otherwise add the forward declaration.
                 if let Some(known) = tracker.check(&open.id) {
                     return Ok(known);
                 }
-                let closed = Rc::new(RefCell::new(Generic::new()));
+                let closed = Rc::new(RefCell::new(Generic::new(scope.clone())));
                 // Note that we register with the old open generic's ID
                 // since that's what's going to be in any nested types
                 // that haven't been closed yet.
@@ -243,32 +328,36 @@ impl Type {
                     match constraint {
                         Property(property) => mutable.add_property_constraint(
                             property.name.clone(),
-                            property.typ.clone().close(tracker)?,
+                            property.typ.clone().close(tracker, scope.clone())?,
                         ),
                         Callable(callable) => {
                             let mut arguments = vec![];
                             for argument in callable.arguments.iter() {
-                                arguments.push(argument.clone().close(tracker)?);
+                                arguments.push(argument.clone().close(tracker, scope.clone())?);
                             }
                             mutable.add_callable_constraint(
                                 arguments,
-                                callable.retrn.clone().close(tracker)?,
+                                callable.retrn.clone().close(tracker, scope.clone())?,
                             )
                         }
                         other @ _ => unreachable!("Cannot close constraint: {:?}", other),
                     }
                 }
                 // Use substitution so that other uses will be updated.
-                Some(Variable::Substitute(Box::new(Type::Generic(closed))))
+                Some(Variable::Substitute {
+                    scope: scope.clone(),
+                    substitute: Box::new(Type::Generic(closed)),
+                })
             }
             // Turn unbounds into closed-but-unconstrained generics.
             // If that's incorrect it will be caught by codegen.
             Variable::Unbound { .. } => {
-                let closed = Generic::new();
+                let closed = Generic::new(scope.clone());
                 // Use substitution so that other uses will be updated.
-                Some(Variable::Substitute(Box::new(Type::Generic(Rc::new(
-                    RefCell::new(closed),
-                )))))
+                Some(Variable::Substitute {
+                    scope: scope.clone(),
+                    substitute: Box::new(Type::Generic(Rc::new(RefCell::new(closed)))),
+                })
             }
             _ => None,
         };
@@ -277,12 +366,14 @@ impl Type {
             *mutable = replacement;
         }
         let result = match &*variable.borrow() {
-            Variable::Generic(_) => unreachable!("Generic should have been replaced"),
+            Variable::Generic { .. } => unreachable!("Generic should have been replaced"),
             // Substitutions can be unboxed into the underlying type.
             // Note the `close()` to recursively resolve nested
             // substitutions.
-            Variable::Substitute(typ) => Ok(typ.clone().close(tracker)?),
-            Variable::Unbound { id } => {
+            Variable::Substitute { substitute, .. } => {
+                Ok(substitute.clone().close(tracker, scope)?)
+            }
+            Variable::Unbound { id, .. } => {
                 // panic!("Unexpected unbound: {}", id);
                 // Err(TypeError::UnexpectedUnbound { id: *id })
                 unreachable!("Unbound should have been replaced: {}", id)
@@ -295,9 +386,14 @@ impl Type {
 impl Closable for Type {
     /// When translation and unification is done we need to turn all the
     /// `Variable` types into closed, fixed types.
-    fn close(self, tracker: &mut RecursionTracker) -> TypeResult<Self> {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
+        // Skip closing if this variable isn't in the scope being closed.
+        if !self.scope().within(&scope) {
+            return Ok(self);
+        }
         match self {
-            Type::Variable(_) => Type::close_variable(self, tracker),
+            Type::Func(_) => Type::close_func(self, tracker, scope),
+            Type::Variable(_) => Type::close_variable(self, tracker, scope),
             other @ _ => Ok(other),
         }
     }
@@ -306,6 +402,7 @@ impl Closable for Type {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub id: usize,
+    pub scope: Scope,
     pub closed: RefCell<bool>,
     // Included for debugging.
     pub name: Option<String>,
@@ -349,21 +446,24 @@ impl PartialEq for Func {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Generic {
     pub id: usize,
+    pub scope: Scope,
     // TODO: Name
     pub constraints: Vec<GenericConstraint>,
 }
 
 impl Generic {
-    pub fn new() -> Self {
+    pub fn new(scope: Scope) -> Self {
         Self {
             id: next_uid(),
+            scope,
             constraints: vec![],
         }
     }
 
-    pub fn new_with_constraints(constraints: Vec<GenericConstraint>) -> Self {
+    pub fn new_with_constraints(constraints: Vec<GenericConstraint>, scope: Scope) -> Self {
         Self {
             id: next_uid(),
+            scope,
             constraints,
         }
     }
@@ -433,6 +533,7 @@ pub enum GenericConstraint {
 #[derive(Clone, Debug)]
 pub struct Object {
     pub id: usize,
+    pub scope: Scope,
     pub class: Class,
     // TODO: Parameterize
 }
@@ -483,6 +584,7 @@ pub struct DerivedClass {
 #[derive(Clone, Debug)]
 pub struct Tuple {
     pub id: usize,
+    pub scope: Scope,
     pub members: Vec<Type>,
 }
 
@@ -508,27 +610,36 @@ impl PartialEq for Tuple {
 pub enum Variable {
     /// An auto-generated generic whose constraints can be mutated by virtue
     /// of being stored in a `Variable`.
-    Generic(Generic),
+    Generic { scope: Scope, generic: Generic },
     /// Substitute this type with another type.
-    Substitute(Box<Type>),
+    Substitute { scope: Scope, substitute: Box<Type> },
     /// We don't know what it is yet. It is an error for any `Unbound`s to
     /// make it to the end of unification.
-    Unbound { id: usize },
+    Unbound { id: usize, scope: Scope },
 }
 
 impl Variable {
     pub fn id(&self) -> usize {
         use Variable::*;
         match self {
-            Generic(generic) => generic.id,
-            Substitute(typ) => typ.id(),
-            Unbound { id } => *id,
+            Generic { generic, .. } => generic.id,
+            Substitute { substitute, .. } => substitute.id(),
+            Unbound { id, .. } => *id,
+        }
+    }
+
+    pub fn scope(&self) -> Scope {
+        use Variable::*;
+        match self {
+            Generic { scope, .. } => scope.clone(),
+            Substitute { scope, .. } => scope.clone(),
+            Unbound { scope, .. } => scope.clone(),
         }
     }
 
     pub fn is_generic(&self) -> bool {
         match self {
-            Variable::Generic(_) => true,
+            Variable::Generic { .. } => true,
             _ => false,
         }
     }
@@ -542,21 +653,21 @@ impl Variable {
 
     pub fn unwrap_substitute(&self) -> &Type {
         match self {
-            Variable::Substitute(substitute) => &**substitute,
+            Variable::Substitute { substitute, .. } => &**substitute,
             other @ _ => unreachable!("Not a Substitute: {:?}", other),
         }
     }
 
     pub fn unwrap_generic(&self) -> &Generic {
         match self {
-            Variable::Generic(generic) => generic,
+            Variable::Generic { generic, .. } => generic,
             other @ _ => unreachable!("Not a Generic: {:?}", other),
         }
     }
 
     pub fn unwrap_mut_generic(&mut self) -> &mut Generic {
         match self {
-            Variable::Generic(generic) => generic,
+            Variable::Generic { generic, .. } => generic,
             other @ _ => unreachable!("Not a Generic: {:?}", other),
         }
     }

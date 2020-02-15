@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use super::scope::Scope;
 use super::typ::{Generic, GenericConstraint, Type, Variable};
 use super::{TypeError, TypeResult};
 
@@ -13,7 +14,11 @@ fn unwrap_variable(typ: &Type) -> &Rc<RefCell<Variable>> {
 }
 
 /// Unify a variable (mutable) generic with another generic.
-pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic) -> TypeResult<()> {
+pub fn unify_variable_generic_with_generic(
+    destination: &Type,
+    source: &Generic,
+    scope: Scope,
+) -> TypeResult<()> {
     let destination = unwrap_variable(destination);
 
     enum Action {
@@ -37,7 +42,11 @@ pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic)
                     if let Some(destination_property) =
                         destination.get_property(&source_property.name)
                     {
-                        unify(&destination_property.typ, &source_property.typ)?;
+                        unify(
+                            &destination_property.typ,
+                            &source_property.typ,
+                            scope.clone(),
+                        )?;
                         None
                     } else {
                         AddPropertyConstraint(
@@ -59,9 +68,13 @@ pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic)
                             .iter()
                             .zip(source_callable.arguments.iter())
                         {
-                            unify(destination_argument, source_argument)?;
+                            unify(destination_argument, source_argument, scope.clone())?;
                         }
-                        unify(&destination_callable.retrn, &source_callable.retrn)?;
+                        unify(
+                            &destination_callable.retrn,
+                            &source_callable.retrn,
+                            scope.clone(),
+                        )?;
                         None
                     } else {
                         AddCallableConstraint(
@@ -85,14 +98,14 @@ pub fn unify_variable_generic_with_generic(destination: &Type, source: &Generic)
     Ok(())
 }
 
-pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
+pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
     if typ1 == typ2 {
         return Ok(());
     }
 
     if let Type::Variable(var2) = typ2 {
-        if let Variable::Substitute(substitute) = &*var2.borrow() {
-            return unify(typ1, substitute);
+        if let Variable::Substitute { substitute, .. } = &*var2.borrow() {
+            return unify(typ1, substitute, scope);
         }
     }
 
@@ -109,14 +122,17 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
         use Action::*;
 
         let action = match &*var1.borrow() {
-            generic @ Variable::Generic(_) => {
+            Variable::Generic { .. } => {
                 // WARNING: These if-elses rely on implicit returns and
                 //   therefore *must* stay exhaustive.
                 if let Type::Variable(var2) = typ2 {
                     // If this is a generic and the other type is unbound then
                     // update the other type to be a substitute for this type.
                     if var2.borrow().is_unbound() {
-                        *var2.borrow_mut() = Variable::Substitute(Box::new(typ1.clone()));
+                        *var2.borrow_mut() = Variable::Substitute {
+                            scope,
+                            substitute: Box::new(typ1.clone()),
+                        };
                         return Ok(());
                     // If it's also a variable generic then we can attempt to
                     // union the two sets of generic constraints.
@@ -137,27 +153,33 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
             }
             // If we're a substitute then unify whatever we're substituted with
             // with `typ2`.
-            Variable::Substitute(substitute) => Reunify(*substitute.clone()),
+            Variable::Substitute { substitute, .. } => Reunify(*substitute.clone()),
             // If we're unbound then inherit whatever the other type is.
             Variable::Unbound { .. } => Substitute(typ2.clone()),
         };
 
         return match action {
             Substitute(typ) => {
-                *var1.borrow_mut() = Variable::Substitute(Box::new(typ));
+                *var1.borrow_mut() = Variable::Substitute {
+                    scope,
+                    substitute: Box::new(typ),
+                };
                 Ok(())
             }
-            Reunify(typ) => unify(&typ, typ2),
+            Reunify(typ) => unify(&typ, typ2, scope),
             UnifyGenerics => {
                 let var2 = unwrap_variable(typ2);
                 // If both types are variable generics then first merge the
                 // right into the left.
                 {
                     let generic = Ref::map(var2.borrow(), Variable::unwrap_generic);
-                    unify_variable_generic_with_generic(typ1, &generic)?;
+                    unify_variable_generic_with_generic(typ1, &generic, scope.clone())?;
                 }
                 // Then make the right a substitute for the left.
-                *var2.borrow_mut() = Variable::Substitute(Box::new(typ1.clone()));
+                *var2.borrow_mut() = Variable::Substitute {
+                    scope,
+                    substitute: Box::new(typ1.clone()),
+                };
                 Ok(())
             }
         };
@@ -166,7 +188,7 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
     // If the other type is a variable then unify with it as the first term so
     // that we can reuse the logic above.
     if let Type::Variable(_) = &typ2 {
-        return unify(typ2, typ1).map_err(|err| err.reverse());
+        return unify(typ2, typ1, scope).map_err(|err| err.reverse());
     }
 
     match (typ1, typ2) {
@@ -182,11 +204,11 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
             for (func1_argument, func2_argument) in
                 func1_arguments.iter().zip(func2_arguments.iter())
             {
-                unify(func1_argument, func2_argument)?;
+                unify(func1_argument, func2_argument, scope.clone())?;
             }
             let func1_return = &*func1.retrn.borrow();
             let func2_return = &*func2.retrn.borrow();
-            return unify(&func1_return, &func2_return);
+            return unify(&func1_return, &func2_return, scope);
         }
         _ => (),
     }
