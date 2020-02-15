@@ -53,9 +53,7 @@ impl Scope {
     // of this scope. Also returns true if they're the same scope.
     pub fn within(&self, other: &Scope) -> bool {
         let mut parent = self.clone();
-        // println!("begin within self: {:?} parent: {:?}", self, parent);
         loop {
-            // println!("within parent: {:?} other: {:?} ==: {:?}", parent, other, &parent == other);
             if &parent == other {
                 return true;
             }
