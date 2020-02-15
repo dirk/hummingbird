@@ -185,15 +185,6 @@ mod tests {
     use super::scope::{FuncScope, Scope};
     use super::{unify, Builtins, Closable, FuncBody, ScopeLike, Type, TypeError, Variable};
 
-    impl Type {
-        fn unwrap_variable(&self) -> Variable {
-            match self {
-                Type::Variable(variable) => variable.borrow().clone(),
-                _ => unreachable!("Not a Variable: {:?}", self),
-            }
-        }
-    }
-
     fn new_scope() -> Scope {
         FuncScope::new(None).into_scope()
     }
@@ -205,14 +196,14 @@ mod tests {
         let phantom = Type::new_phantom();
         let unbound = Type::new_unbound(scope.clone());
         unify(&unbound, &phantom, scope)?;
-        assert_eq!(&phantom, unbound.unwrap_variable().unwrap_substitute());
+        assert_eq!(&phantom, unbound.unwrap_variable().borrow().unwrap_substitute());
 
         // And with unbound on the right.
         let scope = new_scope();
         let phantom = Type::new_phantom();
         let unbound = Type::new_unbound(scope.clone());
         unify(&phantom, &unbound, scope)?;
-        assert_eq!(&phantom, unbound.unwrap_variable().unwrap_substitute());
+        assert_eq!(&phantom, unbound.unwrap_variable().borrow().unwrap_substitute());
 
         Ok(())
     }
