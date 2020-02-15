@@ -14,32 +14,58 @@ mod parse_ast;
 mod parser;
 mod type_ast;
 
-use type_ast::TypeError;
+use type_ast::{Printer, PrinterOptions, TypeError};
+
+fn extract_option<S: AsRef<str>>(args: Vec<String>, option: S) -> (Vec<String>, bool) {
+    let mut found = false;
+    let mut new = vec![];
+    for arg in args.iter() {
+        if arg == option.as_ref() {
+            found = true
+        } else {
+            new.push(arg.clone())
+        }
+    }
+    (new, found)
+}
+
+fn print_usage() {
+    println!("Usage: hummingbird [file] [options]");
+    println!();
+    println!("  --print-pointers  Include pointers in debugging output");
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 1 || args.len() > 2 {
-        println!("Usage: hummingbird [file]?");
+    let args = env::args().collect::<Vec<_>>();
+    if args.len() <= 1 {
+        print_usage();
         exit(-1);
     }
-    match args.len() {
-        2 => {
-            let filename = &args[1];
-            let source = std::fs::read_to_string(filename).unwrap();
-            let mut token_stream = parser::TokenStream::from_string(source.clone());
-            let parse_ast = parser::parse_module(&mut token_stream).unwrap();
-            let type_ast = match type_ast::translate_module(parse_ast) {
-                Ok(module) => module,
-                Err(type_error) => {
-                    print_type_error(type_error, filename.clone(), source);
-                    return;
-                }
-            };
-            let printer = type_ast::Printer::new(std::io::stdout());
-            printer.print_module(type_ast).unwrap();
-        }
-        _ => unreachable!(),
+    // Remove the first argument (ourselves).
+    let args = args[1..].to_vec();
+    let (args, print_pointers) = extract_option(args, "--print-pointers");
+    if args.len() != 1 {
+        eprintln!("Invalid args: {:?}", args);
+        exit(1);
     }
+    if &args[0] == "help" {
+        print_usage();
+        exit(0);
+    }
+
+    let filename = &args[0];
+    let source = std::fs::read_to_string(filename).unwrap();
+    let mut token_stream = parser::TokenStream::from_string(source.clone());
+    let parse_ast = parser::parse_module(&mut token_stream).unwrap();
+    let type_ast = match type_ast::translate_module(parse_ast) {
+        Ok(module) => module,
+        Err(type_error) => {
+            print_type_error(type_error, filename.clone(), source);
+            return;
+        }
+    };
+    let printer = Printer::new_with_options(std::io::stdout(), PrinterOptions { print_pointers });
+    printer.print_module(type_ast).unwrap();
 }
 
 fn print_type_error(error: TypeError, filename: String, source: String) {

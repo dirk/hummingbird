@@ -18,16 +18,34 @@ macro_rules! lnwrite {
     );
 }
 
+pub struct PrinterOptions {
+    pub print_pointers: bool,
+}
+
+impl Default for PrinterOptions {
+    fn default() -> Self {
+        Self {
+            print_pointers: false,
+        }
+    }
+}
+
 pub struct Printer<O: Write> {
     output: RefCell<O>,
     indent: Cell<u8>,
+    print_pointers: bool,
 }
 
 impl<O: Write> Printer<O> {
     pub fn new(output: O) -> Self {
+        Self::new_with_options(output, PrinterOptions::default())
+    }
+
+    pub fn new_with_options(output: O, options: PrinterOptions) -> Self {
         Self {
             output: RefCell::new(output),
             indent: Cell::new(0),
+            print_pointers: options.print_pointers,
         }
     }
 
@@ -100,7 +118,11 @@ impl<O: Write> Printer<O> {
 
         match typ {
             Type::Func(func) => {
-                self.write(format!("{}(", func.name.clone().unwrap_or("".to_string()),))?;
+                self.write(format!(
+                    "{}#{}(",
+                    func.name.clone().unwrap_or("".to_string()),
+                    func.id
+                ))?;
                 let arguments = func.arguments.borrow();
                 if !arguments.is_empty() {
                     if with_children {
@@ -118,15 +140,18 @@ impl<O: Write> Printer<O> {
                 } else {
                     self.write(")")?;
                 }
-                self.write(format!(" @ {}({:p})", func.id, &*func,))
+                self.write_pointer(&**func)
             }
             Type::Object(object) => self.write(format!("{}", object.class.name())),
             Type::Generic(outer) => {
                 let generic = outer.borrow();
-                self.write(format!("${} @ {:p}", generic.id, *outer))?;
+                self.write(format!("${}", generic.id))?;
                 if with_children && !recursive {
+                    self.write("(")?;
                     self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
+                    self.write(")")?;
                 }
+                self.write_pointer(&**outer)?;
                 Ok(())
             }
             Type::Tuple(tuple) => self.write(format!("({})", tuple.members.len())),
@@ -140,23 +165,23 @@ impl<O: Write> Printer<O> {
                         } else {
                             self.write_type(&*substitute, with_children)?;
                         }
-                        self.write(format!(") @ {:p}", substitute))
+                        self.write(")")?;
                     }
                     Variable::Unbound { id, .. } => {
-                        self.write(format!("U({}) @ {:p}", id, variable))
+                        self.write(format!("U({})", id))?;
                     }
                     Variable::Generic { generic, .. } => {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
-                        self.write(format!(") @ {:p}", generic))?;
                         if with_children && !recursive {
                             self.indented(|this| {
                                 this.write_constraints(&generic.constraints, tracker)
                             })?;
                         }
-                        Ok(())
+                        self.write(")")?;
                     }
                 }
+                self.write_pointer(variable)
             }
             _ => unreachable!("Cannot print type: {:?}", typ),
         }
@@ -326,6 +351,13 @@ impl<O: Write> Printer<O> {
     fn write_output(&self, bytes: &[u8]) -> Result<()> {
         let mut output = self.output.borrow_mut();
         output.write(bytes).map(|_| ())
+    }
+
+    fn write_pointer<P>(&self, ptr: *const P) -> Result<()> {
+        if !self.print_pointers {
+            return Ok(());
+        }
+        self.write(format!(" @ {:p}", ptr))
     }
 
     // fn write_output(&self, bytes: &[u8]) -> Result<()> {
