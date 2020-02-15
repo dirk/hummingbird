@@ -10,9 +10,9 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
     let mut statements = vec![];
     for pstatement in pmodule.statements.into_iter() {
         let statement = match pstatement {
-            past::ModuleStatement::Func(pfunc) => {
-                ModuleStatement::Func(translate_func(pfunc, scope.clone())?)
-            }
+            past::ModuleStatement::Func(pfunc) => ModuleStatement::Func(
+                translate_func(pfunc, scope.clone())?.close(&mut RecursionTracker::new())?,
+            ),
             _ => unreachable!(),
         };
         statements.push(statement);
@@ -20,13 +20,13 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
 
     // Now that we've translated the whole module we can close all of the
     // statements to ensure all types are bound.
-    let mut closed_statements = vec![];
-    for statement in statements.into_iter() {
-        closed_statements.push(statement.close(&mut RecursionTracker::new())?);
-    }
+    // let mut closed_statements = vec![];
+    // for statement in statements.into_iter() {
+    //     closed_statements.push(statement.close(&mut RecursionTracker::new())?);
+    // }
 
     Ok(Module {
-        statements: closed_statements,
+        statements,
     })
 }
 

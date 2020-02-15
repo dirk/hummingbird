@@ -73,7 +73,7 @@ impl<O: Write> Printer<O> {
         }
         self.iwrite("): ")?;
         let retrn = match &func.typ {
-            Type::Func(func) => (*func.borrow().retrn).clone(),
+            Type::Func(func) => func.retrn.borrow(),
             other @ _ => unreachable!("Func node has non-Func type: {:?}", other),
         };
         self.write_type(&retrn, false)?;
@@ -99,11 +99,11 @@ impl<O: Write> Printer<O> {
 
         match typ {
             Type::Func(func) => {
-                let func = func.borrow();
                 self.write(format!("{}(", func.name.clone().unwrap_or("".to_string()),))?;
-                if !func.arguments.is_empty() {
+                let arguments = func.arguments.borrow();
+                if !arguments.is_empty() {
                     if with_children {
-                        for argument in func.arguments.iter() {
+                        for argument in arguments.iter() {
                             self.indented(|this1| {
                                 this1.lnwrite("")?;
                                 this1.write_recursive_type(argument, true, tracker)?;
@@ -112,7 +112,7 @@ impl<O: Write> Printer<O> {
                         }
                         self.lnwrite(")")?;
                     } else {
-                        self.write(format!("{})", func.arguments.len()))?;
+                        self.write(format!("{})", arguments.len()))?;
                     }
                 } else {
                     self.write(")")?;

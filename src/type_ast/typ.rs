@@ -16,11 +16,9 @@ pub fn next_uid() -> usize {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    /// A callable function; it is fixed and cannot be mutated.
-    ///
-    /// It is *only* mutable in order to support forward declaration. We need
-    /// a shareable `Rc` before we know the closed argument and return types.
-    Func(Rc<RefCell<Func>>),
+    /// A callable function; it is fixed and cannot be mutated once it is
+    /// closed at the end of creation.
+    Func(Rc<Func>),
     /// A generic defined by the user; it is fixed and cannot be mutated.
     ///
     /// It is *only* mutable in order to support forward declaration. We need
@@ -53,13 +51,13 @@ impl PartialEq for Type {
 
 impl Type {
     pub fn new_func(name: Option<String>, arguments: Vec<Type>, retrn: Type) -> Self {
-        Type::Func(Rc::new(RefCell::new(Func {
+        Type::Func(Rc::new(Func {
             id: next_uid(),
-            closed: false,
+            closed: RefCell::new(false),
             name,
-            arguments,
-            retrn: Box::new(retrn),
-        })))
+            arguments: RefCell::new(arguments),
+            retrn: RefCell::new(retrn),
+        }))
     }
 
     pub fn new_object(class: Class) -> Self {
@@ -105,8 +103,9 @@ impl Type {
 
         match self {
             Type::Func(func) => {
-                let func = &*func.borrow();
-                Some((func.arguments.clone(), (*func.retrn).clone()))
+                let arguments = func.arguments.borrow().clone();
+                let retrn = func.retrn.borrow().clone();
+                Some((arguments, retrn))
             }
             Type::Generic(generic) => {
                 let generic = &*generic.borrow();
@@ -126,7 +125,7 @@ impl Type {
     pub fn id(&self) -> usize {
         use Type::*;
         match self {
-            Func(func) => func.borrow().id,
+            Func(func) => func.id,
             Generic(generic) => generic.borrow().id,
             Object(object) => object.id,
             Phantom { id } => *id,
@@ -173,42 +172,33 @@ impl Type {
         }
     }
 
-    /// Functions are a special semi-variable type that should only be closed
-    /// once. To enforce that this checks (and sets) the `closed` field of the
-    /// `Func` it closes.
     pub fn close_func(typ: Type, tracker: &mut RecursionTracker) -> TypeResult<Type> {
         let func = match typ {
             Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
         };
-        let (id, closed) = {
-            let func = func.borrow();
-            (func.id, func.closed)
-        };
-        if closed {
-            return Err(TypeError::InternalError {
-                message: format!("Func has already been closed: {}", id),
-            });
+        // Don't reclose.
+        if *func.closed.borrow() {
+            return Ok(Type::Func(func));
         }
         // Check if the function's already been built.
-        if let Some(known) = tracker.check(&id) {
+        if let Some(known) = tracker.check(&func.id) {
             return Ok(known);
         }
-        tracker.add(id, Type::Func(func.clone()));
+        tracker.add(func.id, Type::Func(func.clone()));
         // Genericize and close the arguments and return types.
         let (arguments, retrn) = {
-            let func = func.borrow();
             let mut arguments = vec![];
-            let retrn = *func.retrn.clone();
+            let retrn = func.retrn.borrow().clone();
             // First convert any unbound (ie. unused) arguments into open
             // generics. We need to do this in one pass in case earlier
             // arguments depend on later ones.
-            for argument in func.arguments.iter() {
+            for argument in func.arguments.borrow().iter() {
                 argument.genericize()?;
             }
             retrn.genericize()?;
             // Then close the arguments and return.
-            for argument in func.arguments.iter() {
+            for argument in func.arguments.borrow().iter() {
                 arguments.push(argument.clone().close(tracker)?);
             }
             let retrn = retrn.close(tracker)?;
@@ -216,10 +206,12 @@ impl Type {
         };
         // Then write them back to the function to make it closed.
         {
-            let mut mutable = func.borrow_mut();
-            mutable.closed = true;
-            mutable.arguments = arguments;
-            mutable.retrn = Box::new(retrn);
+            let mut mutable_closed = func.closed.borrow_mut();
+            *mutable_closed = true;
+            let mut mutable_arguments = func.arguments.borrow_mut();
+            *mutable_arguments = arguments;
+            let mut mutable_retrn = func.retrn.borrow_mut();
+            *mutable_retrn = retrn;
         }
         Ok(Type::Func(func))
     }
@@ -314,16 +306,18 @@ impl Closable for Type {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub id: usize,
-    pub closed: bool,
+    pub closed: RefCell<bool>,
     // Included for debugging.
     pub name: Option<String>,
-    pub arguments: Vec<Type>,
-    pub retrn: Box<Type>,
+    // The arguments and type are only mutable in order to support forward
+    // declaration.
+    pub arguments: RefCell<Vec<Type>>,
+    pub retrn: RefCell<Type>,
 }
 
 impl Func {
     pub fn arity(&self) -> usize {
-        self.arguments.len()
+        self.arguments.borrow().len()
     }
 }
 
@@ -336,15 +330,19 @@ impl PartialEq for Func {
         if self.id == other.id {
             return true;
         }
-        if self.arguments.len() != other.arguments.len() {
+        if self.arity() != other.arity() {
             return false;
         }
-        for (self_argument, other_argument) in self.arguments.iter().zip(other.arguments.iter()) {
+        let self_arguments = self.arguments.borrow();
+        let other_arguments = other.arguments.borrow();
+        for (self_argument, other_argument) in self_arguments.iter().zip(other_arguments.iter()) {
             if self_argument != other_argument {
                 return false;
             }
         }
-        self.retrn == other.retrn
+        let self_retrn = &*self.retrn.borrow();
+        let other_retrn = &*other.retrn.borrow();
+        self_retrn == other_retrn
     }
 }
 

@@ -171,27 +171,21 @@ pub fn unify(typ1: &Type, typ2: &Type) -> TypeResult<()> {
 
     match (typ1, typ2) {
         (Type::Func(func1), Type::Func(func2)) => {
-            let (func1_arguments, func1_return, func2_arguments, func2_return) = {
-                let func1 = func1.borrow();
-                let func2 = func2.borrow();
-                if func1.arity() != func2.arity() {
-                    return Err(TypeError::TypeMismatch {
-                        expected: typ1.clone(),
-                        got: typ2.clone(),
-                    });
-                }
-                (
-                    func1.arguments.clone(),
-                    (*func1.retrn).clone(),
-                    func2.arguments.clone(),
-                    (*func2.retrn).clone(),
-                )
-            };
+            if func1.arity() != func2.arity() {
+                return Err(TypeError::TypeMismatch {
+                    expected: typ1.clone(),
+                    got: typ2.clone(),
+                });
+            }
+            let func1_arguments = func1.arguments.borrow();
+            let func2_arguments = func2.arguments.borrow();
             for (func1_argument, func2_argument) in
                 func1_arguments.iter().zip(func2_arguments.iter())
             {
                 unify(func1_argument, func2_argument)?;
             }
+            let func1_return = &*func1.retrn.borrow();
+            let func2_return = &*func2.retrn.borrow();
             return unify(&func1_return, &func2_return);
         }
         _ => (),
