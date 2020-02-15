@@ -5,22 +5,12 @@ use super::scope::Scope;
 use super::typ::{Generic, GenericConstraint, Object, Type, Variable};
 use super::{TypeError, TypeResult};
 
-// Extract the variable type within a type.
-fn unwrap_variable(typ: &Type) -> &Rc<RefCell<Variable>> {
-    match typ {
-        Type::Variable(variable) => variable,
-        other @ _ => unreachable!("Not a Variable: {:?}", other),
-    }
-}
-
 /// Unify a variable (mutable) generic with another generic.
 pub fn unify_variable_generic_with_generic(
-    destination: &Type,
+    destination: &Rc<RefCell<Variable>>,
     source: &Generic,
     scope: Scope,
 ) -> TypeResult<()> {
-    let destination = unwrap_variable(destination);
-
     enum Action {
         AddCallableConstraint(Vec<Type>, Type),
         AddPropertyConstraint(String, Type),
@@ -188,15 +178,16 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
             }
             Reunify(typ) => unify(&typ, typ2, scope),
             UnifyGenerics => {
-                let var2 = unwrap_variable(typ2);
+                let variable2 = typ2.unwrap_variable();
                 // If both types are variable generics then first merge the
                 // right into the left.
                 {
-                    let generic = Ref::map(var2.borrow(), Variable::unwrap_generic);
-                    unify_variable_generic_with_generic(typ1, &generic, scope.clone())?;
+                    let variable1 = typ1.unwrap_variable();
+                    let generic2 = Ref::map(variable2.borrow(), Variable::unwrap_generic);
+                    unify_variable_generic_with_generic(variable1, &generic2, scope.clone())?;
                 }
                 // Then make the right a substitute for the left.
-                *var2.borrow_mut() = Variable::Substitute {
+                *variable2.borrow_mut() = Variable::Substitute {
                     scope,
                     substitute: Box::new(typ1.clone()),
                 };

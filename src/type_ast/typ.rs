@@ -104,6 +104,13 @@ impl Type {
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
+    pub fn unwrap_variable(&self) -> &Rc<RefCell<Variable>> {
+        match self {
+            Type::Variable(variable) => variable,
+            other @ _ => unreachable!("Not a Variable: {:?}", other),
+        }
+    }
+
     /// Returns a Some(arguments, retrn) if the type is some kind of callable
     /// (func or callable generic constraint).
     pub fn maybe_callable(&self) -> Option<(Vec<Type>, Type)> {
