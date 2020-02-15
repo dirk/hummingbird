@@ -3,7 +3,7 @@ sudo: false
 language: rust
 
 rust:
-  - "1.37.0"
+  - "1.41.0"
 
 cache:
   bundler: true
@@ -19,4 +19,4 @@ before_script:
 
 script:
   - "cargo test --verbose"
-  - "bundle exec rspec"
+  # "bundle exec rspec"
