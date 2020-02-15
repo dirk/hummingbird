@@ -2,7 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 use super::scope::Scope;
-use super::typ::{Generic, GenericConstraint, Type, Variable};
+use super::typ::{Generic, GenericConstraint, Object, Type, Variable};
 use super::{TypeError, TypeResult};
 
 // Extract the variable type within a type.
@@ -98,6 +98,20 @@ pub fn unify_variable_generic_with_generic(
     Ok(())
 }
 
+/// Check if an object satisfies a generic's constraints.
+fn object_satisfies_constraints(generic: &Generic, object: &Rc<Object>) -> TypeResult<()> {
+    if generic.constraints.is_empty() {
+        return Ok(());
+    }
+    // TODO: Actually check each constraint against the object.
+    Err(TypeError::InternalError {
+        message: format!(
+            "Object doesn't satisfy constraints:\nobject: {:?}\nconstraints: {:?}",
+            object, generic.constraints,
+        ),
+    })
+}
+
 pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
     if typ1 == typ2 {
         return Ok(());
@@ -118,37 +132,43 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
             Reunify(Type),
             // Unify both variable generics.
             UnifyGenerics,
+            UnifyGenericWithObject(Rc<Object>),
         }
         use Action::*;
 
         let action = match &*var1.borrow() {
             Variable::Generic { .. } => {
-                // WARNING: These if-elses rely on implicit returns and
+                // WARNING: These branches rely on implicit returns and
                 //   therefore *must* stay exhaustive.
-                if let Type::Variable(var2) = typ2 {
-                    // If this is a generic and the other type is unbound then
-                    // update the other type to be a substitute for this type.
-                    if var2.borrow().is_unbound() {
-                        *var2.borrow_mut() = Variable::Substitute {
-                            scope,
-                            substitute: Box::new(typ1.clone()),
-                        };
-                        return Ok(());
-                    // If it's also a variable generic then we can attempt to
-                    // union the two sets of generic constraints.
-                    } else if var2.borrow().is_generic() {
-                        UnifyGenerics
-                    } else {
+                match typ2 {
+                    Type::Object(object2) => UnifyGenericWithObject(object2.clone()),
+                    Type::Variable(var2) => {
+                        // If this is a generic and the other type is unbound
+                        // then update the other type to be a substitute for
+                        // this type.
+                        if var2.borrow().is_unbound() {
+                            *var2.borrow_mut() = Variable::Substitute {
+                                scope,
+                                substitute: Box::new(typ1.clone()),
+                            };
+                            return Ok(());
+                        // If it's also a variable generic then we can attempt to
+                        // union the two sets of generic constraints.
+                        } else if var2.borrow().is_generic() {
+                            UnifyGenerics
+                        } else {
+                            return Err(TypeError::TypeMismatch {
+                                expected: typ1.clone(),
+                                got: typ2.clone(),
+                            });
+                        }
+                    }
+                    _ => {
                         return Err(TypeError::TypeMismatch {
                             expected: typ1.clone(),
                             got: typ2.clone(),
-                        });
+                        })
                     }
-                } else {
-                    return Err(TypeError::TypeMismatch {
-                        expected: typ1.clone(),
-                        got: typ2.clone(),
-                    });
                 }
             }
             // If we're a substitute then unify whatever we're substituted with
@@ -179,6 +199,20 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
                 *var2.borrow_mut() = Variable::Substitute {
                     scope,
                     substitute: Box::new(typ1.clone()),
+                };
+                Ok(())
+            }
+            UnifyGenericWithObject(object) => {
+                {
+                    // First ensure the object satisfies our constraints.
+                    let generic = Ref::map(var1.borrow(), Variable::unwrap_generic);
+                    object_satisfies_constraints(&generic, &object)?;
+                }
+                // If the constraints are all satisfied then we can substitute
+                // ourselves for the object.
+                *var1.borrow_mut() = Variable::Substitute {
+                    scope,
+                    substitute: Box::new(Type::Object(object)),
                 };
                 Ok(())
             }
