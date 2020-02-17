@@ -169,6 +169,17 @@ impl ScopeResolution {
     }
 }
 
+impl Closable for ScopeResolution {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
+        use ScopeResolution::*;
+        Ok(match self {
+            Local(name, typ) => Local(name, typ.close(tracker, scope)?),
+            Closure(name, typ, chain) => Closure(name, typ.close(tracker, scope)?, chain),
+            Static(name, typ) => Static(name, typ.close(tracker, scope)?),
+        })
+    }
+}
+
 pub trait ScopeLike {
     /// Consume oneself to produce a shareable `Scope`.
     fn into_scope(self) -> Scope;

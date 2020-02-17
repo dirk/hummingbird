@@ -177,7 +177,7 @@ impl Closable for Identifier {
     fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         Ok(Identifier {
             name: self.name,
-            resolution: self.resolution,
+            resolution: self.resolution.close(tracker, scope.clone())?,
             typ: self.typ.close(tracker, scope)?,
         })
     }
