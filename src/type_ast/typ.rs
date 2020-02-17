@@ -72,8 +72,14 @@ impl Type {
         }))
     }
 
+    #[cfg(test)]
     pub fn new_phantom() -> Self {
         Type::Phantom { id: next_uid() }
+    }
+
+    #[cfg(not(test))]
+    pub fn new_phantom() -> Self {
+        unreachable!("Phantom types cannot be constructed outside of tests")
     }
 
     pub fn new_substitute(typ: Type, scope: Scope) -> Self {

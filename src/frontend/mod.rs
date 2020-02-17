@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::hash::{Hash, Hasher};
 
 use super::parser::{self, ParseError, TokenStream};
 use super::type_ast::{self, Module as TModule, TypeError};
@@ -39,14 +39,14 @@ impl Manager {
             let modules = self.0.modules.borrow();
             for module in modules.iter() {
                 if module.path() == path {
-                    return Err(LoadError::CircularDependency(path))
+                    return Err(LoadError::CircularDependency(path));
                 }
             }
         }
         {
             let loading = self.0.loading.borrow();
             if loading.contains(&path) {
-                return Err(LoadError::CircularDependency(path))
+                return Err(LoadError::CircularDependency(path));
             }
         }
         let mut loading = self.0.loading.borrow_mut();
@@ -59,7 +59,10 @@ impl Manager {
         {
             let mut loading = self.0.loading.borrow_mut();
             if !loading.remove(&path) {
-                unreachable!("Module was not in the loading set: {}", path.to_str().unwrap())
+                unreachable!(
+                    "Module was not in the loading set: {}",
+                    path.to_str().unwrap()
+                )
             }
         }
         let mut modules = self.0.modules.borrow_mut();
