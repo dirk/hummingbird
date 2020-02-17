@@ -59,15 +59,16 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
     for argument_node in arguments_nodes.iter() {
         func_scope.add_local(&argument_node.name, argument_node.typ.clone())?;
     }
-    // Build a forward declaration for the recursive call and add it to
-    // the function's scope.
+    // Build a forward declaration for the recursive call.
     let typ = Type::new_func(
         Some(name.clone()),
         arguments.clone(),
         retrn.clone(),
         func_scope.clone(),
     );
-    func_scope.add_local(&name, typ.clone())?;
+    // Add the function to its defining scope.
+    // TODO: This should be an `add_static` once functions are static.
+    scope.add_local(&name, typ.clone())?;
 
     let body = match pfunc.body {
         past::FuncBody::Block(block) => {
@@ -77,9 +78,6 @@ fn translate_func(pfunc: past::Func, scope: Scope) -> TypeResult<Func> {
 
     let implicit_retrn = body.typ();
     unify(&retrn, &implicit_retrn, func_scope.clone())?;
-
-    // Add the function to its defining scope.
-    scope.add_local(&name, typ.clone())?;
 
     Ok(Func {
         name: name.clone(),
