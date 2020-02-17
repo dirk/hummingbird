@@ -105,6 +105,7 @@ pub enum Token {
     CommentLine(String, Span),
     Dot(Location),
     EOF(Location),
+    Equals(Location),
     Func(Location),
     Import(Location),
     Minus(Location),
@@ -117,6 +118,7 @@ pub enum Token {
     Slash(Location),
     Star(Location),
     Struct(Location),
+    Var(Location),
     Word(Word),
 }
 
@@ -132,6 +134,7 @@ impl Token {
             | Comma(location)
             | Dot(location)
             | EOF(location)
+            | Equals(location)
             | Func(location)
             | Import(location)
             | Minus(location)
@@ -142,7 +145,8 @@ impl Token {
             | Plus(location)
             | Slash(location)
             | Star(location)
-            | Struct(location) => location.clone(),
+            | Struct(location)
+            | Var(location) => location.clone(),
         }
     }
 
@@ -235,6 +239,7 @@ impl TokenStream {
                 '}' => Token::BraceRight(location),
                 ',' => Token::Comma(location),
                 '.' => Token::Dot(location),
+                '=' => Token::Equals(location),
                 '(' => Token::ParenthesesLeft(location),
                 ')' => Token::ParenthesesRight(location),
                 '+' => Token::Plus(location),
@@ -254,6 +259,7 @@ impl TokenStream {
             "func" => Token::Func(start),
             "import" => Token::Import(start),
             "struct" => Token::Struct(start),
+            "var" => Token::Var(start),
             _ => Token::Word(Word {
                 name,
                 span: Span::new(start, end),

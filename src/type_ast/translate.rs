@@ -100,6 +100,7 @@ fn translate_block(pblock: past::Block, scope: Scope) -> TypeResult<Block> {
             past::BlockStatement::Expression(pexpression) => {
                 BlockStatement::Expression(translate_expression(&pexpression, scope.clone())?)
             }
+            past::BlockStatement::Var(pvar) => BlockStatement::Var(translate_var(pvar, scope.clone())?),
         };
         statements.push(statement);
     }
@@ -111,6 +112,24 @@ fn translate_block(pblock: past::Block, scope: Scope) -> TypeResult<Block> {
     Ok(Block {
         statements,
         span: pblock.span.clone(),
+        typ,
+    })
+}
+
+fn translate_var(pvar: past::Var, scope: Scope) -> TypeResult<Var> {
+    let typ = Type::new_unbound(scope.clone());
+    scope.add_local(&pvar.name.name, typ.clone());
+    let initializer = match &pvar.initializer {
+        Some(expression) => {
+            let initializer = translate_expression(expression, scope.clone())?;
+            unify(&typ, initializer.typ(), scope)?;
+            Some(initializer)
+        },
+        None => None,
+    };
+    Ok(Var {
+        name: pvar.name.clone(),
+        initializer,
         typ,
     })
 }

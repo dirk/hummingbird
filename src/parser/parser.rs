@@ -32,8 +32,7 @@ pub fn parse_module(input: &mut TokenStream) -> ParseResult<Module> {
     Ok(Module { statements })
 }
 
-/// Must receive a `Token::CommentLine`; returns a corresponding
-/// `ModuleStatement::CommentLine`.
+/// Must receive a `Token::CommentLine`; returns a corresponding `CommentLine`.
 fn token_to_comment_line(token: Token) -> CommentLine {
     if let Token::CommentLine(content, span) = token {
         CommentLine { content, span }
@@ -116,6 +115,7 @@ fn parse_block_statement(input: &mut TokenStream) -> ParseResult<Option<BlockSta
         Token::CommentLine(_, _) => Some(BlockStatement::CommentLine(token_to_comment_line(
             input.read(),
         ))),
+        Token::Var(_) => Some(BlockStatement::Var(expect_var(input)?)),
         Token::Newline(_) => None,
         Token::Func(_) => Some(BlockStatement::Func(expect_func(input)?)),
         _ => Some(BlockStatement::Expression(parse_expression(input)?)),
@@ -159,6 +159,24 @@ fn expect_block_terminals(input: &mut TokenStream) -> ParseResult<Vec<BlockState
             next.clone(),
         ))
     }
+}
+
+fn expect_var(input: &mut TokenStream) -> ParseResult<Var> {
+    let start = expect_to_read!(input, { Token::Var(start) => start });
+    let name = expect_to_read!(input, { Token::Word(word) => word });
+    let (initializer, end) = if let Token::Equals(_) = input.peek() {
+        input.read();
+        let initializer = parse_expression(input)?;
+        let end = initializer.span().end.clone();
+        (Some(initializer), end)
+    } else {
+        (None, name.span.end.clone())
+    };
+    Ok(Var {
+        name,
+        initializer,
+        span: Span::new(start, end),
+    })
 }
 
 fn parse_expression(input: &mut TokenStream) -> ParseResult<Expression> {

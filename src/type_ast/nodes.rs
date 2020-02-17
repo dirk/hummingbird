@@ -109,6 +109,7 @@ impl Closable for Block {
 pub enum BlockStatement {
     Expression(Expression),
     Func(Func),
+    Var(Var),
 }
 
 impl BlockStatement {
@@ -117,6 +118,7 @@ impl BlockStatement {
         match self {
             Expression(expression) => expression.typ().clone(),
             Func(func) => func.typ.clone(),
+            Var(var) => var.typ.clone(),
         }
     }
 }
@@ -127,6 +129,28 @@ impl Closable for BlockStatement {
         Ok(match self {
             Expression(expression) => Expression(expression.close(tracker, scope)?),
             Func(func) => Func(func.close(tracker, scope)?),
+            Var(var) => Var(var.close(tracker, scope)?),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct Var {
+    pub name: Word,
+    pub initializer: Option<Expression>,
+    pub typ: Type,
+}
+
+impl Closable for Var {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
+        let initializer = match self.initializer {
+            Some(expression) => Some(expression.close(tracker, scope.clone())?),
+            None => None,
+        };
+        Ok(Self {
+            name: self.name,
+            initializer,
+            typ: self.typ.close(tracker, scope)?,
         })
     }
 }

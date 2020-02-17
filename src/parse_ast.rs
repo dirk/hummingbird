@@ -42,6 +42,13 @@ impl FuncBody {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Var {
+    pub name: Word,
+    pub initializer: Option<Expression>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Import {
     pub path: String,
     pub span: Span,
@@ -63,6 +70,7 @@ pub struct Block {
 pub enum BlockStatement {
     CommentLine(CommentLine),
     Expression(Expression),
+    Var(Var),
     Func(Func),
 }
 
@@ -73,6 +81,23 @@ pub enum Expression {
     LiteralInt(LiteralInt),
     PostfixCall(PostfixCall),
     PostfixProperty(PostfixProperty),
+}
+
+impl Expression {
+    pub fn span(&self) -> Span {
+        use Expression::*;
+        match self {
+            Identifier(identifier) => identifier.name.span.clone(),
+            Infix(infix) => {
+                let start = infix.lhs.span().start;
+                let end = infix.rhs.span().end;
+                Span::new(start, end)
+            }
+            LiteralInt(literal) => literal.span.clone(),
+            PostfixCall(call) => call.span.clone(),
+            PostfixProperty(property) => property.span.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

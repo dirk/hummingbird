@@ -68,7 +68,7 @@ impl<O: Write> Printer<O> {
                 Func(func) => self.print_func(func, index == 0)?,
             }
         }
-        self.lnwrite("");
+        self.lnwrite("")?;
         Ok(())
     }
 
@@ -226,6 +226,23 @@ impl<O: Write> Printer<O> {
         })
     }
 
+    fn print_var(&self, var: &Var, first: bool) -> Result<()> {
+        let opener = format!("var {}: ", &var.name.name);
+        if first {
+            self.iwrite(opener)?;
+        } else {
+            self.lnwrite(opener)?;
+        }
+        self.write_type(&var.typ, true)?;
+        if let Some(initializer) = &var.initializer {
+            self.indented(|this| {
+                this.write(" =")?;
+                this.print_expression(initializer)
+            })?;
+        }
+        Ok(())
+    }
+
     fn print_block(&self, block: &Block, initial_indent: bool) -> Result<()> {
         let opener = "{";
         if initial_indent {
@@ -242,6 +259,7 @@ impl<O: Write> Printer<O> {
                         self.print_expression(expression)?;
                     }
                     Func(func) => self.print_func(func, false)?,
+                    Var(var) => self.print_var(var, false)?,
                 }
             }
             Ok(())
