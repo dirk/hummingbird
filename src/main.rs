@@ -8,8 +8,10 @@ extern crate lazy_static;
 extern crate termcolor;
 
 use std::env;
+use std::path::PathBuf;
 use std::process::exit;
 
+mod frontend;
 mod parse_ast;
 mod parser;
 mod type_ast;
@@ -66,6 +68,8 @@ fn main() {
     };
     let printer = Printer::new_with_options(std::io::stdout(), PrinterOptions { print_pointers });
     printer.print_module(type_ast).unwrap();
+
+    frontend::Manager::compile_main(filename.into()).unwrap();
 }
 
 fn print_type_error(error: TypeError, filename: String, source: String) {

@@ -409,12 +409,16 @@ impl Closable for Type {
 #[derive(Clone, Debug)]
 pub struct Func {
     pub id: usize,
+    /// The scope that this function was defined in, not the actual scope of
+    /// its body. If you want that see the `type_ast::Func.scope`.
     pub scope: Scope,
+    /// False while the type is being built (forward declaration), true
+    /// afterwards. Should not be mutated once closed!
     pub closed: RefCell<bool>,
-    // Included for debugging.
+    /// Included for debugging.
     pub name: Option<String>,
-    // The arguments and type are only mutable in order to support forward
-    // declaration.
+    // The arguments and return types are only mutable in order to support
+    // forward declaration (for closures and recursion).
     pub arguments: RefCell<Vec<Type>>,
     pub retrn: RefCell<Type>,
 }

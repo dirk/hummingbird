@@ -196,14 +196,20 @@ mod tests {
         let phantom = Type::new_phantom();
         let unbound = Type::new_unbound(scope.clone());
         unify(&unbound, &phantom, scope)?;
-        assert_eq!(&phantom, unbound.unwrap_variable().borrow().unwrap_substitute());
+        assert_eq!(
+            &phantom,
+            unbound.unwrap_variable().borrow().unwrap_substitute()
+        );
 
         // And with unbound on the right.
         let scope = new_scope();
         let phantom = Type::new_phantom();
         let unbound = Type::new_unbound(scope.clone());
         unify(&phantom, &unbound, scope)?;
-        assert_eq!(&phantom, unbound.unwrap_variable().borrow().unwrap_substitute());
+        assert_eq!(
+            &phantom,
+            unbound.unwrap_variable().borrow().unwrap_substitute()
+        );
 
         Ok(())
     }
