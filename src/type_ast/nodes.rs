@@ -1,5 +1,5 @@
 use super::super::parser::{Location, Span, Token, Word};
-use super::scope::Scope;
+use super::scope::{Scope, ScopeResolution};
 use super::{Closable, RecursionTracker, Type, TypeResult};
 
 #[derive(Debug)]
@@ -169,6 +169,7 @@ impl Closable for Expression {
 #[derive(Debug)]
 pub struct Identifier {
     pub name: Word,
+    pub resolution: ScopeResolution,
     pub typ: Type,
 }
 
@@ -176,6 +177,7 @@ impl Closable for Identifier {
     fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         Ok(Identifier {
             name: self.name,
+            resolution: self.resolution,
             typ: self.typ.close(tracker, scope)?,
         })
     }

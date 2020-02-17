@@ -13,7 +13,7 @@ pub enum Scope {
 }
 
 impl Scope {
-    pub fn get_local(&self, name: &str) -> TypeResult<Type> {
+    pub fn get_local(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         match self {
             Func(func) => func.borrow_mut().get_local(name),
@@ -25,12 +25,14 @@ impl Scope {
     ///
     ///     return self.parent.get_local_from_parent(name);
     ///
-    pub fn get_local_from_parent(&self, name: &str) -> TypeResult<(Type, ParentResolution)> {
+    pub fn get_local_from_parent(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
-        match self {
+        let resolution = match self {
             Func(func) => func.borrow_mut().get_local_as_parent(name),
             Module(module) => module.borrow_mut().get_local_as_parent(name),
-        }
+        };
+        // Add ourselves (the parent) onto the end of the scope chain.
+        resolution.map(|resolution| resolution.add_scope(self.clone()))
     }
 
     pub fn add_local(&self, name: &str, typ: Type) -> TypeResult<()> {
@@ -120,21 +122,60 @@ impl PartialEq for Scope {
     }
 }
 
-/// When getting locals from parent scopes we need to know if it was a local
-/// that was ultimately read (need to set up closures) or if it was a static
-/// (no need for closures).
-pub enum ParentResolution {
-    Local,
-    Static,
+/// When getting locals from parent scopes we need to know how the local
+/// was read:
+///   - Local: in the current scope
+///   - Closure: in a higher up func and/or block scope
+///   - Static
+#[derive(Debug, PartialEq)]
+pub enum ScopeResolution {
+    Local(String, Type),
+    /// A local that was found in a func and/or block scope above the current
+    /// scope. The `Vec<Scope>` lists the chain of scopes traversed: the first
+    /// is the highest/farthest and the last is the lowest/nearest to the
+    /// current scope.
+    Closure(String, Type, Vec<Scope>),
+    // TODO: Add the module, import, or class the static was found on.
+    Static(String, Type),
+}
+
+impl ScopeResolution {
+    pub fn name(&self) -> String {
+        use ScopeResolution::*;
+        match self {
+            Local(name, _) | Closure(name, _, _) | Static(name, _) => name.clone(),
+        }
+    }
+
+    pub fn typ(&self) -> Type {
+        use ScopeResolution::*;
+        match self {
+            Local(_, typ) | Closure(_, typ, _) | Static(_, typ) => typ.clone(),
+        }
+    }
+
+    /// Add a scope to the end of the scope chain if it's a closure resolution,
+    /// otherwise this is a no-op identity function.
+    pub fn add_scope(self, scope: Scope) -> Self {
+        use ScopeResolution::*;
+        match self {
+            Closure(name, typ, scopes) => {
+                let mut new_scopes = scopes.clone();
+                new_scopes.push(scope);
+                Closure(name, typ, new_scopes)
+            }
+            other @ _ => other,
+        }
+    }
 }
 
 pub trait ScopeLike {
     /// Consume oneself to produce a shareable `Scope`.
     fn into_scope(self) -> Scope;
 
-    fn get_local(&mut self, name: &str) -> TypeResult<Type>;
+    fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution>;
 
-    fn get_local_as_parent(&mut self, name: &str) -> TypeResult<(Type, ParentResolution)>;
+    fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution>;
 
     fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()>;
 
@@ -170,21 +211,23 @@ impl ScopeLike for FuncScope {
         Scope::Func(Rc::new(RefCell::new(self)))
     }
 
-    fn get_local(&mut self, name: &str) -> Result<Type, TypeError> {
+    fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
+        use ScopeResolution::*;
         if let Some(typ) = self.locals.get(name) {
-            return Ok(typ.clone());
+            return Ok(Local(name.to_string(), typ.clone()));
         }
         if let Some(parent) = &self.parent {
             return match parent.get_local_from_parent(name) {
-                Ok((typ, resolution)) => {
+                Ok(resolution) => {
                     match resolution {
                         // If the ultimate resolution was as a local variable
                         // then we need to mark ourselves as capturing our
                         // parent's scope.
-                        ParentResolution::Local => self.captures = true,
-                        _ => (),
+                        Closure(_, _, _) => self.captures = true,
+                        Static(_, _) => (),
+                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
                     }
-                    Ok(typ)
+                    Ok(resolution)
                 }
                 Err(err) => Err(err),
             };
@@ -194,33 +237,35 @@ impl ScopeLike for FuncScope {
         })
     }
 
-    fn get_local_as_parent(&mut self, name: &str) -> TypeResult<(Type, ParentResolution)> {
+    fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution> {
+        use ScopeResolution::*;
         if let Some(typ) = self.locals.get(name) {
             // If we found it in ourselves.
             self.captured = true;
             self.captured_locals.insert(name.to_string());
-            return Ok((typ.clone(), ParentResolution::Local));
+            // Our caller (`get_local_from_parent`) will add ourselves onto the
+            // scope chain `Vec`.
+            return Ok(Closure(name.to_string(), typ.clone(), vec![]));
         }
-
         if let Some(parent) = &self.parent {
             return match parent.get_local_from_parent(name) {
-                Ok((typ, resolution)) => {
+                Ok(resolution) => {
                     match resolution {
-                        // If the ultimate resolution was as a local variable
-                        // then we need to mark ourselves as both captured and
-                        // as capturing.
-                        ParentResolution::Local => {
+                        // If the ultimate resolution was as a closed over
+                        // variable then we need to mark ourselves as both
+                        // captured and capturing.
+                        Closure(_, _, _) => {
                             self.captures = true;
                             self.captured = true;
                         }
-                        _ => (),
+                        Static(_, _) => (),
+                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
                     }
-                    Ok((typ, resolution))
+                    Ok(resolution)
                 }
                 err @ Err(_) => err,
             };
         }
-
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
         })
@@ -249,6 +294,7 @@ impl std::fmt::Debug for FuncScope {
 
 pub struct ModuleScope {
     pub statics: HashMap<String, Type>,
+    // Keeping track of which statics are used by child scopes. Not sure why...
     captured_statics: HashSet<String>,
 }
 
@@ -266,26 +312,26 @@ impl ScopeLike for ModuleScope {
         Scope::Module(Rc::new(RefCell::new(self)))
     }
 
-    fn get_local(&mut self, name: &str) -> Result<Type, TypeError> {
+    fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
         if let Some(typ) = self.statics.get(name) {
-            return Ok(typ.clone());
+            return Ok(ScopeResolution::Static(name.to_string(), typ.clone()));
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
         })
     }
 
-    fn get_local_as_parent(&mut self, name: &str) -> Result<(Type, ParentResolution), TypeError> {
+    fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution> {
         if let Some(typ) = self.statics.get(name) {
             self.captured_statics.insert(name.to_string());
-            return Ok((typ.clone(), ParentResolution::Static));
+            return Ok(ScopeResolution::Static(name.to_string(), typ.clone()));
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
         })
     }
 
-    fn add_local(&mut self, name: &str, typ: Type) -> Result<(), TypeError> {
+    fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()> {
         if self.statics.contains_key(name) {
             return Err(TypeError::LocalAlreadyDefined {
                 name: name.to_string(),
@@ -303,5 +349,57 @@ impl ScopeLike for ModuleScope {
 impl std::fmt::Debug for ModuleScope {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "ModuleScope({:p})", self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::typ::Type;
+    use super::{FuncScope, ModuleScope, ScopeLike, ScopeResolution};
+
+    #[test]
+    fn test_scope_resolution() {
+        let level1 = ModuleScope::new().into_scope();
+        let static1 = Type::new_phantom();
+        level1.add_local("static1", static1.clone()).unwrap();
+
+        let level2 = FuncScope::new(Some(level1.clone())).into_scope();
+        let local2 = Type::new_phantom();
+        level2.add_local("local2", local2.clone()).unwrap();
+
+        let level3 = FuncScope::new(Some(level2.clone())).into_scope();
+        let local3 = Type::new_phantom();
+        level3.add_local("local3", local3.clone()).unwrap();
+
+        let level4 = FuncScope::new(Some(level3.clone())).into_scope();
+        let local4 = Type::new_phantom();
+        level4.add_local("local4", local4.clone()).unwrap();
+
+        // Check that module statics are resolved to static.
+        assert_eq!(
+            level4.get_local("static1").unwrap(),
+            ScopeResolution::Static("static1".to_string(), static1)
+        );
+
+        // Check that locals are resolved to local.
+        assert_eq!(
+            level4.get_local("local4").unwrap(),
+            ScopeResolution::Local("local4".to_string(), local4)
+        );
+
+        // And check that closed-over locals are resolved to closures with
+        // correct chains.
+        assert_eq!(
+            level4.get_local("local2").unwrap(),
+            ScopeResolution::Closure(
+                "local2".to_string(),
+                local2,
+                vec![level2.clone(), level3.clone()]
+            )
+        );
+        assert_eq!(
+            level4.get_local("local3").unwrap(),
+            ScopeResolution::Closure("local3".to_string(), local3, vec![level3.clone()])
+        );
     }
 }

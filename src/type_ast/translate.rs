@@ -121,8 +121,13 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
     Ok(match pexpression {
         past::Expression::Identifier(pidentifier) => {
             let name = pidentifier.name.clone();
-            let typ = scope.get_local(&name.name)?;
-            Expression::Identifier(Identifier { name, typ })
+            let resolution = scope.get_local(&name.name)?;
+            let typ = resolution.typ();
+            Expression::Identifier(Identifier {
+                name,
+                resolution,
+                typ,
+            })
         }
         past::Expression::Infix(pinfix) => {
             let lhs = translate_expression(&*pinfix.lhs, scope.clone())?;
