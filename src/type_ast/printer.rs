@@ -271,11 +271,44 @@ impl<O: Write> Printer<O> {
     fn print_expression(&self, expression: &Expression) -> Result<()> {
         use Expression::*;
         match expression {
+            Closure(closure) => self.print_closure(closure),
             Identifier(identifier) => self.print_identifier(identifier),
             Infix(infix) => self.print_infix(infix),
             LiteralInt(literal) => self.lnwrite(format!("{}", literal.value)),
             PostfixCall(call) => self.print_postfix_call(call, 0).map(|_| ()),
             PostfixProperty(property) => self.print_postfix_property(property, 0).map(|_| ()),
+        }
+    }
+
+    fn print_closure(&self, closure: &Closure) -> Result<()> {
+        self.lnwrite("Closure(")?;
+        if !closure.arguments.is_empty() {
+            self.write("\n")?;
+            self.indented(|this| {
+                for argument in closure.arguments.iter() {
+                    this.iwrite(format!("{}: ", argument.name))?;
+                    this.write_type(&argument.typ, true)?;
+                    this.write(",\n")?;
+                }
+                Ok(())
+            })?;
+        }
+        self.iwrite("): ")?;
+        let retrn = match &closure.typ {
+            Type::Func(func) => func.retrn.borrow(),
+            other @ _ => unreachable!("Closure node has non-Func type: {:?}", other),
+        };
+        self.write_type(&retrn, false)?;
+        self.write(" ")?;
+        match &*closure.body {
+            ClosureBody::Block(block) => self.print_block(block, false),
+            ClosureBody::Expression(expression) => {
+                self.indented(|this| {
+                    this.write("(")?;
+                    this.print_expression(expression)?;
+                    this.write(")")
+                })
+            }
         }
     }
 

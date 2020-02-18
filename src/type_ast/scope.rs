@@ -8,7 +8,7 @@ use super::{Closable, RecursionTracker, Type, TypeError, TypeResult};
 /// Proxy so that we can share different kinds of scopes.
 #[derive(Clone, Debug)]
 pub enum Scope {
-    Func(Rc<RefCell<FuncScope>>),
+    Closure(Rc<RefCell<ClosureScope>>),
     Module(Rc<RefCell<ModuleScope>>),
 }
 
@@ -16,7 +16,7 @@ impl Scope {
     pub fn get_local(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         match self {
-            Func(func) => func.borrow_mut().get_local(name),
+            Closure(func) => func.borrow_mut().get_local(name),
             Module(module) => module.borrow_mut().get_local(name),
         }
     }
@@ -28,7 +28,7 @@ impl Scope {
     pub fn get_local_from_parent(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         let resolution = match self {
-            Func(func) => func.borrow_mut().get_local_as_parent(name),
+            Closure(func) => func.borrow_mut().get_local_as_parent(name),
             Module(module) => module.borrow_mut().get_local_as_parent(name),
         };
         // Add ourselves (the parent) onto the end of the scope chain.
@@ -38,7 +38,7 @@ impl Scope {
     pub fn add_local(&self, name: &str, typ: Type) -> TypeResult<()> {
         use Scope::*;
         match self {
-            Func(func) => func.borrow_mut().add_local(name, typ),
+            Closure(func) => func.borrow_mut().add_local(name, typ),
             Module(module) => module.borrow_mut().add_local(name, typ),
         }
     }
@@ -46,7 +46,7 @@ impl Scope {
     fn get_parent(&self) -> Option<Scope> {
         use Scope::*;
         match self {
-            Func(func) => func.borrow().get_parent(),
+            Closure(func) => func.borrow().get_parent(),
             Module(module) => module.borrow().get_parent(),
         }
     }
@@ -72,14 +72,14 @@ impl Closable for Scope {
     fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         use Scope::*;
         Ok(match self {
-            Func(shared) => {
+            Closure(shared) => {
                 let replacement = {
                     let func = shared.borrow();
                     let mut locals = HashMap::new();
                     for (name, typ) in func.locals.iter() {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
-                    FuncScope {
+                    ClosureScope {
                         locals,
                         parent: func.parent.clone(),
                         captures: func.captures,
@@ -88,7 +88,7 @@ impl Closable for Scope {
                     }
                 };
                 shared.replace(replacement);
-                Func(shared)
+                Closure(shared)
             }
             Module(shared) => {
                 let replacement = {
@@ -113,7 +113,7 @@ impl PartialEq for Scope {
     fn eq(&self, other: &Self) -> bool {
         use Scope::*;
         match (self, other) {
-            (Func(self_func), Func(other_func)) => self_func.as_ptr() == other_func.as_ptr(),
+            (Closure(self_func), Closure(other_func)) => self_func.as_ptr() == other_func.as_ptr(),
             (Module(self_module), Module(other_module)) => {
                 self_module.as_ptr() == other_module.as_ptr()
             }
@@ -193,7 +193,7 @@ pub trait ScopeLike {
     fn get_parent(&self) -> Option<Scope>;
 }
 
-pub struct FuncScope {
+pub struct ClosureScope {
     pub locals: HashMap<String, Type>,
     parent: Option<Scope>,
     /// Whether or not this scope captures its parent scope.
@@ -205,7 +205,7 @@ pub struct FuncScope {
     captured_locals: HashSet<String>,
 }
 
-impl FuncScope {
+impl ClosureScope {
     pub fn new(parent: Option<Scope>) -> Self {
         Self {
             locals: HashMap::new(),
@@ -217,9 +217,9 @@ impl FuncScope {
     }
 }
 
-impl ScopeLike for FuncScope {
+impl ScopeLike for ClosureScope {
     fn into_scope(self) -> Scope {
-        Scope::Func(Rc::new(RefCell::new(self)))
+        Scope::Closure(Rc::new(RefCell::new(self)))
     }
 
     fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
@@ -297,7 +297,7 @@ impl ScopeLike for FuncScope {
     }
 }
 
-impl std::fmt::Debug for FuncScope {
+impl std::fmt::Debug for ClosureScope {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "FuncScope({:p})", self)
     }
@@ -366,7 +366,7 @@ impl std::fmt::Debug for ModuleScope {
 #[cfg(test)]
 mod tests {
     use super::super::typ::Type;
-    use super::{FuncScope, ModuleScope, ScopeLike, ScopeResolution};
+    use super::{ClosureScope, ModuleScope, ScopeLike, ScopeResolution};
 
     #[test]
     fn test_scope_resolution() {
@@ -374,15 +374,15 @@ mod tests {
         let static1 = Type::new_phantom();
         level1.add_local("static1", static1.clone()).unwrap();
 
-        let level2 = FuncScope::new(Some(level1.clone())).into_scope();
+        let level2 = ClosureScope::new(Some(level1.clone())).into_scope();
         let local2 = Type::new_phantom();
         level2.add_local("local2", local2.clone()).unwrap();
 
-        let level3 = FuncScope::new(Some(level2.clone())).into_scope();
+        let level3 = ClosureScope::new(Some(level2.clone())).into_scope();
         let local3 = Type::new_phantom();
         level3.add_local("local3", local3.clone()).unwrap();
 
-        let level4 = FuncScope::new(Some(level3.clone())).into_scope();
+        let level4 = ClosureScope::new(Some(level3.clone())).into_scope();
         let local4 = Type::new_phantom();
         level4.add_local("local4", local4.clone()).unwrap();
 

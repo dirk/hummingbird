@@ -99,6 +99,7 @@ pub struct Word {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    Arrow(Location),
     BraceLeft(Location),
     BraceRight(Location),
     Comma(Location),
@@ -129,7 +130,8 @@ impl Token {
             CommentLine(_, span) => span.start.clone(),
             LiteralInt(literal) => literal.span.start.clone(),
             Word(word) => word.span.start.clone(),
-            BraceLeft(location)
+            Arrow(location)
+            | BraceLeft(location)
             | BraceRight(location)
             | Comma(location)
             | Dot(location)
@@ -268,10 +270,10 @@ impl TokenStream {
     }
 
     fn lex_arrow_minus_or_numeric(&mut self, start: Location, head: char) -> Token {
-        // if first_character == '-' && self.input.peek() == '>' {
-        //     self.input.read();
-        //     return Token::Arrow;
-        // }
+        if head == '-' && self.input.peek() == '>' {
+            self.input.read();
+            return Token::Arrow(start);
+        }
         if head == '-' && !digit(self.input.peek()) {
             return Token::Minus(start);
         }
@@ -348,6 +350,17 @@ mod tests {
             }
         }
         return tokens;
+    }
+
+    #[test]
+    fn test_parse_arrow() {
+        assert_eq!(
+            parse("->"),
+            vec![
+                Token::Arrow(Location::new(0, 1, 1)),
+                Token::EOF(Location::new(2, 1, 3))
+            ]
+        );
     }
 
     #[test]

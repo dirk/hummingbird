@@ -17,8 +17,8 @@ pub fn next_uid() -> usize {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    /// A callable function; it is fixed and cannot be mutated once it is
-    /// closed at the end of creation.
+    /// A callable function or closure; it is fixed and cannot be mutated once
+    /// it is closed at the end of creation.
     Func(Rc<Func>),
     /// A generic defined by the user; it is fixed and cannot be mutated.
     ///
@@ -140,6 +140,7 @@ impl Type {
                 let variable = &*variable.borrow();
                 match variable {
                     Variable::Generic { generic, .. } => generic_to_callable(generic),
+                    Variable::Substitute { substitute, .. } => substitute.maybe_callable(),
                     _ => None,
                 }
             }

@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Error, Formatter};
 
 use super::super::parse_ast::*;
 use super::lexer::{Token, TokenStream};
-use super::{Location, Span};
+use super::{Location, Span, Word};
 
 type ParseResult<T> = Result<T, ParseError>;
 
@@ -118,7 +118,7 @@ fn parse_block_statement(input: &mut TokenStream) -> ParseResult<Option<BlockSta
         Token::Var(_) => Some(BlockStatement::Var(expect_var(input)?)),
         Token::Newline(_) => None,
         Token::Func(_) => Some(BlockStatement::Func(expect_func(input)?)),
-        _ => Some(BlockStatement::Expression(parse_expression(input)?)),
+        _ => Some(BlockStatement::Expression(expect_expression(input)?)),
     })
 }
 
@@ -166,7 +166,7 @@ fn expect_var(input: &mut TokenStream) -> ParseResult<Var> {
     let name = expect_to_read!(input, { Token::Word(word) => word });
     let (initializer, end) = if let Token::Equals(_) = input.peek() {
         input.read();
-        let initializer = parse_expression(input)?;
+        let initializer = expect_expression(input)?;
         let end = initializer.span().end.clone();
         (Some(initializer), end)
     } else {
@@ -179,7 +179,7 @@ fn expect_var(input: &mut TokenStream) -> ParseResult<Var> {
     })
 }
 
-fn parse_expression(input: &mut TokenStream) -> ParseResult<Expression> {
+fn expect_expression(input: &mut TokenStream) -> ParseResult<Expression> {
     parse_infix(input)
 }
 
@@ -257,7 +257,7 @@ fn expect_postfix_call(input: &mut TokenStream, target: Expression) -> ParseResu
                 break;
             }
             _ => {
-                arguments.push(parse_expression(input)?);
+                arguments.push(expect_expression(input)?);
                 match input.peek() {
                     Token::Comma(_) => {
                         input.read();
@@ -275,14 +275,44 @@ fn expect_postfix_call(input: &mut TokenStream, target: Expression) -> ParseResu
 }
 
 fn parse_group(input: &mut TokenStream) -> ParseResult<Expression> {
-    if let Token::ParenthesesLeft(_) = input.peek() {
+    let head = if let Token::ParenthesesLeft(_) = input.peek() {
         input.read();
-        let expression = parse_expression(input)?;
+        let expression = expect_expression(input)?;
         expect_to_read!(input, { Token::ParenthesesRight(_) => () });
-        Ok(expression)
+        expression
     } else {
-        expect_atom(input)
+        expect_atom(input)?
+    };
+    if let Token::Arrow(_) = input.peek() {
+        expect_to_read!(input, { Token::Arrow(_) => () });
+        let start = head.span().start.clone();
+        let body = match input.peek() {
+            Token::BraceLeft(_) => ClosureBody::Block(expect_block(input)?),
+            _ => ClosureBody::Expression(expect_expression(input)?),
+        };
+        let end = body.span().end;
+        // Convert the head expression into arguments.
+        let arguments = convert_expression_into_closure_arguments(head)?;
+        return Ok(Expression::Closure(Closure {
+            arguments,
+            body: Box::new(body),
+            span: Span::new(start, end),
+        }));
     }
+    Ok(head)
+}
+
+/// Groups, tuples, and identifiers can all be converted to closure arguments:
+///   (foo) -> bar         Group
+///   (foo,) -> bar        Tuple
+///   (foo, bar) -> baz    Tuple
+///   foo -> bar           Identifier
+fn convert_expression_into_closure_arguments(expression: Expression) -> ParseResult<Vec<Word>> {
+    Ok(match expression {
+        Expression::Identifier(identifier) => vec![identifier.name],
+        // TODO: Handle parsing of groups and tuples as closure arguments.
+        other @ _ => unreachable!("Cannot convert: {:?}", other),
+    })
 }
 
 /// Parse an identifier or literal.
@@ -412,7 +442,7 @@ mod tests {
     use super::super::super::parse_ast::*;
     use super::super::lexer::TokenStream;
     use super::super::{Location, Span, Token, Word};
-    use super::{expect_block, parse_infix, parse_module, parse_postfix};
+    use super::{expect_block, expect_expression, parse_infix, parse_module, parse_postfix};
 
     fn input(input: &str) -> TokenStream {
         TokenStream::from_string(input.to_string())
@@ -486,6 +516,49 @@ mod tests {
                         span: Span::unknown(),
                     })),
                 }))
+            }))
+        );
+    }
+
+    fn word<S: AsRef<str>>(name: S) -> Word {
+        Word {
+            name: name.as_ref().to_string(),
+            span: Span::unknown(),
+        }
+    }
+
+    #[test]
+    fn test_parse_closure() {
+        // Simplest case.
+        assert_eq!(
+            expect_expression(&mut input("foo -> bar")),
+            Ok(Expression::Closure(Closure {
+                arguments: vec![word("foo")],
+                body: Box::new(ClosureBody::Expression(Expression::Identifier(
+                    Identifier { name: word("bar") }
+                ))),
+                span: Span::unknown()
+            }))
+        );
+        // Chain case with an infix in between; with parentheses added this
+        // should be equal to:
+        //   foo -> (foo + (bar -> baz))
+        assert_eq!(
+            expect_expression(&mut input("foo -> bar + foo -> baz")),
+            Ok(Expression::Closure(Closure {
+                arguments: vec![word("foo")],
+                body: Box::new(ClosureBody::Expression(Expression::Infix(Infix {
+                    lhs: Box::new(Expression::Identifier(Identifier { name: word("bar") })),
+                    op: Token::Plus(Location::unknown()),
+                    rhs: Box::new(Expression::Closure(Closure {
+                        arguments: vec![word("foo")],
+                        body: Box::new(ClosureBody::Expression(Expression::Identifier(
+                            Identifier { name: word("baz") }
+                        ))),
+                        span: Span::unknown(),
+                    }))
+                }))),
+                span: Span::unknown()
             }))
         );
     }

@@ -24,7 +24,7 @@ mod unify;
 pub use builtins::Builtins;
 pub use nodes::*;
 pub use printer::{Printer, PrinterOptions};
-pub use scope::{FuncScope, ModuleScope, Scope, ScopeLike};
+pub use scope::{ClosureScope, ModuleScope, Scope, ScopeLike};
 pub use translate::translate_module;
 pub use typ::{Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, Variable};
 pub use unify::unify;
@@ -182,11 +182,11 @@ mod tests {
 
     use super::super::parse_ast as past;
     use super::super::parser::{Location, Span, Token, Word};
-    use super::scope::{FuncScope, Scope};
+    use super::scope::{ClosureScope, Scope};
     use super::{unify, Builtins, Closable, FuncBody, ScopeLike, Type, TypeError, Variable};
 
     fn new_scope() -> Scope {
-        FuncScope::new(None).into_scope()
+        ClosureScope::new(None).into_scope()
     }
 
     #[test]

@@ -20,6 +20,29 @@ pub struct CommentLine {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Closure {
+    pub arguments: Vec<Word>,
+    pub body: Box<ClosureBody>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ClosureBody {
+    Block(Block),
+    Expression(Expression),
+}
+
+impl ClosureBody {
+    pub fn span(&self) -> Span {
+        use ClosureBody::*;
+        match self {
+            Block(block) => block.span.clone(),
+            Expression(expression) => expression.span(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Func {
     pub name: Word,
     pub arguments: Vec<Word>,
@@ -76,6 +99,7 @@ pub enum BlockStatement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
+    Closure(Closure),
     Identifier(Identifier),
     Infix(Infix),
     LiteralInt(LiteralInt),
@@ -87,6 +111,7 @@ impl Expression {
     pub fn span(&self) -> Span {
         use Expression::*;
         match self {
+            Closure(closure) => closure.span.clone(),
             Identifier(identifier) => identifier.name.span.clone(),
             Infix(infix) => {
                 let start = infix.lhs.span().start;

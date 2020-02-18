@@ -22,6 +22,60 @@ impl Closable for ModuleStatement {
 }
 
 #[derive(Debug)]
+pub struct Closure {
+    pub arguments: Vec<FuncArgument>,
+    pub body: Box<ClosureBody>,
+    pub scope: Scope,
+    pub typ: Type,
+}
+
+impl Closable for Closure {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
+        let typ = Type::close_func(self.typ, tracker, scope.clone())?;
+        let mut arguments = vec![];
+        for argument in self.arguments {
+            arguments.push(FuncArgument {
+                name: argument.name,
+                typ: argument.typ.close(tracker, scope.clone())?,
+            })
+        }
+        let body = (*self.body).close(tracker, scope.clone())?;
+        Ok(Closure {
+            arguments,
+            body: Box::new(body),
+            scope: self.scope.close(tracker, scope)?,
+            typ,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum ClosureBody {
+    Block(Block),
+    Expression(Expression),
+}
+
+impl ClosureBody {
+    pub fn typ(&self) -> &Type {
+        use ClosureBody::*;
+        match self {
+            Block(block) => &block.typ,
+            Expression(expression) => expression.typ(),
+        }
+    }
+}
+
+impl Closable for ClosureBody {
+    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
+        use ClosureBody::*;
+        Ok(match self {
+            Block(block) => Block(block.close(tracker, scope)?),
+            Expression(expression) => Expression(expression.close(tracker, scope)?),
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct Func {
     pub name: String,
     pub arguments: Vec<FuncArgument>,
@@ -157,6 +211,7 @@ impl Closable for Var {
 
 #[derive(Debug)]
 pub enum Expression {
+    Closure(Closure),
     Identifier(Identifier),
     Infix(Infix),
     LiteralInt(LiteralInt),
@@ -168,6 +223,7 @@ impl Expression {
     pub fn typ(&self) -> &Type {
         use Expression::*;
         match self {
+            Closure(closure) => &closure.typ,
             Identifier(identifier) => &identifier.typ,
             Infix(infix) => &infix.typ,
             LiteralInt(literal) => &literal.typ,
@@ -181,6 +237,7 @@ impl Closable for Expression {
     fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         use Expression::*;
         Ok(match self {
+            Closure(closure) => Closure(closure.close(tracker, scope)?),
             Identifier(identifier) => Identifier(identifier.close(tracker, scope)?),
             Infix(infix) => Infix(infix.close(tracker, scope)?),
             literal @ LiteralInt(_) => literal,
