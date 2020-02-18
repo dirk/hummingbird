@@ -189,6 +189,30 @@ impl ScopeResolution {
             other @ _ => other,
         }
     }
+
+    /// Ensure that the resolution is not a `Closure`; will return an `Err` if
+    /// it is. Useful with `Result#and_then`:
+    ///
+    ///     resolution.and_then(ScopeResolution::disallow_closure)
+    ///
+    fn disallow_closure(resolution: Self) -> TypeResult<Self> {
+        use ScopeResolution::*;
+        match resolution {
+            Closure(name, _, _) => Err(TypeError::CannotCapture {
+                name: name.to_string(),
+            }),
+            other @ _ => Ok(other),
+        }
+    }
+
+    /// Useful for ensuring that the resolution is not `Local`.
+    fn assert_not_local(resolution: Self) -> TypeResult<Self> {
+        use ScopeResolution::*;
+        match resolution {
+            local @ Local(_, _) => panic!("Unexpected local resolution: {:?}", local),
+            other @ _ => Ok(other),
+        }
+    }
 }
 
 impl Closable for ScopeResolution {
@@ -250,20 +274,9 @@ impl ScopeLike for ClosureScope {
             return Ok(Local(name.to_string(), typ.clone()));
         }
         if let Some(parent) = &self.parent {
-            return match parent.get_local_from_parent(name) {
-                Ok(resolution) => {
-                    match resolution {
-                        // If the ultimate resolution was as a local variable
-                        // then we need to mark ourselves as capturing our
-                        // parent's scope.
-                        Closure(_, _, _) => self.captures = true,
-                        Static(_, _) => (),
-                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
-                    }
-                    Ok(resolution)
-                }
-                Err(err) => Err(err),
-            };
+            return parent
+                .get_local_from_parent(name)
+                .and_then(ScopeResolution::assert_not_local);
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
@@ -281,23 +294,9 @@ impl ScopeLike for ClosureScope {
             return Ok(Closure(name.to_string(), typ.clone(), vec![]));
         }
         if let Some(parent) = &self.parent {
-            return match parent.get_local_from_parent(name) {
-                Ok(resolution) => {
-                    match resolution {
-                        // If the ultimate resolution was as a closed over
-                        // variable then we need to mark ourselves as both
-                        // captured and capturing.
-                        Closure(_, _, _) => {
-                            self.captures = true;
-                            self.captured = true;
-                        }
-                        Static(_, _) => (),
-                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
-                    }
-                    Ok(resolution)
-                }
-                err @ Err(_) => err,
-            };
+            return parent
+                .get_local_from_parent(name)
+                .and_then(ScopeResolution::assert_not_local);
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
@@ -356,19 +355,10 @@ impl ScopeLike for FuncScope {
             return Ok(Local(name.to_string(), typ.clone()));
         }
         if let Some(parent) = &self.parent {
-            return match parent.get_local_from_parent(name) {
-                Ok(resolution) => {
-                    match resolution {
-                        // Functions are not allowed to capture closures.
-                        Closure(_, _, _) => Err(TypeError::CannotCapture {
-                            name: name.to_string(),
-                        }),
-                        statc @ Static(_, _) => Ok(statc),
-                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
-                    }
-                }
-                err @ Err(_) => err,
-            };
+            return parent
+                .get_local_from_parent(name)
+                .and_then(ScopeResolution::assert_not_local)
+                .and_then(ScopeResolution::disallow_closure);
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
@@ -383,16 +373,10 @@ impl ScopeLike for FuncScope {
             return Ok(Closure(name.to_string(), typ.clone(), vec![]));
         }
         if let Some(parent) = &self.parent {
-            return match parent.get_local_from_parent(name) {
-                Ok(resolution) => match resolution {
-                    Closure(_, _, _) => Err(TypeError::CannotCapture {
-                        name: name.to_string(),
-                    }),
-                    statc @ Static(_, _) => Ok(statc),
-                    Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
-                },
-                err @ Err(_) => err,
-            };
+            return parent
+                .get_local_from_parent(name)
+                .and_then(ScopeResolution::assert_not_local)
+                .and_then(ScopeResolution::disallow_closure);
         }
         Err(TypeError::LocalNotFound {
             name: name.to_string(),
