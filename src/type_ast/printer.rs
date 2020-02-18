@@ -302,13 +302,11 @@ impl<O: Write> Printer<O> {
         self.write(" ")?;
         match &*closure.body {
             ClosureBody::Block(block) => self.print_block(block, false),
-            ClosureBody::Expression(expression) => {
-                self.indented(|this| {
-                    this.write("(")?;
-                    this.print_expression(expression)?;
-                    this.write(")")
-                })
-            }
+            ClosureBody::Expression(expression) => self.indented(|this| {
+                this.write("(")?;
+                this.print_expression(expression)?;
+                this.write(")")
+            }),
         }
     }
 

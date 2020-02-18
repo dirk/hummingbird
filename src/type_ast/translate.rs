@@ -1,6 +1,6 @@
 use super::super::parse_ast as past;
 use super::nodes::*;
-use super::scope::{ClosureScope, ModuleScope, Scope, ScopeLike};
+use super::scope::{ClosureScope, FuncScope, ModuleScope, Scope, ScopeLike};
 use super::typ::{Generic, Type, Variable};
 use super::{unify, Builtins, Closable, RecursionTracker, TypeError, TypeResult};
 
@@ -33,7 +33,7 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
 fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {
     let name = pfunc.name.name.clone();
     // The scope that the function's arguments and body will be evaluated in.
-    let func_scope = ClosureScope::new(Some(scope.clone())).into_scope();
+    let func_scope = FuncScope::new(Some(scope.clone())).into_scope();
 
     // Build the `FuncArgument` nodes ahead of time so that they have types
     // in place.
@@ -114,7 +114,7 @@ fn translate_block(pblock: &past::Block, scope: Scope) -> TypeResult<Block> {
 
 fn translate_var(pvar: &past::Var, scope: Scope) -> TypeResult<Var> {
     let typ = Type::new_unbound(scope.clone());
-    scope.add_local(&pvar.name.name, typ.clone());
+    scope.add_local(&pvar.name.name, typ.clone())?;
     let initializer = match &pvar.initializer {
         Some(expression) => {
             let initializer = translate_expression(expression, scope.clone())?;
@@ -137,7 +137,9 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
         }
         past::Expression::Identifier(pidentifier) => {
             let name = pidentifier.name.clone();
-            let resolution = scope.get_local(&name.name)?;
+            let resolution = scope
+                .get_local(&name.name)
+                .map_err(|err| err.with_span(pidentifier.name.span.clone()))?;
             let typ = resolution.typ();
             Expression::Identifier(Identifier {
                 name,
@@ -190,7 +192,7 @@ fn translate_closure(pclosure: &past::Closure, scope: Scope) -> TypeResult<Closu
     let retrn = Type::new_unbound(closure_scope.clone());
 
     for argument_node in arguments_nodes.iter() {
-        closure_scope.add_local(&argument_node.name, argument_node.typ.clone());
+        closure_scope.add_local(&argument_node.name, argument_node.typ.clone())?;
     }
 
     let body = match &*pclosure.body {
@@ -376,10 +378,9 @@ mod tests {
 
     #[test]
     fn test_translate_func() -> Result<(), TypeError> {
-        let pfunc_inner = past::Func {
-            name: word("foo_inner"),
+        let pclosure = past::Closure {
             arguments: vec![],
-            body: past::FuncBody::Block(past::Block {
+            body: Box::new(past::ClosureBody::Block(past::Block {
                 // statements: vec![past::BlockStatement::Expression(past::Expression::Infix(
                 //     past::Infix {
                 //         lhs: Box::new(past::Expression::Identifier(past::Identifier {
@@ -396,7 +397,7 @@ mod tests {
                     past::Expression::Identifier(past::Identifier { name: word("bar") }),
                 )],
                 span: Span::unknown(),
-            }),
+            })),
             span: Span::unknown(),
         };
 
@@ -417,7 +418,7 @@ mod tests {
                 //     },
                 // ))],
                 statements: vec![
-                    past::BlockStatement::Func(pfunc_inner),
+                    past::BlockStatement::Expression(past::Expression::Closure(pclosure)),
                     past::BlockStatement::Expression(past::Expression::Infix(past::Infix {
                         lhs: Box::new(past::Expression::Identifier(past::Identifier {
                             name: word("bar"),

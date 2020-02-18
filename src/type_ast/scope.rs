@@ -9,6 +9,7 @@ use super::{Closable, RecursionTracker, Type, TypeError, TypeResult};
 #[derive(Clone, Debug)]
 pub enum Scope {
     Closure(Rc<RefCell<ClosureScope>>),
+    Func(Rc<RefCell<FuncScope>>),
     Module(Rc<RefCell<ModuleScope>>),
 }
 
@@ -16,7 +17,8 @@ impl Scope {
     pub fn get_local(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         match self {
-            Closure(func) => func.borrow_mut().get_local(name),
+            Closure(closure) => closure.borrow_mut().get_local(name),
+            Func(func) => func.borrow_mut().get_local(name),
             Module(module) => module.borrow_mut().get_local(name),
         }
     }
@@ -28,7 +30,8 @@ impl Scope {
     pub fn get_local_from_parent(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         let resolution = match self {
-            Closure(func) => func.borrow_mut().get_local_as_parent(name),
+            Closure(closure) => closure.borrow_mut().get_local_as_parent(name),
+            Func(func) => func.borrow_mut().get_local_as_parent(name),
             Module(module) => module.borrow_mut().get_local_as_parent(name),
         };
         // Add ourselves (the parent) onto the end of the scope chain.
@@ -38,7 +41,8 @@ impl Scope {
     pub fn add_local(&self, name: &str, typ: Type) -> TypeResult<()> {
         use Scope::*;
         match self {
-            Closure(func) => func.borrow_mut().add_local(name, typ),
+            Closure(closure) => closure.borrow_mut().add_local(name, typ),
+            Func(func) => func.borrow_mut().add_local(name, typ),
             Module(module) => module.borrow_mut().add_local(name, typ),
         }
     }
@@ -46,7 +50,8 @@ impl Scope {
     fn get_parent(&self) -> Option<Scope> {
         use Scope::*;
         match self {
-            Closure(func) => func.borrow().get_parent(),
+            Closure(closure) => closure.borrow().get_parent(),
+            Func(func) => func.borrow().get_parent(),
             Module(module) => module.borrow().get_parent(),
         }
     }
@@ -74,21 +79,38 @@ impl Closable for Scope {
         Ok(match self {
             Closure(shared) => {
                 let replacement = {
+                    let closure = shared.borrow();
+                    let mut locals = HashMap::new();
+                    for (name, typ) in closure.locals.iter() {
+                        locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
+                    }
+                    ClosureScope {
+                        locals,
+                        parent: closure.parent.clone(),
+                        captures: closure.captures,
+                        captured: closure.captured,
+                        captured_locals: closure.captured_locals.clone(),
+                    }
+                };
+                shared.replace(replacement);
+                Closure(shared)
+            }
+            Func(shared) => {
+                let replacement = {
                     let func = shared.borrow();
                     let mut locals = HashMap::new();
                     for (name, typ) in func.locals.iter() {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
-                    ClosureScope {
+                    FuncScope {
                         locals,
                         parent: func.parent.clone(),
-                        captures: func.captures,
                         captured: func.captured,
                         captured_locals: func.captured_locals.clone(),
                     }
                 };
                 shared.replace(replacement);
-                Closure(shared)
+                Func(shared)
             }
             Module(shared) => {
                 let replacement = {
@@ -199,7 +221,7 @@ pub struct ClosureScope {
     /// Whether or not this scope captures its parent scope.
     captures: bool,
     /// Whether or not this scope (or one of its parent scopes) is captured
-    /// by child scopes (closures).
+    /// by child scopes.
     captured: bool,
     /// Locals in this scope which are captured by closures.
     captured_locals: HashSet<String>,
@@ -298,6 +320,101 @@ impl ScopeLike for ClosureScope {
 }
 
 impl std::fmt::Debug for ClosureScope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "ClosureScope({:p})", self)
+    }
+}
+
+pub struct FuncScope {
+    locals: HashMap<String, Type>,
+    /// Only static resolutions are allowed through the parent.
+    parent: Option<Scope>,
+    /// Whether or not this scope is captured by child scopes (closures).
+    captured: bool,
+    captured_locals: HashSet<String>,
+}
+
+impl FuncScope {
+    pub fn new(parent: Option<Scope>) -> Self {
+        Self {
+            locals: HashMap::new(),
+            parent,
+            captured: false,
+            captured_locals: HashSet::new(),
+        }
+    }
+}
+
+impl ScopeLike for FuncScope {
+    fn into_scope(self) -> Scope {
+        Scope::Func(Rc::new(RefCell::new(self)))
+    }
+
+    fn get_local(&mut self, name: &str) -> Result<ScopeResolution, TypeError> {
+        use ScopeResolution::*;
+        if let Some(typ) = self.locals.get(name) {
+            return Ok(Local(name.to_string(), typ.clone()));
+        }
+        if let Some(parent) = &self.parent {
+            return match parent.get_local_from_parent(name) {
+                Ok(resolution) => {
+                    match resolution {
+                        // Functions are not allowed to capture closures.
+                        Closure(_, _, _) => Err(TypeError::CannotCapture {
+                            name: name.to_string(),
+                        }),
+                        statc @ Static(_, _) => Ok(statc),
+                        Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
+                    }
+                }
+                err @ Err(_) => err,
+            };
+        }
+        Err(TypeError::LocalNotFound {
+            name: name.to_string(),
+        })
+    }
+
+    fn get_local_as_parent(&mut self, name: &str) -> Result<ScopeResolution, TypeError> {
+        use ScopeResolution::*;
+        if let Some(typ) = self.locals.get(name) {
+            self.captured = true;
+            self.captured_locals.insert(name.to_string());
+            return Ok(Closure(name.to_string(), typ.clone(), vec![]));
+        }
+        if let Some(parent) = &self.parent {
+            return match parent.get_local_from_parent(name) {
+                Ok(resolution) => match resolution {
+                    Closure(_, _, _) => Err(TypeError::CannotCapture {
+                        name: name.to_string(),
+                    }),
+                    statc @ Static(_, _) => Ok(statc),
+                    Local(_, _) => unreachable!("Cannot get a local from a parent scope"),
+                },
+                err @ Err(_) => err,
+            };
+        }
+        Err(TypeError::LocalNotFound {
+            name: name.to_string(),
+        })
+    }
+
+    fn add_local(&mut self, name: &str, typ: Type) -> Result<(), TypeError> {
+        if self.locals.contains_key(name) {
+            return Err(TypeError::LocalAlreadyDefined {
+                name: name.to_string(),
+            });
+        }
+        self.locals.insert(name.to_string(), typ);
+        Ok(())
+    }
+
+    fn get_parent(&self) -> Option<Scope> {
+        self.parent.clone()
+    }
+}
+
+impl std::fmt::Debug for FuncScope {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "FuncScope({:p})", self)
     }

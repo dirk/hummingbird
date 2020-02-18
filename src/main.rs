@@ -84,15 +84,17 @@ fn print_type_error(error: TypeError, filename: String, source: String) {
         let mut files = Files::new();
         let file_id = files.add(filename, source);
 
-        let diagnostic = Diagnostic::new_error(
+        let mut diagnostic = Diagnostic::new_error(
             error.short_message(),
             Label::new(
                 file_id,
                 CodeSpan::new(span.start.index, span.end.index),
                 error.label_message(),
             ),
-        )
-        .with_notes(vec![format!("{:?}", error)]);
+        );
+        if let Some(notes) = error.notes() {
+            diagnostic = diagnostic.with_notes(vec![notes]);
+        }
 
         let config = codespan_reporting::term::Config::default();
         let mut writer = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);

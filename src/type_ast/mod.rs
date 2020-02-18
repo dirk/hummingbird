@@ -39,6 +39,9 @@ pub enum TypeError {
     LocalNotFound {
         name: String,
     },
+    CannotCapture {
+        name: String,
+    },
     // PropertyAlreadyDefined {
     //     name: String,
     // },
@@ -92,6 +95,7 @@ impl TypeError {
         let message = match self.unwrap() {
             LocalAlreadyDefined { .. } => "LocalAlreadyDefined",
             LocalNotFound { .. } => "LocalNotFound",
+            CannotCapture { .. } => "CannotCapture",
             // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
             CannotUnify { .. } => "CannotUnify",
             TypeMismatch { .. } => "TypeMismatch",
@@ -107,12 +111,29 @@ impl TypeError {
     pub fn label_message(&self) -> String {
         use TypeError::*;
         match self.unwrap() {
+            CannotCapture { .. } => "Attempted to capture here".to_string(),
             CannotUnify { .. } => "Trying to unify here".to_string(),
             TypeMismatch { .. } => "Mismatch occurred here".to_string(),
             InternalError { message } => message.clone(),
             WithSpan { .. } => unreachable!(),
             _ => "Here".to_string(),
         }
+    }
+
+    pub fn notes(&self) -> Option<String> {
+        use TypeError::*;
+        match self.unwrap() {
+            CannotCapture { .. } => {
+                return Some(
+                    "Functions cannot capture local variables from higher scopes.\n\
+                    \n\
+                    To avoid this error convert the function to a closure."
+                        .to_string(),
+                )
+            }
+            _ => (),
+        }
+        None
     }
 
     pub fn span(&self) -> Option<Span> {
