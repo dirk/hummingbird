@@ -135,7 +135,10 @@ impl PartialEq for Scope {
     fn eq(&self, other: &Self) -> bool {
         use Scope::*;
         match (self, other) {
-            (Closure(self_func), Closure(other_func)) => self_func.as_ptr() == other_func.as_ptr(),
+            (Closure(self_closure), Closure(other_closure)) => {
+                self_closure.as_ptr() == other_closure.as_ptr()
+            }
+            (Func(self_func), Func(other_func)) => self_func.as_ptr() == other_func.as_ptr(),
             (Module(self_module), Module(other_module)) => {
                 self_module.as_ptr() == other_module.as_ptr()
             }
