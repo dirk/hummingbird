@@ -133,16 +133,20 @@ impl<O: Write> Printer<O> {
                                 this1.write(",")
                             })?;
                         }
-                        self.lnwrite(")")?;
+                        self.lnwrite("): ")?;
                     } else {
-                        self.write(format!("{})", arguments.len()))?;
+                        self.write(format!("{}): ", arguments.len()))?;
                     }
                 } else {
-                    self.write(")")?;
+                    self.write("): ")?;
                 }
+                self.write_recursive_type(&func.retrn.borrow(), true, tracker)?;
                 self.write_pointer(&**func)
             }
-            Type::Object(object) => self.write(format!("{}", object.class.name())),
+            Type::Object(object) => {
+                self.write(format!("{}", object.class.name()))?;
+                self.write_pointer(&**object)
+            },
             Type::Generic(outer) => {
                 let generic = outer.borrow();
                 self.write(format!("${}", generic.id))?;
@@ -151,8 +155,7 @@ impl<O: Write> Printer<O> {
                     self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
                     self.write(")")?;
                 }
-                self.write_pointer(&**outer)?;
-                Ok(())
+                self.write_pointer(&**outer)
             }
             Type::Tuple(tuple) => self.write(format!("({})", tuple.members.len())),
             Type::Variable(variable) => {
