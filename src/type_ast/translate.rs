@@ -15,9 +15,10 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
             }
             _ => unreachable!(),
         };
+        statements.push(statement);
         // NOTE: Closing should already be done within the translation of every
         //   module-level statement:
-        statements.push(statement.close(&mut RecursionTracker::new(), scope.clone())?);
+        // statements.push(statement.close(&mut RecursionTracker::new(), scope.clone())?);
     }
 
     // Now that we've translated the whole module we can close all of the
@@ -80,7 +81,7 @@ fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {
         body,
         scope: func_scope.clone(),
         typ,
-    })
+    }.close(&mut RecursionTracker::new(), func_scope)?)
 }
 
 fn translate_block(pblock: &past::Block, scope: Scope) -> TypeResult<Block> {
@@ -222,7 +223,8 @@ fn translate_closure(pclosure: &past::Closure, scope: Scope) -> TypeResult<Closu
         body: Box::new(body),
         scope: closure_scope.clone(),
         typ,
-    })
+    }
+    .close(&mut RecursionTracker::new(), closure_scope)?)
 }
 
 fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult<PostfixCall> {
