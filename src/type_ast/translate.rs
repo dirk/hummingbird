@@ -13,6 +13,7 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
             past::ModuleStatement::Func(pfunc) => {
                 ModuleStatement::Func(translate_func(&pfunc, scope.clone())?)
             }
+            past::ModuleStatement::CommentLine(_) => continue,
             _ => unreachable!(),
         };
         statements.push(statement);
