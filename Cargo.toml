@@ -9,3 +9,4 @@ codespan = "0.7.0"
 codespan-reporting = "0.7.0"
 lazy_static = "1.4.0"
 termcolor = "1.1.0"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm8-0" }
