@@ -150,7 +150,7 @@ impl<O: Write> Printer<O> {
             Type::Generic(outer) => {
                 let generic = outer.borrow();
                 self.write(format!("${}", generic.id))?;
-                if with_children && !recursive {
+                if generic.has_constrains() && with_children && !recursive {
                     self.write("(")?;
                     self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
                     self.write(")")?;

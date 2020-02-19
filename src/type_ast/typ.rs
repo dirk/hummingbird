@@ -478,6 +478,10 @@ impl Generic {
         }
     }
 
+    pub fn has_constrains(&self) -> bool {
+        !self.constraints.is_empty()
+    }
+
     pub fn add_callable_constraint(&mut self, arguments: Vec<Type>, retrn: Type) {
         self.constraints
             .push(GenericConstraint::Callable(CallableConstraint {
