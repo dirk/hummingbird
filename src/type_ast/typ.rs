@@ -17,8 +17,7 @@ pub fn next_uid() -> usize {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    /// A callable function or closure; it is fixed and cannot be mutated once
-    /// it is closed at the end of creation.
+    /// A callable function or closure.
     Func(Rc<Func>),
     /// A generic defined by the user; it is fixed and cannot be mutated.
     ///
@@ -57,7 +56,6 @@ impl Type {
         Type::Func(Rc::new(Func {
             id: next_uid(),
             scope,
-            closed: RefCell::new(false),
             name,
             arguments: RefCell::new(arguments),
             retrn: RefCell::new(retrn),
@@ -276,11 +274,9 @@ impl Type {
             Type::Func(func) => func,
             other @ _ => unreachable!("Called close_func on non-Func: {:?}", other),
         };
-        // Don't reclose.
-        if *func.closed.borrow() {
-            return Ok(Type::Func(func));
-        }
-        // Check if the function's already been built.
+        // Check if the function's already been built at this scope. This
+        // function may be called again by higher scopes (with a new tracker
+        // each time).
         if let Some(known) = tracker.check(&func.id) {
             return Ok(known);
         }
@@ -305,8 +301,6 @@ impl Type {
         };
         // Then write them back to the function to make it closed.
         {
-            let mut mutable_closed = func.closed.borrow_mut();
-            *mutable_closed = true;
             let mut mutable_arguments = func.arguments.borrow_mut();
             *mutable_arguments = arguments;
             let mut mutable_retrn = func.retrn.borrow_mut();
@@ -419,13 +413,11 @@ pub struct Func {
     /// The scope that this function was defined in, not the actual scope of
     /// its body. If you want that see the `type_ast::Func.scope`.
     pub scope: Scope,
-    /// False while the type is being built (forward declaration), true
-    /// afterwards. Should not be mutated once closed!
-    pub closed: RefCell<bool>,
     /// Included for debugging.
     pub name: Option<String>,
-    // The arguments and return types are only mutable in order to support
-    // forward declaration (for closures and recursion).
+    /// The arguments and return types are only mutable in order to support
+    /// forward declaration (for closures and recursion). Once their module
+    /// is typed they should not be mutated.
     pub arguments: RefCell<Vec<Type>>,
     pub retrn: RefCell<Type>,
 }
