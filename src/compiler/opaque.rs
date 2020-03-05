@@ -1,15 +1,14 @@
 /// Inkwell's representation of modules has a nasty lifetime bound on the
 /// context that makes it impossible to store them for the duration of
 /// compilation. Therefore we have to cheat the borrow-checker.
-
 use std::fmt::{Debug, Error, Formatter};
 use std::intrinsics::transmute;
 use std::ops::Deref;
 
-use inkwell::values::{IntValue, FunctionValue};
-use inkwell::types::FunctionType;
-use inkwell::module::Module;
 use inkwell::builder::Builder;
+use inkwell::module::Module;
+use inkwell::types::FunctionType;
+use inkwell::values::{FunctionValue, IntValue};
 
 macro_rules! opaque {
     ($typ:ident, $size:literal) => {
@@ -18,6 +17,7 @@ macro_rules! opaque {
             type [<$typ Size>] = [usize; $size];
 
             // Generate an `OpaqueModule` holding a `ModuleSize`.
+            #[derive(Clone)]
             pub struct [<Opaque $typ>]([<$typ Size>]);
 
             impl [<Opaque $typ>] {

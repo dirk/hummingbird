@@ -21,7 +21,7 @@ impl Closable for ModuleStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Closure {
     pub arguments: Vec<FuncArgument>,
     pub body: Box<ClosureBody>,
@@ -49,7 +49,7 @@ impl Closable for Closure {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ClosureBody {
     Block(Block),
     Expression(Expression),
@@ -75,7 +75,7 @@ impl Closable for ClosureBody {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Func {
     pub name: String,
     pub arguments: Vec<FuncArgument>,
@@ -109,13 +109,13 @@ impl Closable for Func {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FuncArgument {
     pub name: String,
     pub typ: Type,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum FuncBody {
     Block(Block),
 }
@@ -138,7 +138,7 @@ impl Closable for FuncBody {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Block {
     pub statements: Vec<BlockStatement>,
     pub span: Span,
@@ -160,7 +160,7 @@ impl Closable for Block {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum BlockStatement {
     Expression(Expression),
     Func(Func),
@@ -189,7 +189,7 @@ impl Closable for BlockStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Var {
     pub name: Word,
     pub initializer: Option<Expression>,
@@ -210,7 +210,7 @@ impl Closable for Var {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expression {
     Closure(Closure),
     Identifier(Identifier),
@@ -248,7 +248,7 @@ impl Closable for Expression {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Identifier {
     pub name: Word,
     pub resolution: ScopeResolution,
@@ -265,7 +265,7 @@ impl Closable for Identifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Infix {
     pub lhs: Box<Expression>,
     pub op: Token,
@@ -284,13 +284,13 @@ impl Closable for Infix {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LiteralInt {
     pub value: i64,
     pub typ: Type,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PostfixCall {
     pub target: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -313,7 +313,7 @@ impl Closable for PostfixCall {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PostfixProperty {
     pub target: Box<Expression>,
     pub property: Word,

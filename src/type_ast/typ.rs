@@ -117,6 +117,13 @@ impl Type {
         }
     }
 
+    pub fn unwrap_func(&self) -> &Rc<Func> {
+        match self {
+            Type::Func(func) => func,
+            other @ _ => unreachable!("Not a Func: {:?}", other),
+        }
+    }
+
     /// Returns a Some(arguments, retrn) if the type is some kind of callable
     /// (func or callable generic constraint).
     pub fn maybe_callable(&self) -> Option<(Vec<Type>, Type)> {

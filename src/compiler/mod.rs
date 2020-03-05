@@ -1,14 +1,15 @@
-use std::cell::{Ref, Cell};
+use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
 use inkwell::basic_block::BasicBlock;
 use inkwell::builder::{Builder as InkBuilder, Builder};
-use inkwell::context::{Context as InkContext, Context};
+use inkwell::context::Context as InkContext;
 use inkwell::module::Module as InkModule;
 use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
-use inkwell::types::{AnyType, BasicType};
 use inkwell::types::FunctionType;
+use inkwell::types::{AnyType, BasicType};
 use inkwell::values::{BasicValue, FunctionValue, IntValue};
 use inkwell::OptimizationLevel;
 
@@ -19,9 +20,31 @@ mod opaque;
 
 use opaque::*;
 
-trait GetInk<'ctx> {
+/// Methods that compile (top-level), func, and block contexts all need
+/// to provide.
+trait Context<'ctx> {
     fn get_ink_context(&self) -> &'ctx InkContext;
+    fn get_ink_module(&self) -> &InkModule<'ctx>;
     fn get_ink_builder(&self) -> &InkBuilder<'ctx>;
+
+    /// Add a func to the specialization tracker so that we can build
+    /// implementations later when we call the func.
+    fn stub_func(&self, ast_func: ast::Func) -> UnspecializedFuncValue;
+
+    /// NOTE: You *must* call `stub_func` with the func's AST node before
+    ///   you can build specializations.
+    fn get_or_build_func_specialization(
+        &self,
+        typ: ast::Type,
+        args: Vec<Type>,
+        retrn: Type,
+    ) -> FuncValue;
+}
+
+struct FuncSpecializations {
+    /// The implementation source that we'll recompile for specializations.
+    ast_func: ast::Func,
+    specializations: Vec<FuncValue>,
 }
 
 struct CompileContext<'ctx> {
@@ -31,15 +54,76 @@ struct CompileContext<'ctx> {
     /// reopen modules to add new specializations.
     ink_module: InkModule<'ctx>,
     ink_builder: InkBuilder<'ctx>,
+    /// Track the specializations of functions to provide the correct
+    /// implementation. We'll use the func's type's ID to for lookups.
+    func_specializations: RefCell<HashMap<TypeId, FuncSpecializations>>,
 }
 
-impl<'ctx> GetInk<'ctx> for &CompileContext<'ctx> {
-    fn get_ink_context(&self) -> &'ctx Context {
+impl<'ctx> Context<'ctx> for CompileContext<'ctx> {
+    fn get_ink_context(&self) -> &'ctx InkContext {
         self.ink_ctx
+    }
+
+    fn get_ink_module(&self) -> &InkModule<'ctx> {
+        &self.ink_module
     }
 
     fn get_ink_builder(&self) -> &Builder<'ctx> {
         &self.ink_builder
+    }
+
+    fn stub_func(&self, ast_func: ast::Func) -> UnspecializedFuncValue {
+        let typ = ast_func.typ.clone();
+        let id = typ.id();
+        let mut tracker = self.func_specializations.borrow_mut();
+        if tracker.contains_key(&id) {
+            panic!(
+                "Already have specializations for: {} ({:?})",
+                id,
+                typ.unwrap_func().name
+            )
+        }
+        tracker.insert(
+            id,
+            FuncSpecializations {
+                ast_func,
+                specializations: vec![],
+            },
+        );
+        UnspecializedFuncValue { typ }
+    }
+
+    fn get_or_build_func_specialization(
+        &self,
+        typ: ast::Type,
+        args: Vec<Type>,
+        retrn: Type,
+    ) -> FuncValue {
+        let typ = typ.unwrap_func();
+        let id = typ.id;
+        let mut specializations = {
+            let mut tracker = self.func_specializations.borrow_mut();
+            RefMut::map(tracker, |tracker| {
+                tracker
+                    .get_mut(&id)
+                    .expect(&format!("Missing func: {} ({:?})", id, typ.name))
+            })
+        };
+
+        // TODO: Actually iterate through the specializations looking for a
+        //   matching one.
+
+        let builder = self.get_ink_builder();
+        // So that we can restore the builder after we build the func.
+        let current_basic_block = builder.get_insert_block();
+        let func_value = build_func_specialization(self, &specializations.ast_func, args, retrn);
+        // Add the specialization so that we can eventually reuse it.
+        specializations.specializations.push(func_value.clone());
+        // Reposition the builder so as to not make life harder for our caller.
+        if let Some(previous_basic_block) = current_basic_block {
+            builder.position_at_end(previous_basic_block);
+        }
+        func_value
     }
 }
 
@@ -50,10 +134,11 @@ pub fn build_main(frontend_module: &FrontendModule) {
         ink_ctx: &ink_ctx,
         ink_module: ink_ctx.create_module("main"),
         ink_builder: ink_ctx.create_builder(),
+        func_specializations: RefCell::new(HashMap::new()),
     };
 
     let main_func = find_main_func(frontend_module);
-    build_func(&compile_ctx, &main_func, vec![], Type::UInt64);
+    build_func_specialization(&compile_ctx, &main_func, vec![], Type::UInt64);
 
     // Set up the paths we'll emit to.
     let object = Path::new("./build/out.o");
@@ -87,13 +172,13 @@ pub fn build_main(frontend_module: &FrontendModule) {
         .unwrap();
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Type {
     UInt64,
 }
 
 impl Type {
-    fn get_ink_type<'ctx, C: GetInk<'ctx>>(&self, ctx: &C) -> Box<dyn BasicType<'ctx> + 'ctx> {
+    fn get_ink_type<'ctx, C: Context<'ctx>>(&self, ctx: &C) -> Box<dyn BasicType<'ctx> + 'ctx> {
         use Type::*;
         let ink_context = ctx.get_ink_context();
         match self {
@@ -102,13 +187,31 @@ impl Type {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Value {
+    Func(FuncValue),
+    UnspecializedFunc(UnspecializedFuncValue),
     Tuple(TupleValue),
     UInt64(OpaqueIntValue),
 }
 
-#[derive(Debug)]
+/// We don't yet know how this function is going to be called, but we still
+/// need to be able to treat it like a value.
+#[derive(Clone, Debug)]
+struct UnspecializedFuncValue {
+    typ: ast::Type,
+}
+
+#[derive(Clone, Debug)]
+struct FuncValue {
+    // We store this in the top-level specialization tracker so the lifetime
+    // has to be able to escape the local compilation context.
+    value: OpaqueFunctionValue,
+    args: Vec<Type>,
+    retrn: Type,
+}
+
+#[derive(Clone, Debug)]
 struct TupleValue {
     // TODO: Include the struct or void pointer in the tuple.
     value: OpaqueIntValue,
@@ -116,7 +219,7 @@ struct TupleValue {
 }
 
 impl Value {
-    fn unit<'ctx, C: GetInk<'ctx>>(ctx: &C) -> Self {
+    fn unit<'ctx, C: Context<'ctx>>(ctx: &C) -> Self {
         let ink_context = ctx.get_ink_context();
         let int_type = ink_context.bool_type();
         let value = int_type.const_zero();
@@ -129,27 +232,64 @@ impl Value {
     fn get_ink_value<'ctx>(&self) -> Box<dyn BasicValue<'ctx> + 'ctx> {
         use Value::*;
         match self {
-            Tuple(tuple) => {
-                Box::new(tuple.value.unwrap().clone())
-            },
+            Tuple(tuple) => Box::new(tuple.value.unwrap().clone()),
             UInt64(value) => Box::new(value.unwrap().clone()),
+            other @ _ => unreachable!("Cannot get Ink value: {:?}", other),
         }
     }
 }
 
 struct FunctionContext<'ctx, 'pctx> {
-    parent: Option<&'ctx dyn GetInk<'pctx>>,
+    parent: Option<&'ctx dyn Context<'pctx>>,
     function_value: FunctionValue<'ctx>,
     // TODO: Manage stack and heap frames.
+    stack: HashMap<String, Value>,
+    unspecialized: RefCell<HashMap<String, UnspecializedFuncValue>>,
 }
 
-impl<'ctx, 'pctx> GetInk<'pctx> for FunctionContext<'ctx, 'pctx> {
-    fn get_ink_context(&self) -> &'pctx Context {
+impl<'ctx, 'pctx> FunctionContext<'ctx, 'pctx> {
+    fn write_unspecialized(&self, key: String, value: UnspecializedFuncValue) {
+        let mut unspecialized = self.unspecialized.borrow_mut();
+        unspecialized.insert(key, value);
+    }
+
+    fn build_read_local(&self, key: String) -> Value {
+        if let Some(unspecialized) = self.unspecialized.borrow().get(&key) {
+            return Value::UnspecializedFunc(unspecialized.clone());
+        }
+        self.stack
+            .get(&key)
+            .expect(&format!("Local not found: {}", key))
+            .clone()
+    }
+}
+
+impl<'ctx, 'pctx> Context<'pctx> for FunctionContext<'ctx, 'pctx> {
+    fn get_ink_context(&self) -> &'pctx InkContext {
         self.parent.unwrap().get_ink_context()
+    }
+
+    fn get_ink_module(&self) -> &InkModule<'pctx> {
+        self.parent.unwrap().get_ink_module()
     }
 
     fn get_ink_builder(&self) -> &Builder<'pctx> {
         self.parent.unwrap().get_ink_builder()
+    }
+
+    fn stub_func(&self, ast_func: ast::Func) -> UnspecializedFuncValue {
+        self.parent.unwrap().stub_func(ast_func)
+    }
+
+    fn get_or_build_func_specialization(
+        &self,
+        typ: ast::Type,
+        args: Vec<Type>,
+        retrn: Type,
+    ) -> FuncValue {
+        self.parent
+            .unwrap()
+            .get_or_build_func_specialization(typ, args, retrn)
     }
 }
 
@@ -163,34 +303,47 @@ impl<'ctx, 'pctx> GetFunctionValue<'ctx> for FunctionContext<'ctx, 'pctx> {
     }
 }
 
-fn build_func(
+/// This shouldn't usually be called directly; instead you should use
+/// `Context::get_or_build_func_specialization` to get the right specialization
+/// for your call.
+fn build_func_specialization(
     compile_ctx: &CompileContext,
     ast_func: &ast::Func,
     args: Vec<Type>,
     retrn: Type,
-) {
-    // TODO: Look for an existing specialization in the context.
+) -> FuncValue {
+    // TODO: Look for an existing specialization for the given `args` and
+    //   `retrn` and, if found, use that.
 
-    let return_ink_type = retrn.get_ink_type(&compile_ctx);
+    let return_ink_type = retrn.get_ink_type(compile_ctx);
     let function_ink_type = return_ink_type.fn_type(&[], false);
-    let function_value = compile_ctx.ink_module.add_function(&ast_func.name, function_ink_type, None);
+    let function_value =
+        compile_ctx
+            .ink_module
+            .add_function(&ast_func.name, function_ink_type, None);
 
     let function_ctx = FunctionContext {
-        parent: Some(&compile_ctx),
+        parent: Some(compile_ctx),
         function_value,
+        unspecialized: RefCell::new(HashMap::new()),
+        stack: HashMap::new(),
     };
 
     match &ast_func.body {
         ast::FuncBody::Block(block) => build_func_body_block(&function_ctx, block),
     }
 
+    // Uncomment to see the IR as it's built:
     function_value.print_to_stderr();
+
+    FuncValue {
+        value: OpaqueFunctionValue::wrap(function_value),
+        args,
+        retrn,
+    }
 }
 
-fn build_func_body_block(
-    ctx: &FunctionContext,
-    block: &ast::Block,
-) {
+fn build_func_body_block(ctx: &FunctionContext, block: &ast::Block) {
     let tracker = BlockTracker::new(None);
     let value = build_block(ctx, &tracker, block, Some("entry".to_string()));
     build_return(ctx, &tracker, value);
@@ -222,7 +375,13 @@ fn build_block(
                 ast::BlockStatement::Expression(expression) => {
                     Some(build_expression(ctx, tracker, expression))
                 }
-                other @ _ => unreachable!("Cannot build: {:?}", other),
+                ast::BlockStatement::Func(func) => {
+                    let name = func.name.clone();
+                    let unspecialized_func_value = ctx.stub_func(func.clone());
+                    ctx.write_unspecialized(name, unspecialized_func_value);
+                    None
+                }
+                other @ _ => unreachable!("Cannot build BlockStatement: {:?}", other),
             };
             if index == last_index {
                 value = statement_value;
@@ -245,8 +404,38 @@ fn build_infix_int64(ctx: &FunctionContext, lhs: OpaqueIntValue, rhs: OpaqueIntV
     let builder = ctx.get_ink_builder();
     let lhs: IntValue = *lhs.unwrap();
     let rhs: IntValue = *rhs.unwrap();
-    let clear = builder.build_int_add(lhs, rhs, "");
-    Value::UInt64(OpaqueIntValue::wrap(clear))
+    let value = builder.build_int_add(lhs, rhs, "");
+    Value::UInt64(OpaqueIntValue::wrap(value))
+}
+
+fn build_postfix_call(
+    ctx: &FunctionContext,
+    tracker: &BlockTracker,
+    call: &ast::PostfixCall,
+) -> Value {
+    let target = build_expression(ctx, tracker, &*call.target);
+    let call_target = match target {
+        Value::UnspecializedFunc(unspecialized) => {
+            // FIXME: Convert the AST types in the call to IR types to pass to
+            //   `get_or_build_func_specialization` for lookup.
+            let retrn = Type::UInt64;
+            ctx.get_or_build_func_specialization(unspecialized.typ.clone(), vec![], retrn)
+        }
+        other @ _ => unreachable!("Cannot build Call to target: {:?}", other),
+    };
+    Value::unit(ctx)
+}
+
+fn build_identifier(
+    ctx: &FunctionContext,
+    tracker: &BlockTracker,
+    identifier: &ast::Identifier,
+) -> Value {
+    use ast::ScopeResolution::*;
+    match &identifier.resolution {
+        Local(name, _) => ctx.build_read_local(name.clone()),
+        other @ _ => unreachable!("Cannot build Identifier with ScopeResolution: {:?}", other),
+    }
 }
 
 fn build_expression(
@@ -255,14 +444,16 @@ fn build_expression(
     expression: &ast::Expression,
 ) -> Value {
     match expression {
+        ast::Expression::Identifier(identifier) => build_identifier(ctx, tracker, identifier),
         ast::Expression::Infix(infix) => build_infix(ctx, tracker, infix),
         ast::Expression::LiteralInt(literal) => {
             let int_type = ctx.get_ink_context().i64_type();
             // FIXME: Support negative integer constants.
-            let clear = int_type.const_int(literal.value as u64, false);
-            Value::UInt64(OpaqueIntValue::wrap(clear))
+            let value = int_type.const_int(literal.value as u64, false);
+            Value::UInt64(OpaqueIntValue::wrap(value))
         }
-        other @ _ => unreachable!("Cannot build: {:?}", other),
+        ast::Expression::PostfixCall(call) => build_postfix_call(ctx, tracker, call),
+        other @ _ => unreachable!("Cannot build Expression: {:?}", other),
     }
 }
 
@@ -289,7 +480,7 @@ impl BlockTracker {
 
     /// Add a basic block to the function and position the builder at the end
     /// of that block.
-    fn new_basic_block<'ictx, 'fctx, C: GetInk<'ictx> + GetFunctionValue<'fctx>>(
+    fn new_basic_block<'ictx, 'fctx, C: Context<'ictx> + GetFunctionValue<'fctx>>(
         &self,
         ctx: &C,
         name: String,

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Error, Formatter};
 use std::rc::Rc;
@@ -69,6 +69,14 @@ impl Scope {
             } else {
                 return false;
             }
+        }
+    }
+
+    pub fn unwrap_func(&self) -> Ref<FuncScope> {
+        use Scope::*;
+        match self {
+            Func(func) => func.borrow(),
+            other @ _ => unreachable!("Not a Func scope: {:?}", other),
         }
     }
 }
@@ -152,7 +160,7 @@ impl PartialEq for Scope {
 ///   - Local: in the current scope
 ///   - Closure: in a higher up func and/or block scope
 ///   - Static
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ScopeResolution {
     Local(String, Type),
     /// A local that was found in a func and/or block scope above the current
@@ -344,6 +352,10 @@ impl FuncScope {
             captured: false,
             captured_locals: HashSet::new(),
         }
+    }
+
+    pub fn get_locals(&self) -> &HashMap<String, Type> {
+        &self.locals
     }
 }
 
