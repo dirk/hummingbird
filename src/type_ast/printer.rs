@@ -62,23 +62,22 @@ impl<O: Write> Printer<O> {
     }
 
     pub fn print_module(&self, module: Module) -> Result<()> {
-        for (index, statement) in module.statements.iter().enumerate() {
-            use ModuleStatement::*;
-            match statement {
-                Func(func) => self.print_func(func, index == 0)?,
+        self.write("module {")?;
+        self.indented(|this| {
+            for statement in module.statements.iter() {
+                use ModuleStatement::*;
+                match statement {
+                    Func(func) => self.print_func(func)?,
+                }
             }
-        }
-        self.lnwrite("")?;
+            Ok(())
+        })?;
+        self.lnwrite("}\n")?;
         Ok(())
     }
 
-    fn print_func(&self, func: &nodes::Func, first: bool) -> Result<()> {
-        let opener = format!("func {}(", func.name);
-        if first {
-            self.iwrite(opener)?;
-        } else {
-            self.lnwrite(opener)?;
-        }
+    fn print_func(&self, func: &nodes::Func) -> Result<()> {
+        self.lnwrite(format!("func {}(", func.name))?;
         if !func.arguments.is_empty() {
             self.write("\n")?;
             self.indented(|this| {
@@ -146,7 +145,7 @@ impl<O: Write> Printer<O> {
             Type::Object(object) => {
                 self.write(format!("{}", object.class.name()))?;
                 self.write_pointer(&**object)
-            },
+            }
             Type::Generic(outer) => {
                 let generic = outer.borrow();
                 self.write(format!("${}", generic.id))?;
@@ -255,13 +254,14 @@ impl<O: Write> Printer<O> {
         }
 
         self.indented(|this| {
-            for (_, statement) in block.statements.iter().enumerate() {
+            let last_index = block.statements.len().checked_sub(1).unwrap_or(0);
+            for statement in block.statements.iter() {
                 use BlockStatement::*;
                 match statement {
                     Expression(expression) => {
                         self.print_expression(expression)?;
                     }
-                    Func(func) => self.print_func(func, false)?,
+                    Func(func) => self.print_func(func)?,
                     Var(var) => self.print_var(var, false)?,
                 }
             }

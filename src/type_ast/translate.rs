@@ -82,7 +82,8 @@ fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {
         body,
         scope: func_scope.clone(),
         typ,
-    }.close(&mut RecursionTracker::new(), func_scope)?)
+    }
+    .close(&mut RecursionTracker::new(), func_scope)?)
 }
 
 fn translate_block(pblock: &past::Block, scope: Scope) -> TypeResult<Block> {

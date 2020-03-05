@@ -26,7 +26,9 @@ pub use nodes::*;
 pub use printer::{Printer, PrinterOptions};
 pub use scope::{ClosureScope, ModuleScope, Scope, ScopeLike};
 pub use translate::translate_module;
-pub use typ::{Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, Variable};
+pub use typ::{
+    Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, TypeId, Variable,
+};
 pub use unify::unify;
 
 type TypeResult<T> = Result<T, TypeError>;
@@ -56,9 +58,6 @@ pub enum TypeError {
     ArgumentLengthMismatch {
         expected: Vec<Type>,
         got: Vec<Type>,
-    },
-    RecursiveType {
-        id: usize,
     },
     /// When we try to `Type#close` and run into an `Unbound`.
     UnexpectedUnbound {
@@ -100,7 +99,6 @@ impl TypeError {
             CannotUnify { .. } => "CannotUnify",
             TypeMismatch { .. } => "TypeMismatch",
             ArgumentLengthMismatch { .. } => "ArgumentLengthMismatch",
-            RecursiveType { .. } => "RecursiveType",
             UnexpectedUnbound { .. } => "UnexpectedUnbound",
             InternalError { .. } => "InternalError",
             WithSpan { .. } => unreachable!(),

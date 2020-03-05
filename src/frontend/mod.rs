@@ -1,16 +1,17 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use super::compiler;
 use super::parser::{self, ParseError, TokenStream};
 use super::type_ast::{self, Module as TModule, TypeError};
 
 /// Combines underlying parsing and type errors with the canonicalized path and
 /// source code of the module that produced the error.
 #[derive(Debug)]
-pub enum LoadError {
+pub enum CompileError {
     Parse((ParseError, PathBuf, String)),
     Type((TypeError, PathBuf, String)),
     CircularDependency(PathBuf),
@@ -26,27 +27,31 @@ struct ManagerInner {
 }
 
 impl Manager {
-    pub fn compile_main(entry: PathBuf) -> Result<Self, LoadError> {
-        let manager = Self(Rc::new(ManagerInner {
+    pub fn compile_main(entry_path: PathBuf) -> Result<Self, CompileError> {
+        let manager = Manager(Rc::new(ManagerInner {
             modules: RefCell::new(HashSet::new()),
             loading: RefCell::new(HashSet::new()),
         }));
+        let entry = manager.load(entry_path)?;
+
+        compiler::build_main(&entry);
+
         Ok(manager)
     }
 
-    fn start_loading(&self, path: PathBuf) -> Result<(), LoadError> {
+    fn start_loading(&self, path: PathBuf) -> Result<(), CompileError> {
         {
             let modules = self.0.modules.borrow();
             for module in modules.iter() {
                 if module.path() == path {
-                    return Err(LoadError::CircularDependency(path));
+                    return Err(CompileError::CircularDependency(path));
                 }
             }
         }
         {
             let loading = self.0.loading.borrow();
             if loading.contains(&path) {
-                return Err(LoadError::CircularDependency(path));
+                return Err(CompileError::CircularDependency(path));
             }
         }
         let mut loading = self.0.loading.borrow_mut();
@@ -69,7 +74,8 @@ impl Manager {
         modules.insert(module);
     }
 
-    pub fn load(&self, path: PathBuf) -> Result<Module, LoadError> {
+    pub fn load(&self, path: PathBuf) -> Result<Module, CompileError> {
+        let path = path.canonicalize().unwrap();
         // Check for circular dependencies and track that this module is being
         // actively loaded in `loading`.
         self.start_loading(path.clone())?;
@@ -86,7 +92,7 @@ impl Manager {
 }
 
 #[derive(Clone)]
-struct Module(Rc<ModuleInner>);
+pub struct Module(Rc<ModuleInner>);
 
 impl Module {
     pub fn new(id: usize, path: PathBuf) -> Self {
@@ -97,26 +103,39 @@ impl Module {
         }))
     }
 
+    pub fn id(&self) -> usize {
+        self.0.id
+    }
+
     pub fn path(&self) -> &Path {
         self.0.path.as_path()
     }
 
-    pub fn load(&self, manager: Manager) -> Result<(), LoadError> {
+    pub fn borrow_typed(&self) -> Ref<TModule> {
+        Ref::map(self.0.typed.borrow(), |module| module.as_ref().unwrap())
+    }
+
+    pub fn load(&self, manager: Manager) -> Result<(), CompileError> {
         let path = self.0.path.clone();
         let source = std::fs::read_to_string(path.clone()).unwrap();
 
         let mut token_stream = TokenStream::from_string(source.clone());
         let parsed = parser::parse_module(&mut token_stream)
-            .map_err(|err| LoadError::Parse((err, path.clone(), source.clone())))?;
+            .map_err(|err| CompileError::Parse((err, path.clone(), source.clone())))?;
 
         let typed = type_ast::translate_module(parsed)
-            .map_err(|err| LoadError::Type((err, path.clone(), source.clone())))?;
+            .map_err(|err| CompileError::Type((err, path.clone(), source.clone())))?;
 
         {
             let mut mutable = self.0.typed.borrow_mut();
             *mutable = Some(typed);
         }
         Ok(())
+    }
+
+    /// Consumes oneself returning the typed AST within.
+    pub fn unwrap_ast(&self) -> Ref<TModule> {
+        Ref::map(self.0.typed.borrow(), |option| option.as_ref().unwrap())
     }
 }
 

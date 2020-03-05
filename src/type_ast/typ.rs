@@ -15,6 +15,8 @@ pub fn next_uid() -> usize {
     UID.fetch_add(1, Ordering::SeqCst)
 }
 
+pub type TypeId = usize;
+
 #[derive(Clone, Debug)]
 pub enum Type {
     /// A callable function or closure.
@@ -27,7 +29,7 @@ pub enum Type {
     Object(Rc<Object>),
     // Used to make writing tests easier.
     Phantom {
-        id: usize,
+        id: TypeId,
     },
     Tuple(Tuple),
     /// A type whose entire identity can change.
@@ -409,7 +411,7 @@ impl Closable for Type {
 
 #[derive(Clone, Debug)]
 pub struct Func {
-    pub id: usize,
+    pub id: TypeId,
     /// The scope that this function was defined in, not the actual scope of
     /// its body. If you want that see the `type_ast::Func.scope`.
     pub scope: Scope,
@@ -455,7 +457,7 @@ impl PartialEq for Func {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Generic {
-    pub id: usize,
+    pub id: TypeId,
     pub scope: Scope,
     // TODO: Name
     pub constraints: Vec<GenericConstraint>,
@@ -546,7 +548,7 @@ pub enum GenericConstraint {
 
 #[derive(Clone, Debug)]
 pub struct Object {
-    pub id: usize,
+    pub id: TypeId,
     pub scope: Scope,
     pub class: Class,
     // TODO: Parameterize
@@ -583,21 +585,21 @@ impl Class {
 /// A class built into the language.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IntrinsicClass {
-    pub id: usize,
+    pub id: TypeId,
     pub name: String,
 }
 
 /// A user-defined class.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DerivedClass {
-    pub id: usize,
+    pub id: TypeId,
     pub name: String,
     // TODO: Parameters
 }
 
 #[derive(Clone, Debug)]
 pub struct Tuple {
-    pub id: usize,
+    pub id: TypeId,
     pub scope: Scope,
     pub members: Vec<Type>,
 }
@@ -629,7 +631,7 @@ pub enum Variable {
     Substitute { scope: Scope, substitute: Box<Type> },
     /// We don't know what it is yet. It is an error for any `Unbound`s to
     /// make it to the end of unification.
-    Unbound { id: usize, scope: Scope },
+    Unbound { id: TypeId, scope: Scope },
 }
 
 impl Variable {

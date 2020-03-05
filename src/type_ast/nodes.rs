@@ -80,6 +80,7 @@ pub struct Func {
     pub name: String,
     pub arguments: Vec<FuncArgument>,
     pub body: FuncBody,
+    // The scope of variables defined within the function.
     pub scope: Scope,
     pub typ: Type,
 }

@@ -5,12 +5,16 @@ extern crate codespan;
 extern crate codespan_reporting;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate paste;
+extern crate regex;
 extern crate termcolor;
 
 use std::env;
 use std::path::PathBuf;
 use std::process::exit;
 
+mod compiler;
 mod frontend;
 mod parse_ast;
 mod parser;
@@ -56,6 +60,7 @@ fn main() {
     }
 
     let filename = &args[0];
+    /*
     let source = std::fs::read_to_string(filename).unwrap();
     let mut token_stream = parser::TokenStream::from_string(source.clone());
     let parse_ast = parser::parse_module(&mut token_stream).unwrap();
@@ -68,6 +73,7 @@ fn main() {
     };
     let printer = Printer::new_with_options(std::io::stdout(), PrinterOptions { print_pointers });
     printer.print_module(type_ast).unwrap();
+    */
 
     frontend::Manager::compile_main(filename.into()).unwrap();
 }
