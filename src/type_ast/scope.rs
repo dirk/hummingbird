@@ -79,6 +79,14 @@ impl Scope {
             other @ _ => unreachable!("Not a Func scope: {:?}", other),
         }
     }
+
+    pub fn unwrap_module(&self) -> Ref<ModuleScope> {
+        use Scope::*;
+        match self {
+            Module(module) => module.borrow(),
+            other @ _ => unreachable!("Not a Module scope: {:?}", other),
+        }
+    }
 }
 
 impl Closable for Scope {
@@ -336,7 +344,7 @@ impl std::fmt::Debug for ClosureScope {
 }
 
 pub struct FuncScope {
-    locals: HashMap<String, Type>,
+    pub locals: HashMap<String, Type>,
     /// Only static resolutions are allowed through the parent.
     parent: Option<Scope>,
     /// Whether or not this scope is captured by child scopes (closures).

@@ -29,7 +29,7 @@ pub fn translate_module(pmodule: past::Module) -> TypeResult<Module> {
     //     closed_statements.push(statement.close(&mut RecursionTracker::new())?);
     // }
 
-    Ok(Module { statements })
+    Ok(Module { statements, scope })
 }
 
 fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {

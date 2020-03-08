@@ -75,7 +75,18 @@ fn main() {
     printer.print_module(type_ast).unwrap();
     */
 
-    frontend::Manager::compile_main(filename.into()).unwrap();
+    match frontend::Manager::compile_main(filename.into()) {
+        Ok(_) => (),
+        Err(error) => {
+            use frontend::CompileError;
+            match error {
+                CompileError::Type(type_error, path, source) => {
+                    print_type_error(type_error, path.to_str().unwrap().to_string(), source)
+                }
+                other @ _ => panic!("{:#?}", other),
+            }
+        }
+    }
 }
 
 fn print_type_error(error: TypeError, filename: String, source: String) {
@@ -107,7 +118,7 @@ fn print_type_error(error: TypeError, filename: String, source: String) {
         codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic).unwrap();
     } else {
         // If we don't have a span then just report the error.
-        println!("{:?}", error);
+        println!("{:#?}", error);
     }
     exit(1)
 }

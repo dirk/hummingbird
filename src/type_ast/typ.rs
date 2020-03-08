@@ -236,6 +236,42 @@ impl Type {
         false
     }
 
+    pub fn contains_generics(&self) -> bool {
+        match self {
+            Type::Func(func) => {
+                for argument in func.arguments.borrow().iter() {
+                    if argument.contains_generics() {
+                        return true;
+                    }
+                }
+                func.retrn.borrow().contains_generics()
+            }
+            Type::Generic(generic) => true,
+            // FIXME: Revisit class types to support generics.
+            Type::Object(object) => false,
+            Type::Phantom { .. } => false,
+            Type::Tuple(tuple) => {
+                for typ in tuple.members.iter() {
+                    if typ.contains_generics() {
+                        return true;
+                    }
+                }
+                false
+            }
+            Type::Variable(variable) => {
+                let variable = variable.borrow();
+                match &*variable {
+                    Variable::Generic { .. } => true,
+                    Variable::Substitute { substitute, .. } => substitute.contains_generics(),
+                    Variable::Unbound { id, .. } => {
+                        eprintln!("WARNING: Calling contains_generics on unbound ({})", id);
+                        true
+                    }
+                }
+            }
+        }
+    }
+
     /// Called on a function's arguments to recursively convert any unbound
     /// types into open generics.
     fn genericize(&self, scope: Scope) -> TypeResult<()> {

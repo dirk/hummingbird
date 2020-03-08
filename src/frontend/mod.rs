@@ -12,8 +12,8 @@ use super::type_ast::{self, Module as TModule, TypeError};
 /// source code of the module that produced the error.
 #[derive(Debug)]
 pub enum CompileError {
-    Parse((ParseError, PathBuf, String)),
-    Type((TypeError, PathBuf, String)),
+    Parse(ParseError, PathBuf, String),
+    Type(TypeError, PathBuf, String),
     CircularDependency(PathBuf),
 }
 
@@ -34,7 +34,9 @@ impl Manager {
         }));
         let entry = manager.load(entry_path)?;
 
-        compiler::build_main(&entry);
+        // compiler::build_main(&entry);
+        let modules = compiler::ir::compile_modules(manager.0.modules.borrow().iter());
+        compiler::compile_modules(modules);
 
         Ok(manager)
     }
@@ -121,10 +123,10 @@ impl Module {
 
         let mut token_stream = TokenStream::from_string(source.clone());
         let parsed = parser::parse_module(&mut token_stream)
-            .map_err(|err| CompileError::Parse((err, path.clone(), source.clone())))?;
+            .map_err(|err| CompileError::Parse(err, path.clone(), source.clone()))?;
 
         let typed = type_ast::translate_module(parsed)
-            .map_err(|err| CompileError::Type((err, path.clone(), source.clone())))?;
+            .map_err(|err| CompileError::Type(err, path.clone(), source.clone()))?;
 
         {
             let mut mutable = self.0.typed.borrow_mut();

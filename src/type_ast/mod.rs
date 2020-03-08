@@ -27,7 +27,7 @@ pub use printer::{Printer, PrinterOptions};
 pub use scope::{ClosureScope, ModuleScope, Scope, ScopeLike, ScopeResolution};
 pub use translate::translate_module;
 pub use typ::{
-    Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, TypeId, Variable,
+    Class, Func as TFunc, Generic, GenericConstraint, PropertyConstraint, Type, TypeId, Variable,
 };
 pub use unify::unify;
 

@@ -5,6 +5,7 @@ use super::{Closable, RecursionTracker, Type, TypeResult};
 #[derive(Debug)]
 pub struct Module {
     pub statements: Vec<ModuleStatement>,
+    pub scope: Scope,
 }
 
 #[derive(Debug)]
