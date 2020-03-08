@@ -2,7 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 use super::scope::Scope;
-use super::typ::{Generic, GenericConstraint, Object, Type, Variable};
+use super::typ::{Func, Generic, GenericConstraint, Object, Type, Variable};
 use super::{TypeError, TypeResult};
 
 /// Unify a variable (mutable) generic with another generic.
@@ -123,6 +123,7 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
             // Unify both variable generics.
             UnifyGenerics,
             UnifyGenericWithObject(Rc<Object>),
+            UnifyGenericWithFunc(Rc<Func>),
         }
         use Action::*;
 
@@ -153,6 +154,7 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
                             });
                         }
                     }
+                    Type::Func(func2) => UnifyGenericWithFunc(func2.clone()),
                     _ => {
                         return Err(TypeError::TypeMismatch {
                             expected: typ1.clone(),
@@ -204,6 +206,22 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
                 *var1.borrow_mut() = Variable::Substitute {
                     scope,
                     substitute: Box::new(Type::Object(object)),
+                };
+                Ok(())
+            }
+            UnifyGenericWithFunc(func) => {
+                {
+                    let generic = Ref::map(var1.borrow(), Variable::unwrap_generic);
+                    // TODO: Implement a func_satisfies_constraints function.
+                    if !generic.constraints.is_empty() {
+                        panic!("Cannot yet unify non-empty generic with func")
+                    }
+                }
+                // If all the constraints are satisfied then we can substitute
+                // ourselves for the func.
+                *var1.borrow_mut() = Variable::Substitute {
+                    scope,
+                    substitute: Box::new(Type::Func(func)),
                 };
                 Ok(())
             }

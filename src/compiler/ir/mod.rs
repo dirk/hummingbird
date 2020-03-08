@@ -446,11 +446,13 @@ impl Value {
     pub fn value_id(&self) -> ValueId {
         use Value::*;
         match self {
-            Func(func_value) => func_value.id,
+            Func(func_value) => {
+                unreachable!("Funcs are static and can't be compiled to an SSA Value")
+            }
             Int64(value_id, _) => *value_id,
             Tuple(value_id, _) => *value_id,
             UnspecializedFunc(_) => {
-                unreachable!("Unspecialized funcs can't be compiled to a Value")
+                unreachable!("Unspecialized funcs can't be compiled to an SSA Value")
             }
         }
     }
