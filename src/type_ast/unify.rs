@@ -102,6 +102,48 @@ fn object_satisfies_constraints(generic: &Generic, object: &Rc<Object>) -> TypeR
     })
 }
 
+/// If the generic has a callable constraint it will unify the func with that
+/// constraint, ensuring that argument and return variable types are unified.
+///
+/// If this succeeds then `unify` will substitute this func for the generic,
+/// so only the func, its arguments, and its return remain in the AST for the
+/// node being translated.
+fn func_satisfies_constraints(generic: &Generic, func: &Rc<Func>, scope: Scope) -> TypeResult<()> {
+    if generic.constraints.is_empty() {
+        return Ok(());
+    }
+    for constraint in generic.constraints.iter() {
+        use GenericConstraint::*;
+        match constraint {
+            Property(property) => {
+                return Err(TypeError::InternalError {
+                    message: format!(
+                        "Funcs don't have properties:\nfunc: {:?}\nproperty: {:?}",
+                        func, property,
+                    ),
+                })
+            }
+            Callable(callable) => {
+                let func_arguments = func.arguments.borrow();
+                let func_retrn = func.retrn.borrow();
+                if func_arguments.len() != callable.arguments.len() {
+                    return Err(TypeError::ArgumentLengthMismatch {
+                        expected: func_arguments.clone(),
+                        got: callable.arguments.clone(),
+                    });
+                }
+                for (func_argument, call_argument) in
+                    func_arguments.iter().zip(callable.arguments.iter())
+                {
+                    unify(func_argument, call_argument, scope.clone())?;
+                }
+                unify(&func_retrn, &callable.retrn, scope.clone())?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
     if typ1 == typ2 {
         return Ok(());
@@ -212,10 +254,7 @@ pub fn unify(typ1: &Type, typ2: &Type, scope: Scope) -> TypeResult<()> {
             UnifyGenericWithFunc(func) => {
                 {
                     let generic = Ref::map(var1.borrow(), Variable::unwrap_generic);
-                    // TODO: Implement a func_satisfies_constraints function.
-                    if !generic.constraints.is_empty() {
-                        panic!("Cannot yet unify non-empty generic with func")
-                    }
+                    func_satisfies_constraints(&generic, &func, scope.clone())?;
                 }
                 // If all the constraints are satisfied then we can substitute
                 // ourselves for the func.

@@ -118,6 +118,8 @@ pub struct FuncArgument {
 
 #[derive(Clone, Debug)]
 pub enum FuncBody {
+    // TODO: Remove this layer of indirection since func bodies must always
+    //   be blocks.
     Block(Block),
 }
 
