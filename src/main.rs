@@ -1,5 +1,8 @@
+#![allow(dead_code)]
+#![allow(private_in_public)]
 #![allow(unused_imports)]
 #![allow(unused_macros)]
+#![allow(unused_variables)]
 
 extern crate codespan;
 extern crate codespan_reporting;

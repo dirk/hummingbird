@@ -9,6 +9,10 @@ use inkwell::AddressSpace;
 
 pub mod ir;
 mod opaque;
+mod path_to_name;
+pub mod target;
+pub mod value_ir;
+mod vecs_equal;
 
 use opaque::*;
 

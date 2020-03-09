@@ -34,9 +34,14 @@ impl Manager {
         }));
         let entry = manager.load(entry_path)?;
 
-        // compiler::build_main(&entry);
-        let modules = compiler::ir::compile_modules(manager.0.modules.borrow().iter());
-        compiler::compile_modules(modules);
+        // let modules = compiler::ir::compile_modules(manager.0.modules.borrow().iter());
+        // compiler::compile_modules(modules);
+
+        let ir_modules =
+            compiler::value_ir::compile_modules(manager.0.modules.borrow().iter(), &entry)
+                .get_modules();
+
+        compiler::target::compile_modules(&ir_modules);
 
         Ok(manager)
     }
