@@ -88,8 +88,10 @@ impl<O: Write> Printer<O> {
                 }
                 Ok(())
             })?;
+            self.iwrite("): ")?;
+        } else {
+            self.write("): ")?;
         }
-        self.iwrite("): ")?;
         let retrn = match &func.typ {
             Type::Func(func) => func.retrn.borrow(),
             other @ _ => unreachable!("Func node has non-Func type: {:?}", other),

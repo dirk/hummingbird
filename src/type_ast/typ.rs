@@ -229,6 +229,13 @@ impl Type {
         }
     }
 
+    pub fn is_func(&self) -> bool {
+        match self {
+            Type::Func(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_unbound(&self) -> bool {
         if let Type::Variable(variable) = self {
             return variable.borrow().is_unbound();
@@ -621,6 +628,14 @@ impl Class {
         match self {
             Intrinsic(intrinsic) => intrinsic.name.clone(),
             Derived(derived) => derived.name.clone(),
+        }
+    }
+
+    pub fn id(&self) -> TypeId {
+        use Class::*;
+        match self {
+            Intrinsic(intrinsic) => intrinsic.id,
+            Derived(derived) => derived.id,
         }
     }
 }

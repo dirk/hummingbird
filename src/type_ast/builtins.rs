@@ -30,4 +30,8 @@ impl Builtins {
             .expect(&format!("Builtin not found: {}", name.as_ref()))
             .clone()
     }
+
+    pub fn get_all() -> &'static HashMap<String, Class> {
+        &BUILTINS.0
+    }
 }
