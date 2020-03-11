@@ -15,7 +15,7 @@ addons:
 
 env:
   global:
-    - RUSTFLAGS="-C target-cpu=native -l ffi"
+    - 'RUSTFLAGS="-C link-dead-code"'
 
 rust:
   - "1.41.1"
