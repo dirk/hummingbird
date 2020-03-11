@@ -27,11 +27,15 @@ struct ManagerInner {
 }
 
 impl Manager {
-    pub fn compile_main(entry_path: PathBuf) -> Result<Self, CompileError> {
-        let manager = Manager(Rc::new(ManagerInner {
+    pub fn new() -> Self {
+        Self(Rc::new(ManagerInner {
             modules: RefCell::new(HashSet::new()),
             loading: RefCell::new(HashSet::new()),
-        }));
+        }))
+    }
+
+    pub fn compile_main(entry_path: PathBuf) -> Result<Self, CompileError> {
+        let manager = Self::new();
         let entry = manager.load(entry_path)?;
 
         // let modules = compiler::ir::compile_modules(manager.0.modules.borrow().iter());

@@ -61,7 +61,7 @@ impl<O: Write> Printer<O> {
         result
     }
 
-    pub fn print_module(&self, module: Module) -> Result<()> {
+    pub fn print_module(&self, module: &Module) -> Result<()> {
         self.write("module {")?;
         self.indented(|this| {
             for statement in module.statements.iter() {

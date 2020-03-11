@@ -23,6 +23,7 @@ mod parse_ast;
 mod parser;
 mod type_ast;
 
+use frontend::CompileError;
 use type_ast::{Printer, PrinterOptions, TypeError};
 
 fn extract_option<S: AsRef<str>>(args: Vec<String>, option: S) -> (Vec<String>, bool) {
@@ -39,9 +40,24 @@ fn extract_option<S: AsRef<str>>(args: Vec<String>, option: S) -> (Vec<String>, 
 }
 
 fn print_usage() {
-    println!("Usage: hummingbird [file] [options]");
+    println!("Usage: hummingbird [command] [file] [options]");
     println!();
+    println!("Commands:");
+    println!("  compile  Build an executable from the file.");
+    println!("  ast      Print the typed AST of a file.");
+    println!();
+    println!("Options:");
     println!("  --print-pointers  Include pointers in debugging output");
+}
+
+fn handle_compile_error(error: CompileError) {
+    match error {
+        CompileError::Type(type_error, path, source) => {
+            print_type_error(type_error, path.to_str().unwrap().to_string(), source)
+        }
+        other @ _ => panic!("{:#?}", other),
+    }
+    exit(-1);
 }
 
 fn main() {
@@ -51,45 +67,61 @@ fn main() {
         exit(-1);
     }
     // Remove the first argument (ourselves).
+    let called = args[0].clone();
     let args = args[1..].to_vec();
     let (args, print_pointers) = extract_option(args, "--print-pointers");
-    if args.len() != 1 {
-        eprintln!("Invalid args: {:?}", args);
-        exit(1);
-    }
-    if &args[0] == "help" {
-        print_usage();
-        exit(0);
-    }
 
-    let filename = &args[0];
-    /*
-    let source = std::fs::read_to_string(filename).unwrap();
-    let mut token_stream = parser::TokenStream::from_string(source.clone());
-    let parse_ast = parser::parse_module(&mut token_stream).unwrap();
-    let type_ast = match type_ast::translate_module(parse_ast) {
-        Ok(module) => module,
-        Err(type_error) => {
-            print_type_error(type_error, filename.clone(), source);
-            return;
+    // Turn them into `&str`s so that we can match against them.
+    let arg0 = args.get(0).map(|arg| arg.as_str());
+    let arg1 = args.get(1).map(|arg| arg.as_str());
+
+    match (arg0, arg1) {
+        (Some("help"), None) => {
+            print_usage();
+            exit(0);
         }
-    };
-    let printer = Printer::new_with_options(std::io::stdout(), PrinterOptions { print_pointers });
-    printer.print_module(type_ast).unwrap();
-    */
-
-    match frontend::Manager::compile_main(filename.into()) {
-        Ok(_) => (),
-        Err(error) => {
-            use frontend::CompileError;
-            match error {
-                CompileError::Type(type_error, path, source) => {
-                    print_type_error(type_error, path.to_str().unwrap().to_string(), source)
-                }
-                other @ _ => panic!("{:#?}", other),
+        (Some("compile"), Some(filename)) => {
+            match frontend::Manager::compile_main(filename.into()) {
+                Ok(_) => (),
+                Err(error) => handle_compile_error(error),
             }
         }
+        (Some("ast"), Some(filename)) => {
+            let manager = frontend::Manager::new();
+            match manager.load(filename.into()) {
+                Ok(module) => {
+                    let printer = Printer::new_with_options(
+                        std::io::stdout(),
+                        PrinterOptions { print_pointers },
+                    );
+                    let ast = module.unwrap_ast();
+                    printer.print_module(&ast).unwrap();
+                }
+                Err(error) => handle_compile_error(error),
+            }
+        }
+        _ => {
+            eprintln!("Invalid args: {:?}", args);
+            eprintln!();
+            eprintln!("See '{} help' for usage details.", called);
+            exit(-1);
+        }
     }
+
+    // let filename = &args[0];
+    //
+    // let source = std::fs::read_to_string(filename).unwrap();
+    // let mut token_stream = parser::TokenStream::from_string(source.clone());
+    // let parse_ast = parser::parse_module(&mut token_stream).unwrap();
+    // let type_ast = match type_ast::translate_module(parse_ast) {
+    //     Ok(module) => module,
+    //     Err(type_error) => {
+    //         print_type_error(type_error, filename.clone(), source);
+    //         return;
+    //     }
+    // };
+    // let printer = Printer::new_with_options(std::io::stdout(), PrinterOptions { print_pointers });
+    // printer.print_module(type_ast).unwrap();
 }
 
 fn print_type_error(error: TypeError, filename: String, source: String) {
@@ -117,11 +149,11 @@ fn print_type_error(error: TypeError, filename: String, source: String) {
         }
 
         let config = codespan_reporting::term::Config::default();
-        let mut writer = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
+        let mut writer = termcolor::StandardStream::stderr(termcolor::ColorChoice::Auto);
         codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic).unwrap();
     } else {
         // If we don't have a span then just report the error.
-        println!("{:#?}", error);
+        eprintln!("{:#?}", error);
     }
-    exit(1)
+    exit(-1)
 }
