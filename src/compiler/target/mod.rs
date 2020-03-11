@@ -5,7 +5,9 @@ use std::process::Command;
 
 use inkwell::context::Context;
 use inkwell::module::Module as InkModule;
-use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
+use inkwell::targets::{
+    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
+};
 use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::{AddressSpace, OptimizationLevel};
@@ -244,12 +246,13 @@ fn generate_module(module: InkModule, print_to_stderr: bool) {
     let reloc_mode = RelocMode::Default;
     let code_model = CodeModel::Default;
     Target::initialize_x86(&InitializationConfig::default());
-    let target = Target::from_name("x86-64").unwrap();
+    let target_triple = TargetMachine::get_default_triple();
+    let target = Target::from_triple(&target_triple).unwrap();
     let target_machine = target
         .create_target_machine(
-            "x86_64-apple-darwin19.3.0",
-            "x86-64",
-            "",
+            &target_triple,
+            TargetMachine::get_host_cpu_name().to_str().unwrap(),
+            TargetMachine::get_host_cpu_features().to_str().unwrap(),
             optimization_level,
             reloc_mode,
             code_model,
