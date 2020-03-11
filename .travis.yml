@@ -1,9 +1,26 @@
+language: "rust"
+
+dist: "xenial"
+
 sudo: false
 
-language: rust
+addons:
+  apt:
+    sources:
+      - "llvm-toolchain-xenial-8"
+    packages:
+      - "libllvm8"
+      - "llvm-8"
+      - "llvm-8-dev"
+
+env:
+  global:
+    # For some reason the linker on Travis will segfault if this flag
+    # isn't included.
+    - 'RUSTFLAGS="-C link-dead-code"'
 
 rust:
-  - "1.37.0"
+  - "1.41.1"
 
 cache:
   bundler: true
@@ -11,12 +28,13 @@ cache:
 
 before_install:
   # Keep this Bundler version in sync with `Gemfile.lock`.
-  - "gem install bundler -v '2.0.2'"
+  - 'gem install bundler -v "2.0.2"'
   - "bundle install --jobs=3 --retry=3"
+  - "export LLVM_SYS_80_PREFIX=$(llvm-config-8 --prefix)"
 
 before_script:
   - "cargo build --verbose"
 
 script:
   - "cargo test --verbose"
-  - "bundle exec rspec"
+  # "bundle exec rspec"

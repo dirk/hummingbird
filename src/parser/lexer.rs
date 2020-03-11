@@ -48,6 +48,20 @@ impl StringStream {
         }
     }
 
+    fn read_while<T: Fn(char) -> bool>(&mut self, test: T) -> (String, Location) {
+        let mut characters = vec![];
+        loop {
+            let character = self.peek();
+            if test(character) {
+                characters.push(self.read());
+            } else {
+                break;
+            }
+        }
+        let string: String = characters.into_iter().collect();
+        (string, self.location())
+    }
+
     fn read_if_match(&mut self, target: &[char]) -> bool {
         // Bounds-check first!
         if (self.index + target.len()) > self.input.len() {
@@ -70,49 +84,104 @@ impl StringStream {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct LiteralInt {
+    pub value: i64,
+    pub span: Span,
+}
+
+/// Any identifier in the source code (eg. "Foo" in a type or "bar" in
+/// an expression).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Word {
+    pub name: String,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    AngleLeft,
-    Arrow,
-    BraceLeft,
-    BraceRight,
-    Comma,
+    Arrow(Location),
+    BraceLeft(Location),
+    BraceRight(Location),
+    Comma(Location),
+    CommentLine(String, Span),
     Dot(Location),
-    DoubleEqual,
-    EOF,
-    Equal,
-    Export,
-    Identifier(String, Span),
-    If(Location),
+    EOF(Location),
+    Equals(Location),
+    Func(Location),
     Import(Location),
-    Integer(i64),
+    Minus(Location),
+    Newline(Location),
     Let(Location),
-    Minus,
-    ParenthesesLeft,
-    ParenthesesRight,
-    Plus,
-    Return,
-    Star,
-    String(String, Span),
-    Symbol(String, Span),
-    Terminal(char),
+    LiteralInt(LiteralInt),
+    ParenthesesLeft(Location),
+    ParenthesesRight(Location),
+    Plus(Location),
+    Slash(Location),
+    Star(Location),
+    Struct(Location),
     Var(Location),
-    While(Location),
+    Word(Word),
 }
 
 impl Token {
-    pub fn location(&self) -> Option<Location> {
+    pub fn location(&self) -> Location {
+        use Token::*;
         match self {
-            Token::Let(location) | Token::Var(location) => Some(location.clone()),
-            Token::Identifier(_, location) => Some(location.start.clone()),
-            _ => None,
+            CommentLine(_, span) => span.start.clone(),
+            LiteralInt(literal) => literal.span.start.clone(),
+            Word(word) => word.span.start.clone(),
+            Arrow(location)
+            | BraceLeft(location)
+            | BraceRight(location)
+            | Comma(location)
+            | Dot(location)
+            | EOF(location)
+            | Equals(location)
+            | Func(location)
+            | Import(location)
+            | Minus(location)
+            | Newline(location)
+            | Let(location)
+            | ParenthesesLeft(location)
+            | ParenthesesRight(location)
+            | Plus(location)
+            | Slash(location)
+            | Star(location)
+            | Struct(location)
+            | Var(location) => location.clone(),
         }
     }
-}
 
-impl Token {
-    pub fn newline(self) -> bool {
+    pub fn to_string(&self) -> String {
+        use Token::*;
         match self {
-            Token::Terminal(character) => character == '\n',
+            Plus(_) => "+",
+            Star(_) => "*",
+            _ => unreachable!("Cannot stringify: {:?}", self),
+        }
+        .to_string()
+    }
+
+    pub fn same_variant_as(&self, other: &Token) -> bool {
+        use Token::*;
+        match (self, other) {
+            (Plus(_), Plus(_)) => true,
+            (Slash(_), Slash(_)) => true,
+            (Star(_), Star(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_brace_right(&self) -> bool {
+        match self {
+            Token::BraceRight(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_eof(&self) -> bool {
+        match self {
+            Token::EOF(_) => true,
             _ => false,
         }
     }
@@ -121,8 +190,7 @@ impl Token {
 #[derive(Clone)]
 pub struct TokenStream {
     input: StringStream,
-    peeking: bool,
-    next_token: Option<Token>,
+    peek: Option<Token>,
 }
 
 impl TokenStream {
@@ -131,232 +199,127 @@ impl TokenStream {
     }
 
     fn new(input: StringStream) -> Self {
-        TokenStream {
-            input: input,
-            peeking: false,
-            next_token: None,
-        }
-    }
-
-    pub fn backtrack(&mut self, other: &TokenStream) {
-        self.input = other.input.clone();
-        self.peeking = other.peeking;
-        self.next_token = other.next_token.clone();
+        TokenStream { input, peek: None }
     }
 
     pub fn peek(&mut self) -> Token {
-        if !self.peeking {
-            self.peeking = true;
-            self.next_token = Some(self.lex());
+        if self.peek.is_none() {
+            self.peek = Some(self.next());
         }
-        self.next_token.clone().unwrap()
-    }
-
-    /// Peeks, and if the peeked token is the same type as the expected then
-    /// read that type and return the read (not expected) token.
-    pub fn read_if(&mut self, expected: Token) -> Option<Token> {
-        use std::mem::discriminant;
-
-        let got = self.peek();
-        if discriminant(&expected) == discriminant(&got) {
-            Some(self.read())
-        } else {
-            None
-        }
+        self.peek.clone().unwrap()
     }
 
     pub fn read(&mut self) -> Token {
-        let token = self.peek();
-        self.peeking = false;
-        token
+        match self.peek.clone() {
+            Some(token) => {
+                self.peek = None;
+                token
+            }
+            None => self.next(),
+        }
     }
 
-    fn lex(&mut self) -> Token {
-        self.consume_space_and_comments();
+    fn next(&mut self) -> Token {
+        self.consume_space();
 
-        loop {
-            let location = self.input.location();
-            let character = self.input.peek();
-
-            if identifier_head(character) {
-                return self.lex_identifier(location);
-            } else if numeric_head(character) {
-                return self.lex_arrow_minus_or_numeric();
-            } else if string_head(character) {
-                return self.lex_string(location);
-            } else if symbol_head(character) {
-                return self.lex_symbol(location);
-            } else {
-                self.input.read();
-                match character {
-                    '\0' => return Token::EOF,
-                    '{' => return Token::BraceLeft,
-                    '}' => return Token::BraceRight,
-                    '(' => return Token::ParenthesesLeft,
-                    ')' => return Token::ParenthesesRight,
-                    ',' => return Token::Comma,
-                    '.' => return Token::Dot(location),
-                    '=' => {
-                        return if self.input.peek() == '=' {
-                            self.input.read();
-                            Token::DoubleEqual
-                        } else {
-                            Token::Equal
-                        }
-                    }
-                    '<' => return Token::AngleLeft,
-                    '+' => return Token::Plus,
-                    '*' => return Token::Star,
-                    ';' => return Token::Terminal(character),
-                    '\n' => {
-                        self.consume_more_newline_terminals();
-                        return Token::Terminal(character);
-                    }
-                    _ => panic!("Unexpected character: {}", character),
-                }
+        let location = self.input.location();
+        let character = self.input.read();
+        if word_head(character) {
+            self.lex_word(location, character)
+        } else if numeric_head(character) {
+            self.lex_arrow_minus_or_numeric(location, character)
+        } else if character == '/' {
+            self.lex_slash_or_line_comment(location)
+        } else if character == '\r' {
+            let next_location = self.input.location();
+            let next = self.input.read();
+            assert_eq!(next, '\n');
+            Token::Newline(next_location)
+        } else {
+            match character {
+                '{' => Token::BraceLeft(location),
+                '}' => Token::BraceRight(location),
+                ',' => Token::Comma(location),
+                '.' => Token::Dot(location),
+                '=' => Token::Equals(location),
+                '(' => Token::ParenthesesLeft(location),
+                ')' => Token::ParenthesesRight(location),
+                '+' => Token::Plus(location),
+                '\n' => Token::Newline(location),
+                '/' => Token::Slash(location),
+                '*' => Token::Star(location),
+                '\0' => Token::EOF(location),
+                _ => unreachable!("Unrecognized character: {:?}", character),
             }
         }
     }
 
-    fn lex_identifier(&mut self, start: Location) -> Token {
-        let mut identifier = vec![self.input.read()];
-        loop {
-            let character = self.input.peek();
-            if identifier_tail(character) {
-                self.input.read();
-                identifier.push(character);
-            } else {
-                break;
-            }
-        }
-        let identifier_string: String = identifier.into_iter().collect();
-        match identifier_string.as_str() {
-            "export" => Token::Export,
-            "let" => Token::Let(start),
-            "if" => Token::If(start),
+    fn lex_word(&mut self, start: Location, head: char) -> Token {
+        let (tail, end) = self.input.read_while(word_tail);
+        let name = head.to_string() + &tail;
+        match name.as_str() {
+            "func" => Token::Func(start),
             "import" => Token::Import(start),
-            "return" => Token::Return,
+            "struct" => Token::Struct(start),
             "var" => Token::Var(start),
-            "while" => Token::While(start),
-            _ => Token::Identifier(
-                identifier_string,
-                Span::new(start.clone(), self.input.location()),
-            ),
+            _ => Token::Word(Word {
+                name,
+                span: Span::new(start, end),
+            }),
         }
     }
 
-    fn lex_string(&mut self, start: Location) -> Token {
-        let opening = self.input.read();
-        assert_eq!(opening, '"');
-        let mut characters = vec![];
-        let mut end;
-        loop {
-            let character = self.input.read();
-            end = self.input.location();
-            if character != '"' {
-                characters.push(character);
-            } else {
-                break;
-            }
-        }
-        let string: String = characters.into_iter().collect();
-        Token::String(string, Span::new(start, end))
-    }
-
-    fn lex_symbol(&mut self, start: Location) -> Token {
-        let marker = self.input.read();
-        assert_eq!(marker, ':');
-        let mut characters = vec![];
-        let mut end = start.clone();
-        loop {
-            let character = self.input.read();
-            if identifier_tail(character) {
-                end = self.input.location();
-                characters.push(character);
-            } else {
-                break;
-            }
-        }
-        let string: String = characters.into_iter().collect();
-        Token::Symbol(string, Span::new(start, end))
-    }
-
-    fn lex_arrow_minus_or_numeric(&mut self) -> Token {
-        let first_character = self.input.read();
-        if first_character == '-' && self.input.peek() == '>' {
+    fn lex_arrow_minus_or_numeric(&mut self, start: Location, head: char) -> Token {
+        if head == '-' && self.input.peek() == '>' {
             self.input.read();
-            return Token::Arrow;
+            return Token::Arrow(start);
         }
-        if first_character == '-' && !digit(self.input.peek()) {
-            return Token::Minus;
+        if head == '-' && !digit(self.input.peek()) {
+            return Token::Minus(start);
         }
-        let mut number = vec![first_character];
-        loop {
-            let character = self.input.peek();
-            if digit(character) {
-                self.input.read();
-                number.push(character);
-            } else {
-                break;
-            }
-        }
-        let number_string: String = number.into_iter().collect();
-        Token::Integer(number_string.parse().unwrap())
+        let (tail, end) = self.input.read_while(digit);
+        let number_string = head.to_string() + &tail;
+        Token::LiteralInt(LiteralInt {
+            value: number_string.parse().unwrap(),
+            span: Span::new(start, end),
+        })
     }
 
-    fn consume_more_newline_terminals(&mut self) {
-        loop {
-            self.consume_space_and_comments();
-            if self.input.peek() == '\n' {
-                self.input.read();
-                continue;
-            } else {
-                break;
-            }
+    fn lex_slash_or_line_comment(&mut self, start: Location) -> Token {
+        let next = self.input.peek();
+        if next == '/' {
+            let (tail, end) = self
+                .input
+                .read_while(|character| character != '\n' && character != '\0');
+            Token::CommentLine(format!("/{}", tail), Span::new(start, end))
+        } else {
+            Token::Slash(start)
         }
     }
 
-    fn consume_space_and_comments(&mut self) {
+    fn consume_space(&mut self) {
         loop {
             let character = self.input.peek();
             if character == ' ' || character == '\t' {
                 self.input.read();
-            } else if self.input.read_if_match(&['/', '/']) {
-                self.input.read_until('\n');
-            } else if self.input.read_if_match(&['/', '*']) {
-                loop {
-                    if self.input.read_if_match(&['*', '/']) {
-                        break;
-                    } else {
-                        self.input.read();
-                    }
-                }
-            } else {
-                // Not any kind of comment.
-                break;
+                continue;
             }
+            // Not any kind of inline whitespace.
+            break;
         }
     }
 }
 
-fn identifier_head(character: char) -> bool {
+fn word_head(character: char) -> bool {
     alphabetical(character) || character == '_'
 }
 
-fn identifier_tail(character: char) -> bool {
+fn word_tail(character: char) -> bool {
     alphabetical(character) || digit(character) || character == '_'
 }
 
 fn numeric_head(character: char) -> bool {
     digit(character) || (character == '-')
-}
-
-fn string_head(character: char) -> bool {
-    character == '"'
-}
-
-fn symbol_head(character: char) -> bool {
-    character == ':'
 }
 
 fn alphabetical(character: char) -> bool {
@@ -369,7 +332,7 @@ fn digit(character: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Location, Span, StringStream, Token, TokenStream};
+    use super::{Location, Span, StringStream, Token, TokenStream, Word};
 
     fn make_token_stream(input: &str) -> TokenStream {
         let string_stream = StringStream::new(input);
@@ -382,7 +345,7 @@ mod tests {
         loop {
             let token = token_stream.read();
             tokens.push(token.clone());
-            if token == Token::EOF {
+            if let Token::EOF(_) = token {
                 break;
             }
         }
@@ -390,252 +353,79 @@ mod tests {
     }
 
     #[test]
-    fn it_parses_identifier() {
+    fn test_parse_arrow() {
+        assert_eq!(
+            parse("->"),
+            vec![
+                Token::Arrow(Location::new(0, 1, 1)),
+                Token::EOF(Location::new(2, 1, 3))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_words() {
+        assert_eq!(
+            parse("func"),
+            vec![
+                Token::Func(Location::new(0, 1, 1)),
+                Token::EOF(Location::new(4, 1, 5))
+            ]
+        );
+        assert_eq!(
+            parse("struct"),
+            vec![
+                Token::Struct(Location::new(0, 1, 1)),
+                Token::EOF(Location::new(6, 1, 7))
+            ]
+        );
         assert_eq!(
             parse("foo"),
             vec![
-                Token::Identifier(
-                    "foo".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
-                ),
-                Token::EOF,
-            ]
-        );
-        assert_eq!(
-            parse("a1_b2"),
-            vec![
-                Token::Identifier(
-                    "a1_b2".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(5, 1, 6)),
-                ),
-                Token::EOF,
-            ]
-        );
-        assert_eq!(
-            parse("_"),
-            vec![
-                Token::Identifier(
-                    "_".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(1, 1, 2)),
-                ),
-                Token::EOF,
+                Token::Word(Word {
+                    name: "foo".to_string(),
+                    span: Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
+                }),
+                Token::EOF(Location::new(3, 1, 4)),
             ]
         );
     }
 
     #[test]
-    fn it_parses_keywords() {
+    fn test_parse_comments() {
         assert_eq!(
-            parse("let"),
-            vec![Token::Let(Location::new(0, 1, 1)), Token::EOF],
-        );
-        assert_eq!(parse("return"), vec![Token::Return, Token::EOF]);
-        assert_eq!(
-            parse("var"),
-            vec![Token::Var(Location::new(0, 1, 1)), Token::EOF],
-        );
-    }
-
-    #[test]
-    fn it_parses_arrows() {
-        assert_eq!(
-            parse("foo() -> {}"),
+            parse("foo // bar"),
             vec![
-                Token::Identifier(
-                    "foo".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
+                Token::Word(Word {
+                    name: "foo".to_string(),
+                    span: Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
+                }),
+                Token::CommentLine(
+                    "// bar".to_string(),
+                    Span::new(Location::new(4, 1, 5), Location::new(10, 1, 11)),
                 ),
-                Token::ParenthesesLeft,
-                Token::ParenthesesRight,
-                Token::Arrow,
-                Token::BraceLeft,
-                Token::BraceRight,
-                Token::EOF,
-            ],
-        );
-    }
-
-    #[test]
-    fn it_parses_comments_and_terminals() {
-        assert_eq!(
-            parse("foo /* Comment */ bar"),
-            vec![
-                Token::Identifier(
-                    "foo".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
-                ),
-                Token::Identifier(
-                    "bar".to_string(),
-                    Span::new(Location::new(18, 1, 19), Location::new(21, 1, 22)),
-                ),
-                Token::EOF,
-            ]
-        );
-
-        assert_eq!(
-            parse("foo // Comment \n bar"),
-            vec![
-                Token::Identifier(
-                    "foo".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
-                ),
-                Token::Terminal('\n'),
-                Token::Identifier(
-                    "bar".to_string(),
-                    Span::new(Location::new(17, 2, 2), Location::new(20, 2, 5)),
-                ),
-                Token::EOF,
-            ]
-        );
-
-        assert_eq!(
-            parse(
-                "foo
-            // Comment about the call
-            // Another comment about the call
-            bar()"
-            ),
-            vec![
-                Token::Identifier(
-                    "foo".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
-                ),
-                Token::Terminal('\n'),
-                Token::Identifier(
-                    "bar".to_string(),
-                    Span::new(Location::new(100, 4, 13), Location::new(103, 4, 16)),
-                ),
-                Token::ParenthesesLeft,
-                Token::ParenthesesRight,
-                Token::EOF,
+                Token::EOF(Location::new(10, 1, 11))
             ]
         );
     }
 
     #[test]
-    fn it_parses_equal() {
-        assert_eq!(parse("="), vec![Token::Equal, Token::EOF]);
-    }
-
-    #[test]
-    fn it_parses_double_equal() {
-        assert_eq!(parse("=="), vec![Token::DoubleEqual, Token::EOF]);
-    }
-
-    #[test]
-    fn it_parses_integers() {
-        assert_eq!(parse("1"), vec![Token::Integer(1), Token::EOF]);
-        assert_eq!(parse("-1"), vec![Token::Integer(-1), Token::EOF]);
+    fn test_parse_newlines() {
+        // Including an \r to make sure it's safely ignored.
         assert_eq!(
-            parse("- 1"),
-            vec![Token::Minus, Token::Integer(1), Token::EOF],
-        );
-        assert_eq!(
-            parse("- -2"),
-            vec![Token::Minus, Token::Integer(-2), Token::EOF],
-        );
-        assert_eq!(
-            parse("1+2"),
+            parse("foo\r\nbar"),
             vec![
-                Token::Integer(1),
-                Token::Plus,
-                Token::Integer(2),
-                Token::EOF,
-            ],
-        );
-        assert_eq!(
-            parse("1 + 2"),
-            vec![
-                Token::Integer(1),
-                Token::Plus,
-                Token::Integer(2),
-                Token::EOF,
-            ],
-        );
-        assert_eq!(
-            parse("1 + -2"),
-            vec![
-                Token::Integer(1),
-                Token::Plus,
-                Token::Integer(-2),
-                Token::EOF,
-            ],
-        );
-    }
-
-    #[test]
-    fn it_parses_strings() {
-        assert_eq!(
-            parse("\"\""),
-            vec![
-                Token::String(
-                    "".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(2, 1, 3)),
-                ),
-                Token::EOF
+                Token::Word(Word {
+                    name: "foo".to_string(),
+                    span: Span::new(Location::new(0, 1, 1), Location::new(3, 1, 4)),
+                }),
+                Token::Newline(Location::new(4, 1, 5)),
+                Token::Word(Word {
+                    name: "bar".to_string(),
+                    span: Span::new(Location::new(5, 2, 1), Location::new(8, 2, 4)),
+                }),
+                Token::EOF(Location::new(8, 2, 4))
             ]
         );
-        assert_eq!(
-            parse("\"abc123\""),
-            vec![
-                Token::String(
-                    "abc123".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(8, 1, 9)),
-                ),
-                Token::EOF
-            ]
-        );
-    }
-
-    #[test]
-    fn it_parses_symbols() {
-        assert_eq!(
-            parse(":abc123"),
-            vec![
-                Token::Symbol(
-                    "abc123".to_string(),
-                    Span::new(Location::new(0, 1, 1), Location::new(7, 1, 8)),
-                ),
-                Token::EOF
-            ]
-        );
-    }
-
-    #[test]
-    fn it_parses_blocks() {
-        assert_eq!(
-            parse("{ 1; }"),
-            vec![
-                Token::BraceLeft,
-                Token::Integer(1),
-                Token::Terminal(';'),
-                Token::BraceRight,
-                Token::EOF,
-            ]
-        );
-    }
-
-    #[test]
-    fn test_read_if() {
-        let input = "a";
-        // Check that `read` works correctly.
-        let actual = Token::Identifier(
-            "a".to_string(),
-            Span::new(Location::new(0, 1, 1), Location::new(1, 1, 2)),
-        );
-        assert_eq!(make_token_stream(input).read(), actual,);
-        // Now check that the contents of the expected token don't equal the
-        // actual token.
-        let expected = Token::Identifier(
-            "".to_string(),
-            Span::new(Location::unknown(), Location::unknown()),
-        );
-        assert_ne!(make_token_stream(input).read(), expected);
-        // But `read_if` should still return the actual token since they're
-        // both `Identifier`s.
-        assert_eq!(make_token_stream("a").read_if(expected), Some(actual));
-        // And finally if we look for something that isn't an identifier it
-        // should return `None`.
-        assert_eq!(make_token_stream("a").read_if(Token::ParenthesesLeft), None);
     }
 }

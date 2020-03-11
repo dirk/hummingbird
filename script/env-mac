@@ -1,0 +1,2 @@
+# Run `source script/env-mac` to set up your environment correctly on macOS.
+export LLVM_SYS_80_PREFIX=/usr/local/opt/llvm@8

@@ -5,18 +5,33 @@
 [travis-image]: https://travis-ci.org/dirk/hummingbird.svg?branch=master
 [travis-url]: https://travis-ci.org/dirk/hummingbird
 
-This is an experimental language and virtual machine.
+This is an experimental language.
 
 For the previous JavaScript implementation which compiled to JavaScript or binary-via-LLVM check out the [`legacy-2015`](https://github.com/dirk/hummingbird/tree/legacy-2015) branch.
 
-## Notes
+## Getting started on macOS
 
-A few environment variables can be used to control debug printing:
+One-time setup:
 
-- **DEBUG_ALL**: Print all stages of compilation
-- **DEBUG_AST**: Print parsed AST
-- **DEBUG_IR**: Print intermediate representation (IR)
-- **DEBUG_BYTECODE**: Print bytecode
+```sh
+# Install LLVM v8
+brew install llvm@8
+```
+
+When starting work in a new shell:
+
+```sh
+# Set up your environment so that the llvm-sys crate can discover Homebrew's
+# installation of llvm@8.
+source script/env-mac
+```
+
+Building and testing:
+
+```sh
+cargo build
+cargo test
+```
 
 ## License
 
