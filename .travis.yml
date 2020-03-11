@@ -15,6 +15,8 @@ addons:
 
 env:
   global:
+    # For some reason the linker on Travis will segfault if this flag
+    # isn't included.
     - 'RUSTFLAGS="-C link-dead-code"'
 
 rust:
@@ -26,7 +28,7 @@ cache:
 
 before_install:
   # Keep this Bundler version in sync with `Gemfile.lock`.
-  - "gem install bundler -v '2.0.2'"
+  - 'gem install bundler -v "2.0.2"'
   - "bundle install --jobs=3 --retry=3"
   - "export LLVM_SYS_80_PREFIX=$(llvm-config-8 --prefix)"
 
