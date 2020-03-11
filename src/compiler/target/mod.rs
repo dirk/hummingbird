@@ -10,7 +10,7 @@ use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::{AddressSpace, OptimizationLevel};
 use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
 
-use super::value_ir::{
+use super::ir::{
     self as ir, Func, FuncId, FuncValue, Instruction, Module, StaticValue, ValueId, Value,
 };
 
