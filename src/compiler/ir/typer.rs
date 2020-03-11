@@ -23,25 +23,6 @@ impl Typer {
         }))
     }
 
-    pub fn is_unit_or_int(&self, ast_type: &ast::Type) -> bool {
-        // If we get an object that's an `Int` that will be resolved by
-        // `lookup_type` using the builtins.
-        if let Some(existing) = self.lookup_type(ast_type) {
-            return match &existing {
-                Type::Real(real_type) => match real_type {
-                    RealType::Int64 => true,
-                    RealType::Tuple(tuple_type) => tuple_type.members.is_empty(),
-                    _ => false,
-                },
-                _ => false,
-            };
-        }
-        match ast_type {
-            ast::Type::Tuple(tuple) => tuple.members.is_empty(),
-            _ => false,
-        }
-    }
-
     /// Searches itself and its parent for a type.
     fn lookup_type(&self, ast_type: &ast::Type) -> Option<Type> {
         let id = ast_type.id();

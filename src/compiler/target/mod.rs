@@ -97,7 +97,7 @@ pub fn compile_modules(modules: &Vec<Module>) {
     let funcs = collect_all_func_values(modules);
     // Forward-define all of the functions.
     for func in funcs.iter() {
-        let name = if func.get_main() {
+        let name = if func.is_main() {
             "main"
         } else {
             func.get_qualified_name()

@@ -118,7 +118,7 @@ impl Container for Module {
     }
 }
 
-/// UnspecializedFuncType -> Func -> FuncValue
+/// AbstractType::UnspecializedFunc -> Func -> FuncValue
 #[derive(Clone)]
 pub struct Func(Rc<InnerFunc>);
 
@@ -183,10 +183,6 @@ impl Func {
 
     fn name(&self) -> &str {
         &self.0.ast_func.name
-    }
-
-    fn arity(&self) -> usize {
-        self.0.ast_func.arguments.len()
     }
 
     fn get_parent_typer(&self) -> Typer {

@@ -149,21 +149,22 @@ impl FuncValue {
     pub fn new(
         qualified_name: String,
         func: Func,
-        parameter_types: Vec<RealType>,
+        parameters: Vec<RealType>,
         retrn: RealType,
     ) -> Self {
         let typer = Typer::new(Some(func.get_parent_typer()));
 
         let ast_func = &func.0.ast_func;
 
-        let mut parameters = vec![];
-        for (index, parameter_type) in parameter_types.into_iter().enumerate() {
+        // Store the mappings of AST parameter and retrn types to the
+        // corresponding real types in this specialization.
+        let mut parameter_pairs = vec![];
+        for (index, parameter) in parameters.into_iter().enumerate() {
             let ast_argument = &ast_func.arguments[index];
-            // Save the resolved type in the typer.
-            typer.set_type(&ast_argument.typ, Type::Real(parameter_type.clone()));
+            typer.set_type(&ast_argument.typ, Type::Real(parameter.clone()));
             // Also save the names of the parameters so that we can do
             // index resolution when building instructions.
-            parameters.push((ast_argument.name.clone(), parameter_type));
+            parameter_pairs.push((ast_argument.name.clone(), parameter));
         }
         let ast_retrn = &ast_func.typ.unwrap_func().retrn.borrow();
         typer.set_type(ast_retrn, Type::Real(retrn.clone()));
@@ -172,6 +173,7 @@ impl FuncValue {
         let scope = ast_func.scope.unwrap_func();
         for (name, ast_typ) in scope.locals.iter() {
             // Skip funcs since they can't be built into real types.
+            // TODO: Separate funcs from locals in `FuncScope`s.
             if ast_typ.is_func() {
                 continue;
             }
@@ -185,7 +187,7 @@ impl FuncValue {
             main: Cell::new(false),
             typer,
             func: Rc::downgrade(&func.0),
-            parameters,
+            parameters: parameter_pairs,
             retrn,
             stack_frame,
             funcs: RefCell::new(vec![]),
@@ -202,7 +204,7 @@ impl FuncValue {
         &self.0.qualified_name
     }
 
-    pub fn get_main(&self) -> bool {
+    pub fn is_main(&self) -> bool {
         self.0.main.get()
     }
 
