@@ -5,13 +5,13 @@ use std::process::Command;
 
 use inkwell::context::Context;
 use inkwell::module::Module as InkModule;
+use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
 use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::{AddressSpace, OptimizationLevel};
-use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
 
 use super::ir::{
-    self as ir, Func, FuncId, FuncValue, Instruction, Module, StaticValue, ValueId, Value,
+    self as ir, Func, FuncId, FuncValue, Instruction, Module, StaticValue, Value, ValueId,
 };
 
 /// Discover all of the funcs in the modules.
@@ -206,9 +206,10 @@ pub fn compile_modules(modules: &Vec<Module>) {
                         // `into_pointer_value` will panic if it's not a
                         // function pointer, so we need to be sure that it's
                         // going to be one.
-                        let value = value_resolver.get(&Value::Local(ir_value.clone())).into_pointer_value();
-                        let call_site =
-                            builder.build_call(value, arguments.as_slice(), "");
+                        let value = value_resolver
+                            .get(&Value::Local(ir_value.clone()))
+                            .into_pointer_value();
+                        let call_site = builder.build_call(value, arguments.as_slice(), "");
                         let retrn = call_site.try_as_basic_value().left().unwrap();
                         value_resolver.set(ir_retrn, retrn);
                     }

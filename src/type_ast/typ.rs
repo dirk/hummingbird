@@ -400,7 +400,6 @@ impl Type {
                                 callable.retrn.clone().close(tracker, scope.clone())?,
                             )
                         }
-                        other @ _ => unreachable!("Cannot close constraint: {:?}", other),
                     }
                 }
                 // Use substitution so that other uses will be updated.

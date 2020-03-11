@@ -373,7 +373,6 @@ fn compile_postfix_call(builder: &Builder, call: &ast::PostfixCall) -> Value {
             }
             _ => (),
         },
-        _ => (),
     }
     unreachable!("Cannot compile Call")
 }

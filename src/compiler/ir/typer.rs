@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use super::super::super::type_ast::{self as ast};
-use super::typ::{RealType, TupleType, Type, FuncPtrType};
+use super::typ::{FuncPtrType, RealType, TupleType, Type};
 
 /// Used to apply generics and cache AST-type-to-IR-type translations.
 #[derive(Clone)]
@@ -83,7 +83,9 @@ impl Typer {
                     Type::Real(RealType::Tuple(TupleType::new(members)))
                 }
                 ast::Type::Func(func) => {
-                    let parameters = func.arguments.borrow()
+                    let parameters = func
+                        .arguments
+                        .borrow()
                         .iter()
                         .map(|argument| self.build_type(argument).into_real())
                         .collect::<Vec<_>>();

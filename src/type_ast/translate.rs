@@ -176,7 +176,6 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
         past::Expression::PostfixProperty(pproperty) => {
             Expression::PostfixProperty(translate_postfix_property(pproperty, scope)?)
         }
-        _ => unreachable!("Cannot translate {:?}", pexpression),
     })
 }
 

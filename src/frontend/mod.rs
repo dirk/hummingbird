@@ -38,8 +38,7 @@ impl Manager {
         // compiler::compile_modules(modules);
 
         let ir_modules =
-            compiler::ir::compile_modules(manager.0.modules.borrow().iter(), &entry)
-                .get_modules();
+            compiler::ir::compile_modules(manager.0.modules.borrow().iter(), &entry).get_modules();
 
         compiler::target::compile_modules(&ir_modules);
 

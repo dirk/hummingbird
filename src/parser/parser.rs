@@ -247,13 +247,13 @@ fn parse_postfix(input: &mut TokenStream) -> ParseResult<Expression> {
 
 fn expect_postfix_call(input: &mut TokenStream, target: Expression) -> ParseResult<Expression> {
     let start = expect_to_read!(input, { Token::ParenthesesLeft(location) => location, });
-    let mut end: Option<Location> = None;
+    let end: Location;
     let mut arguments = vec![];
     loop {
         match input.peek() {
             Token::ParenthesesRight(location) => {
                 input.read();
-                end = Some(location);
+                end = location;
                 break;
             }
             _ => {
@@ -270,7 +270,7 @@ fn expect_postfix_call(input: &mut TokenStream, target: Expression) -> ParseResu
     Ok(Expression::PostfixCall(PostfixCall {
         target: Box::new(target),
         arguments,
-        span: Span::new(start, end.unwrap().plus_one()),
+        span: Span::new(start, end.plus_one()),
     }))
 }
 
