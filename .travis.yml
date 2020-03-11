@@ -1,6 +1,8 @@
-sudo: false
+language: "rust"
 
 dist: "xenial"
+
+sudo: false
 
 addons:
   apt:
@@ -11,7 +13,9 @@ addons:
       - "llvm-8"
       - "llvm-8-dev"
 
-language: "rust"
+env:
+  global:
+    - RUSTFLAGS="-C link-dead-code -C target-cpu=native -l ffi"
 
 rust:
   - "1.41.1"
