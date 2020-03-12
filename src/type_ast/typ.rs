@@ -235,15 +235,6 @@ impl Type {
                 tracker.add(self.id(), open.clone());
                 Ok(open)
             }
-            Type::Variable(variable) => {
-                match &*variable.borrow() {
-                    Variable::Unbound { id, .. } => {
-                        return Err(TypeError::UnexpectedUnbound { id: *id })
-                    }
-                    _ => (),
-                }
-                Ok(self.clone())
-            }
             _ => Ok(self.clone()),
         }
     }
