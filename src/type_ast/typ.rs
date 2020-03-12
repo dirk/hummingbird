@@ -179,53 +179,72 @@ impl Type {
         }
     }
 
-    /// Return an open (ie. variable) duplicate of oneself. Only really applies
-    /// to generics. We use this when calling functions so that unbounds don't
-    /// become substituted for closed immutable types.
+    /// Return an open (ie. variable) duplicate of oneself. We use this when
+    /// calling functions to resolve dependencies between generic arguments. If
+    /// we stuck with the closed type the unifier wouldn't be able to follow
+    /// the generic variables.
     ///
     /// We use a `RecursionTracker` so that we can return the same duplicate
     /// if we see it multiple times. This way links between argument and return
     /// types are preserved.
-    pub fn open_duplicate(&self, tracker: &mut RecursionTracker, scope: Scope) -> Type {
+    pub fn open_duplicate(&self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Type> {
         if let Some(known) = tracker.check(&self.id()) {
-            return known;
+            return Ok(known);
         }
         match self {
+            // FIXME: Make `open_duplicate` build stubs so that self-recursive
+            //   types are reopened correctly.
+            Type::Func(func) => {
+                let mut open_arguments = vec![];
+                for argument in func.arguments.borrow().iter() {
+                    open_arguments.push(argument.open_duplicate(tracker, scope.clone())?);
+                }
+                let open_retrn = func.retrn.borrow().open_duplicate(tracker, scope.clone())?;
+                let open =
+                    Type::new_func(func.name.clone(), open_arguments, open_retrn, scope.clone());
+                tracker.add(func.id, open.clone());
+                Ok(open)
+            }
             Type::Generic(generic) => {
-                let constraints = generic
-                    .borrow()
-                    .constraints
-                    .iter()
-                    .map(|constraint| {
-                        use GenericConstraint::*;
-                        match constraint {
-                            Callable(callable) => {
-                                let mut arguments = vec![];
-                                for argument in callable.arguments.iter() {
-                                    arguments.push(argument.open_duplicate(tracker, scope.clone()));
-                                }
-                                Callable(CallableConstraint {
-                                    arguments,
-                                    retrn: callable.retrn.open_duplicate(tracker, scope.clone()),
-                                })
+                let mut open_constraints = vec![];
+                for constraint in generic.borrow().constraints.iter() {
+                    use GenericConstraint::*;
+                    open_constraints.push(match constraint {
+                        Callable(callable) => {
+                            let mut arguments = vec![];
+                            for argument in callable.arguments.iter() {
+                                arguments.push(argument.open_duplicate(tracker, scope.clone())?);
                             }
-                            Property(property) => Property(PropertyConstraint {
-                                name: property.name.clone(),
-                                typ: property.typ.open_duplicate(tracker, scope.clone()),
-                            }),
+                            Callable(CallableConstraint {
+                                arguments,
+                                retrn: callable.retrn.open_duplicate(tracker, scope.clone())?,
+                            })
                         }
-                    })
-                    .collect::<Vec<_>>();
+                        Property(property) => Property(PropertyConstraint {
+                            name: property.name.clone(),
+                            typ: property.typ.open_duplicate(tracker, scope.clone())?,
+                        }),
+                    });
+                }
                 let open = Type::Variable(Rc::new(RefCell::new(Variable::Generic {
                     scope: scope.clone(),
-                    generic: Generic::new_with_constraints(constraints, scope),
+                    generic: Generic::new_with_constraints(open_constraints, scope),
                 })));
                 // Add the opened version to the track with the closed's ID so
                 // that it will be returned if the closed is encountered again.
                 tracker.add(self.id(), open.clone());
-                open
+                Ok(open)
             }
-            _ => self.clone(),
+            Type::Variable(variable) => {
+                match &*variable.borrow() {
+                    Variable::Unbound { id, .. } => {
+                        return Err(TypeError::UnexpectedUnbound { id: *id })
+                    }
+                    _ => (),
+                }
+                Ok(self.clone())
+            }
+            _ => Ok(self.clone()),
         }
     }
 
