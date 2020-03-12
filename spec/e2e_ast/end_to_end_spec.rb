@@ -1,11 +1,11 @@
-RSpec.describe 'End-to-end' do
+RSpec.describe 'End-to-end AST' do
   directories = Dir[File.join(File.dirname(__FILE__), '*')]
     .select { |entry| File.directory?(entry) }
 
   def expect_runs(source_file, expected_output)
     executable = File.expand_path('../../../target/debug/hummingbird', __FILE__)
     
-    command = "#{executable} #{source_file}"
+    command = "#{executable} ast #{source_file}"
     output = `#{command}`
     if $?.exitstatus != 0
       $stderr.puts "Command failed: #{command}"

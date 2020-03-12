@@ -1,0 +1,67 @@
+Module {
+  Func {
+    name: adder
+    arguments: [
+      arg: $6
+    ]
+    typ: adder#2(
+      $6,
+    ): #5(
+      $6,
+    ): $6
+    body:
+      Block {
+        Closure {
+          arguments: [
+            other: $6
+          ]
+          body:
+            Infix {
+              lhs:
+                Identifier {
+                  name: arg
+                  typ: $6
+                }
+              op: +
+              rhs:
+                Identifier {
+                  name: other
+                  typ: $6
+                }
+              typ: $6
+            }
+          typ: #5(1): $6
+        }
+      }
+  }
+  Func {
+    name: main
+    arguments: []
+    typ: main#8(): #13(
+      Int,
+    ): Int
+    body:
+      Block {
+        PostfixCall {
+          target:
+            Identifier {
+              name: adder
+              typ: adder#2(
+                $6,
+              ): #5(
+                $6,
+              ): $6
+            }
+          arguments: [
+            LiteralInt {
+              value: 1
+              typ: Int
+            }
+          ]
+          typ: #13(
+            Int,
+          ): Int
+        }
+      }
+  }
+}
