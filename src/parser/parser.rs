@@ -1,6 +1,8 @@
 use std::fmt::{Debug, Display, Error, Formatter};
+use std::path::PathBuf;
 
 use super::super::parse_ast::*;
+use super::super::StageError;
 use super::lexer::{Token, TokenStream};
 use super::{Location, Span, Word};
 
@@ -412,6 +414,10 @@ impl ParseError {
             got: base_name(&format!("{:?}", got)).to_string(),
             location,
         }
+    }
+
+    pub fn into_stage_error(self, path: &PathBuf, source: &String) -> StageError {
+        StageError::Parse(self, path.clone(), source.clone())
     }
 }
 

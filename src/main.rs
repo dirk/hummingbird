@@ -23,8 +23,19 @@ mod parse_ast;
 mod parser;
 mod type_ast;
 
-use frontend::CompileError;
+use frontend::FrontendError;
+use parser::ParseError;
 use type_ast::{Printer, PrinterOptions, TypeError};
+
+/// Covers all the different errors that can be raised at various stages of
+/// compilation; includes the path and contents of the file from where the
+/// error originated.
+#[derive(Debug)]
+pub enum StageError {
+    Parse(ParseError, PathBuf, String),
+    Type(TypeError, PathBuf, String),
+    Frontend(FrontendError),
+}
 
 fn extract_option<S: AsRef<str>>(args: Vec<String>, option: S) -> (Vec<String>, bool) {
     let mut found = false;
@@ -50,9 +61,9 @@ fn print_usage() {
     println!("  --print-pointers  Include pointers in debugging output");
 }
 
-fn handle_compile_error(error: CompileError) {
+fn handle_stage_error(error: StageError) {
     match error {
-        CompileError::Type(type_error, path, source) => {
+        StageError::Type(type_error, path, source) => {
             print_type_error(type_error, path.to_str().unwrap().to_string(), source)
         }
         other @ _ => panic!("{:#?}", other),
@@ -83,7 +94,7 @@ fn main() {
         (Some("compile"), Some(filename)) => {
             match frontend::Manager::compile_main(filename.into()) {
                 Ok(_) => (),
-                Err(error) => handle_compile_error(error),
+                Err(error) => handle_stage_error(error),
             }
         }
         (Some("ast"), Some(filename)) => {
@@ -97,7 +108,7 @@ fn main() {
                     let ast = module.unwrap_ast();
                     printer.print_module(&ast).unwrap();
                 }
-                Err(error) => handle_compile_error(error),
+                Err(error) => handle_stage_error(error),
             }
         }
         _ => {

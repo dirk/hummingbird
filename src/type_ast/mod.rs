@@ -6,12 +6,13 @@
 /// remaining in the AST.
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use super::parse_ast as past;
 use super::parser::{Span, Token, Word};
+use super::{parse_ast as past, StageError};
 
 mod builtins;
 mod nodes;
@@ -162,6 +163,10 @@ impl TypeError {
             wrapped: Box::new(self),
             span,
         }
+    }
+
+    pub fn into_stage_error(self, path: &PathBuf, source: &String) -> StageError {
+        StageError::Type(self, path.clone(), source.clone())
     }
 }
 
