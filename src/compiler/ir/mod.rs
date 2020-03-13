@@ -6,14 +6,17 @@ use super::super::type_ast::{self as ast};
 use super::vecs_equal::vecs_equal;
 
 mod compile;
+mod error;
 mod typ;
 mod typer;
 mod value;
 
-pub use compile::{compile_modules, Instruction};
-pub use typ::RealType;
 use typ::*;
 use typer::Typer;
+
+pub use compile::{compile_modules, Instruction};
+pub use error::IrError;
+pub use typ::RealType;
 pub use value::{FuncId, FuncValue, LocalValue, StaticValue, Value, ValueId};
 
 /// A type which:
@@ -121,6 +124,15 @@ impl Container for Module {
 /// AbstractType::UnspecializedFunc -> Func -> FuncValue
 #[derive(Clone)]
 pub struct Func(Rc<InnerFunc>);
+
+impl Func {
+    /// Two `Func`s are equal if and only if they are same `Rc`.
+    pub fn is_equal(&self, other: &Func) -> bool {
+        let self_ptr = &self.0 as *const Rc<InnerFunc>;
+        let other_ptr = &other.0 as *const Rc<InnerFunc>;
+        self_ptr == other_ptr
+    }
+}
 
 struct InnerFunc {
     /// The parent that this func is declared in; should be one of:

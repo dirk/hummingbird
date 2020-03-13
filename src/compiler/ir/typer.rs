@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use super::super::super::type_ast::{self as ast};
-use super::typ::{FuncPtrType, RealType, TupleType, Type};
+use super::{FuncPtrType, IrError, RealType, TupleType, Type};
 
 /// Used to apply generics and cache AST-type-to-IR-type translations.
 #[derive(Clone)]
@@ -85,17 +85,27 @@ impl Typer {
     /// Used when building a func specialization to save the resolution of
     /// possibly-generic parameter types to their appropriate specialization.
     /// Also used by `compile_modules` to add entries for the builtin types.
-    pub fn set_type(&self, ast_type: &ast::Type, typ: Type) {
+    pub fn set_type(&self, ast_type: &ast::Type, typ: Type) -> Result<(), IrError> {
         let id = ast_type.id();
         {
             let types = self.0.types.borrow();
             if let Some(existing) = types.get(&id) {
-                // TODO: Compare them and raise an error if we try to re-set
-                //   with a different type.
+                // Check if the type we've saved is the same as the one we're
+                // trying to re-save. If they're not that means we have a
+                // problem with type flow through the AST.
+                if !existing.is_equal(&typ) {
+                    return Err(IrError::TypeMismatch {
+                        expected: existing.clone(),
+                        got: typ,
+                    });
+                }
+                // If they're equal then we don't need to re-save.
+                return Ok(())
             }
         }
         let mut types = self.0.types.borrow_mut();
         types.insert(id, typ);
+        Ok(())
     }
 }
 
