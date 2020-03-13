@@ -76,8 +76,6 @@ pub fn compile_modules<'m, M: Iterator<Item = &'m FrontendModule>>(
     let typer = Typer::new(None);
     let root = Root::new(typer.clone());
 
-    // TODO: Build a root `TypeScope` will all the builtins.
-
     for frontend_module in frontend_modules {
         define_module(frontend_module, root.clone());
     }
