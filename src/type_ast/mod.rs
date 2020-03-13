@@ -6,12 +6,13 @@
 /// remaining in the AST.
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use super::parse_ast as past;
 use super::parser::{Span, Token, Word};
+use super::{parse_ast as past, StageError};
 
 mod builtins;
 mod nodes;
@@ -163,6 +164,10 @@ impl TypeError {
             span,
         }
     }
+
+    pub fn into_stage_error(self, path: &PathBuf, source: &String) -> StageError {
+        StageError::Type(self, path.clone(), source.clone())
+    }
 }
 
 /// To safely handle recursive types we must register forward declarations
@@ -203,7 +208,7 @@ mod tests {
     use super::super::parse_ast as past;
     use super::super::parser::{Location, Span, Token, Word};
     use super::scope::{ClosureScope, Scope};
-    use super::{unify, Builtins, Closable, FuncBody, ScopeLike, Type, TypeError, Variable};
+    use super::{unify, Builtins, Closable, ScopeLike, Type, TypeError, Variable};
 
     fn new_scope() -> Scope {
         ClosureScope::new(None).into_scope()

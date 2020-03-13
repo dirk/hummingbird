@@ -2,7 +2,7 @@ use super::super::super::type_ast::{self as ast};
 use super::super::vecs_equal::vecs_equal;
 use super::Func;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Type {
     /// A type which can be represented by a value.
     Real(RealType),
@@ -15,6 +15,17 @@ impl Type {
         match self {
             Real(real_type) => real_type,
             _ => panic!("Cannot convert to Real type"),
+        }
+    }
+
+    pub fn is_equal(&self, other: &Type) -> bool {
+        use Type::*;
+        match (self, other) {
+            (Real(self_real), Real(other_real)) => self_real.is_equal(other_real),
+            (Abstract(self_abstract), Abstract(other_abstract)) => {
+                self_abstract.is_equal(other_abstract)
+            }
+            _ => false,
         }
     }
 }
@@ -93,4 +104,25 @@ impl TupleType {
 #[derive(Clone)]
 pub enum AbstractType {
     UnspecializedFunc(Func),
+}
+
+impl AbstractType {
+    pub fn is_equal(&self, other: &AbstractType) -> bool {
+        use AbstractType::*;
+        match (self, other) {
+            (
+                UnspecializedFunc(self_unspecialized_func),
+                UnspecializedFunc(other_unspecialized_func),
+            ) => self_unspecialized_func.is_equal(other_unspecialized_func),
+        }
+    }
+}
+
+impl std::fmt::Debug for AbstractType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use AbstractType::*;
+        match self {
+            UnspecializedFunc(func) => write!(f, "UnspecializedFunc({})", func.name()),
+        }
+    }
 }

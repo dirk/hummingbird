@@ -4,17 +4,19 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use super::compiler;
 use super::parser::{self, ParseError, TokenStream};
 use super::type_ast::{self, Module as TModule, TypeError};
+use super::{compiler, StageError};
 
-/// Combines underlying parsing and type errors with the canonicalized path and
-/// source code of the module that produced the error.
 #[derive(Debug)]
-pub enum CompileError {
-    Parse(ParseError, PathBuf, String),
-    Type(TypeError, PathBuf, String),
+pub enum FrontendError {
     CircularDependency(PathBuf),
+}
+
+impl FrontendError {
+    fn into_stage_error(self) -> StageError {
+        StageError::Frontend(self)
+    }
 }
 
 #[derive(Clone)]
@@ -34,7 +36,7 @@ impl Manager {
         }))
     }
 
-    pub fn compile_main(entry_path: PathBuf) -> Result<Self, CompileError> {
+    pub fn compile_main(entry_path: PathBuf) -> Result<Self, StageError> {
         let manager = Self::new();
         let entry = manager.load(entry_path)?;
 
@@ -49,19 +51,19 @@ impl Manager {
         Ok(manager)
     }
 
-    fn start_loading(&self, path: PathBuf) -> Result<(), CompileError> {
+    fn start_loading(&self, path: PathBuf) -> Result<(), FrontendError> {
         {
             let modules = self.0.modules.borrow();
             for module in modules.iter() {
                 if module.path() == path {
-                    return Err(CompileError::CircularDependency(path));
+                    return Err(FrontendError::CircularDependency(path));
                 }
             }
         }
         {
             let loading = self.0.loading.borrow();
             if loading.contains(&path) {
-                return Err(CompileError::CircularDependency(path));
+                return Err(FrontendError::CircularDependency(path));
             }
         }
         let mut loading = self.0.loading.borrow_mut();
@@ -84,11 +86,12 @@ impl Manager {
         modules.insert(module);
     }
 
-    pub fn load(&self, path: PathBuf) -> Result<Module, CompileError> {
+    pub fn load(&self, path: PathBuf) -> Result<Module, StageError> {
         let path = path.canonicalize().unwrap();
         // Check for circular dependencies and track that this module is being
         // actively loaded in `loading`.
-        self.start_loading(path.clone())?;
+        self.start_loading(path.clone())
+            .map_err(|err| err.into_stage_error())?;
         let next_id = {
             let modules = self.0.modules.borrow();
             modules.len()
@@ -125,16 +128,16 @@ impl Module {
         Ref::map(self.0.typed.borrow(), |module| module.as_ref().unwrap())
     }
 
-    pub fn load(&self, manager: Manager) -> Result<(), CompileError> {
+    pub fn load(&self, manager: Manager) -> Result<(), StageError> {
         let path = self.0.path.clone();
         let source = std::fs::read_to_string(path.clone()).unwrap();
 
         let mut token_stream = TokenStream::from_string(source.clone());
         let parsed = parser::parse_module(&mut token_stream)
-            .map_err(|err| CompileError::Parse(err, path.clone(), source.clone()))?;
+            .map_err(|err| err.into_stage_error(&path, &source))?;
 
         let typed = type_ast::translate_module(parsed)
-            .map_err(|err| CompileError::Type(err, path.clone(), source.clone()))?;
+            .map_err(|err| err.into_stage_error(&path, &source))?;
 
         {
             let mut mutable = self.0.typed.borrow_mut();

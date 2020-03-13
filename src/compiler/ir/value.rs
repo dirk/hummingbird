@@ -161,13 +161,17 @@ impl FuncValue {
         let mut parameter_pairs = vec![];
         for (index, parameter) in parameters.into_iter().enumerate() {
             let ast_argument = &ast_func.arguments[index];
-            typer.set_type(&ast_argument.typ, Type::Real(parameter.clone()));
+            typer
+                .set_type(&ast_argument.typ, Type::Real(parameter.clone()))
+                .expect("Parameter type mismatch");
             // Also save the names of the parameters so that we can do
             // index resolution when building instructions.
             parameter_pairs.push((ast_argument.name.clone(), parameter));
         }
         let ast_retrn = &ast_func.typ.unwrap_func().retrn.borrow();
-        typer.set_type(ast_retrn, Type::Real(retrn.clone()));
+        typer
+            .set_type(ast_retrn, Type::Real(retrn.clone()))
+            .expect("Return type mismatch");
 
         let mut stack_frame = vec![];
         let scope = ast_func.scope.unwrap_func();

@@ -1,2 +1,4 @@
 #!/bin/sh
+# Ensure the latest debug build has been built.
+cargo build
 bundle exec rspec $@

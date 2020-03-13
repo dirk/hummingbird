@@ -76,8 +76,6 @@ pub fn compile_modules<'m, M: Iterator<Item = &'m FrontendModule>>(
     let typer = Typer::new(None);
     let root = Root::new(typer.clone());
 
-    // TODO: Build a root `TypeScope` will all the builtins.
-
     for frontend_module in frontend_modules {
         define_module(frontend_module, root.clone());
     }
@@ -234,11 +232,9 @@ impl<'a> Builder<'a> {
     }
 }
 
-fn compile_func_body(builder: &Builder, func_value: FuncValue, body: &ast::FuncBody) {
+fn compile_func_body(builder: &Builder, func_value: FuncValue, body: &ast::Block) {
     builder.append_basic_block(Some("entry"));
-    let implicit_retrn = match body {
-        ast::FuncBody::Block(block) => compile_block(builder, block),
-    };
+    let implicit_retrn = compile_block(builder, body);
     builder.build_return(implicit_retrn);
 }
 

@@ -67,14 +67,10 @@ fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {
     // TODO: This should be an `add_static` once functions are static.
     scope.add_local(&name, typ.clone())?;
 
-    let body = match &pfunc.body {
-        past::FuncBody::Block(block) => {
-            FuncBody::Block(translate_block(block, func_scope.clone())?)
-        }
-    };
+    let body = translate_block(&pfunc.body, func_scope.clone())?;
 
-    let implicit_retrn = body.typ();
-    unify(&retrn, &implicit_retrn, func_scope.clone())?;
+    let implicit_retrn = &body.typ;
+    unify(&retrn, implicit_retrn, func_scope.clone())?;
 
     Ok(Func {
         name: name.clone(),
@@ -407,7 +403,7 @@ mod tests {
         let pfunc = past::Func {
             name: word("foo"),
             arguments: vec![word("bar")],
-            body: past::FuncBody::Block(past::Block {
+            body: past::Block {
                 // statements: vec![past::BlockStatement::Expression(past::Expression::Infix(
                 //     past::Infix {
                 //         lhs: Box::new(past::Expression::Identifier(past::Identifier {
@@ -434,7 +430,7 @@ mod tests {
                     })),
                 ],
                 span: Span::unknown(),
-            }),
+            },
             span: Span::unknown(),
         };
 

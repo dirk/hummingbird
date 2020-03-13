@@ -49,21 +49,21 @@ impl<O: Write> Printer<O> {
         }
     }
 
-    fn indented<F: FnOnce(&Self) -> Result<()>>(&self, inner: F) -> Result<()> {
+    fn indented<F: FnOnce() -> Result<()>>(&self, inner: F) -> Result<()> {
         self.indented_steps(1, inner)
     }
 
-    fn indented_steps<F: FnOnce(&Self) -> Result<()>>(&self, steps: u8, inner: F) -> Result<()> {
+    fn indented_steps<F: FnOnce() -> Result<()>>(&self, steps: u8, inner: F) -> Result<()> {
         let previous = self.indent.take();
         self.indent.set(previous + (2 * steps));
-        let result = inner(self);
+        let result = inner();
         self.indent.set(previous);
         result
     }
 
     pub fn print_module(&self, module: &Module) -> Result<()> {
         self.writeln("Module {")?;
-        self.indented(|this| {
+        self.indented(|| {
             for statement in module.statements.iter() {
                 use ModuleStatement::*;
                 match statement {
@@ -78,12 +78,12 @@ impl<O: Write> Printer<O> {
 
     fn print_func(&self, func: &nodes::Func) -> Result<()> {
         self.writeln("Func {")?;
-        self.indented(|_| {
+        self.indented(|| {
             writeln!(self, "name: {}", func.name)?;
             self.iwrite("arguments: [")?;
             if !func.arguments.is_empty() {
                 self.write("\n")?;
-                self.indented(|_| {
+                self.indented(|| {
                     for argument in func.arguments.iter() {
                         iwrite!(self, "{}: ", argument.name)?;
                         self.write_type(&argument.typ, true)?;
@@ -95,14 +95,11 @@ impl<O: Write> Printer<O> {
             } else {
                 self.write("]\n")?;
             }
-            // TODO: Body
             self.iwrite("typ: ")?;
             self.write_type(&func.typ, true)?;
             self.write("\n")?;
             self.writeln("body:")?;
-            self.indented(|_| match &func.body {
-                FuncBody::Block(block) => self.print_block(block),
-            })?;
+            self.indented(|| self.print_block(&func.body))?;
             Ok(())
         })?;
         self.writeln("}")
@@ -133,10 +130,10 @@ impl<O: Write> Printer<O> {
                 if !arguments.is_empty() {
                     if with_children {
                         for argument in arguments.iter() {
-                            self.indented(|this1| {
-                                this1.lnwrite("")?;
-                                this1.write_recursive_type(argument, true, tracker)?;
-                                this1.write(",")
+                            self.indented(|| {
+                                self.lnwrite("")?;
+                                self.write_recursive_type(argument, true, tracker)?;
+                                self.write(",")
                             })?;
                         }
                         self.lnwrite("): ")?;
@@ -158,7 +155,7 @@ impl<O: Write> Printer<O> {
                 self.write(format!("${}", generic.id))?;
                 if generic.has_constrains() && with_children && !recursive {
                     self.write("(")?;
-                    self.indented(|this| this.write_constraints(&generic.constraints, tracker))?;
+                    self.indented(|| self.write_constraints(&generic.constraints, tracker))?;
                     self.write(")")?;
                 }
                 self.write_pointer(&**outer)
@@ -183,8 +180,8 @@ impl<O: Write> Printer<O> {
                         self.write("G(")?;
                         self.write(format!("{}", generic.id))?;
                         if with_children && !recursive {
-                            self.indented(|this| {
-                                this.write_constraints(&generic.constraints, tracker)
+                            self.indented(|| {
+                                self.write_constraints(&generic.constraints, tracker)
                             })?;
                         }
                         self.write(")")?;
@@ -205,29 +202,29 @@ impl<O: Write> Printer<O> {
             return Ok(());
         }
         self.lnwrite("where")?;
-        self.indented(|this1| {
+        self.indented(|| {
             for constraint in constraints {
                 use GenericConstraint::*;
                 match constraint {
                     Property(property) => {
-                        this1.lnwrite(format!("{}: ", property.name))?;
-                        this1.write_recursive_type(&property.typ, true, tracker)?;
+                        self.lnwrite(format!("{}: ", property.name))?;
+                        self.write_recursive_type(&property.typ, true, tracker)?;
                     }
                     Callable(callable) => {
                         if callable.arguments.is_empty() {
-                            this1.lnwrite("(): ")?;
+                            self.lnwrite("(): ")?;
                         } else {
-                            this1.lnwrite("(\n")?;
+                            self.lnwrite("(\n")?;
                             for argument in callable.arguments.iter() {
-                                this1.indented(|this2| {
-                                    this2.iwrite("")?;
-                                    this2.write_recursive_type(argument, true, tracker)?;
-                                    this2.write(",")
+                                self.indented(|| {
+                                    self.iwrite("")?;
+                                    self.write_recursive_type(argument, true, tracker)?;
+                                    self.write(",")
                                 })?;
                             }
-                            this1.lnwrite("): ")?;
+                            self.lnwrite("): ")?;
                         }
-                        this1.write_recursive_type(&callable.retrn, true, tracker)?;
+                        self.write_recursive_type(&callable.retrn, true, tracker)?;
                     }
                 }
             }
@@ -244,9 +241,9 @@ impl<O: Write> Printer<O> {
         }
         self.write_type(&var.typ, true)?;
         if let Some(initializer) = &var.initializer {
-            self.indented(|this| {
-                this.write(" =")?;
-                this.print_expression(initializer)
+            self.indented(|| {
+                self.write(" =")?;
+                self.print_expression(initializer)
             })?;
         }
         Ok(())
@@ -258,7 +255,7 @@ impl<O: Write> Printer<O> {
             return self.write("}\n");
         }
         self.write("\n")?;
-        self.indented(|_| {
+        self.indented(|| {
             let last_index = block.statements.len().checked_sub(1).unwrap_or(0);
             for statement in block.statements.iter() {
                 use BlockStatement::*;
@@ -289,11 +286,11 @@ impl<O: Write> Printer<O> {
 
     fn print_closure(&self, closure: &Closure) -> Result<()> {
         self.writeln("Closure {")?;
-        self.indented(|_| {
+        self.indented(|| {
             self.iwrite("arguments: [")?;
             if !closure.arguments.is_empty() {
                 self.write("\n")?;
-                self.indented(|_| {
+                self.indented(|| {
                     for argument in closure.arguments.iter() {
                         self.iwrite(format!("{}: ", argument.name))?;
                         self.write_type(&argument.typ, true)?;
@@ -306,7 +303,7 @@ impl<O: Write> Printer<O> {
                 self.write("]\n")?;
             }
             self.writeln("body:")?;
-            self.indented(|_| match &*closure.body {
+            self.indented(|| match &*closure.body {
                 ClosureBody::Block(block) => self.print_block(block),
                 ClosureBody::Expression(expression) => self.print_expression(expression),
             })?;
@@ -319,7 +316,7 @@ impl<O: Write> Printer<O> {
 
     fn print_literal_int(&self, literal: &LiteralInt) -> Result<()> {
         self.writeln("LiteralInt {")?;
-        self.indented(|_| {
+        self.indented(|| {
             writeln!(self, "value: {}", literal.value)?;
             self.iwrite("typ: ")?;
             self.write_type(&literal.typ, false)?;
@@ -330,7 +327,7 @@ impl<O: Write> Printer<O> {
 
     fn print_identifier(&self, identifier: &Identifier) -> Result<()> {
         self.writeln("Identifier {")?;
-        self.indented(|_| {
+        self.indented(|| {
             writeln!(self, "name: {}", identifier.name.name)?;
             self.iwrite("typ: ")?;
             self.write_type(&identifier.typ, true)?;
@@ -341,12 +338,12 @@ impl<O: Write> Printer<O> {
 
     fn print_infix(&self, infix: &Infix) -> Result<()> {
         self.writeln("Infix {")?;
-        self.indented(|_| {
+        self.indented(|| {
             self.writeln("lhs:")?;
-            self.indented(|_| self.print_expression(&infix.lhs))?;
+            self.indented(|| self.print_expression(&infix.lhs))?;
             writeln!(self, "op: {}", infix.op.to_string())?;
             self.writeln("rhs:")?;
-            self.indented(|_| self.print_expression(&infix.rhs))?;
+            self.indented(|| self.print_expression(&infix.rhs))?;
             self.iwrite("typ: ")?;
             self.write_type(&infix.typ, false)?;
             self.write("\n")
@@ -356,13 +353,13 @@ impl<O: Write> Printer<O> {
 
     fn print_postfix_call(&self, call: &PostfixCall) -> Result<()> {
         self.writeln("PostfixCall {")?;
-        self.indented(|_| {
+        self.indented(|| {
             self.writeln("target:")?;
-            self.indented(|_| self.print_expression(&call.target))?;
+            self.indented(|| self.print_expression(&call.target))?;
             self.iwrite("arguments: [")?;
             if !call.arguments.is_empty() {
                 self.write("\n")?;
-                self.indented(|_| {
+                self.indented(|| {
                     for argument in call.arguments.iter() {
                         self.print_expression(argument)?;
                     }
@@ -381,9 +378,9 @@ impl<O: Write> Printer<O> {
 
     fn print_postfix_property(&self, property: &PostfixProperty) -> Result<()> {
         self.writeln("PostfixCall {")?;
-        self.indented(|_| {
+        self.indented(|| {
             self.writeln("target:")?;
-            self.indented(|_| self.print_expression(&property.target))?;
+            self.indented(|| self.print_expression(&property.target))?;
             writeln!(self, "property: {}", property.property.name)?;
             self.iwrite("typ: ")?;
             self.write_type(&property.typ, true)?;

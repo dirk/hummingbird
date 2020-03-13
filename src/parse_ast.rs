@@ -46,22 +46,8 @@ impl ClosureBody {
 pub struct Func {
     pub name: Word,
     pub arguments: Vec<Word>,
-    pub body: FuncBody,
+    pub body: Block,
     pub span: Span,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum FuncBody {
-    Block(Block),
-}
-
-impl FuncBody {
-    pub fn span(&self) -> Span {
-        use FuncBody::*;
-        match self {
-            Block(block) => block.span.clone(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
