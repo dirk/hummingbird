@@ -255,11 +255,11 @@ fn translate_postfix_call(pcall: &past::PostfixCall, scope: Scope) -> TypeResult
                 target_arguments.iter().zip(call_arguments.iter())
             {
                 let open_target_argument =
-                    target_argument.open_duplicate(&mut tracker, scope.clone());
+                    target_argument.open_duplicate(&mut tracker, scope.clone())?;
                 unify(call_argument, &open_target_argument, scope.clone())?;
             }
             let call_retrn = Type::new_unbound(scope.clone());
-            let open_target_retrn = target_retrn.open_duplicate(&mut tracker, scope.clone());
+            let open_target_retrn = target_retrn.open_duplicate(&mut tracker, scope.clone())?;
             unify(&call_retrn, &open_target_retrn, scope)?;
             call_retrn
 

@@ -8,13 +8,13 @@ use super::typ::*;
 
 macro_rules! iwrite {
     ($self: ident, $($arg:tt)*) => (
-        $self.writeln(format_args!($($arg)*))
+        $self.iwrite(format!($($arg)*))
     );
 }
 
-macro_rules! lnwrite {
+macro_rules! writeln {
     ($self: ident, $($arg:tt)*) => (
-        $self.writeln(format_args!($($arg)*))
+        $self.writeln(format!($($arg)*))
     );
 }
 
@@ -62,7 +62,7 @@ impl<O: Write> Printer<O> {
     }
 
     pub fn print_module(&self, module: &Module) -> Result<()> {
-        self.write("module {")?;
+        self.writeln("Module {")?;
         self.indented(|this| {
             for statement in module.statements.iter() {
                 use ModuleStatement::*;
@@ -72,35 +72,40 @@ impl<O: Write> Printer<O> {
             }
             Ok(())
         })?;
-        self.lnwrite("}\n")?;
+        self.writeln("}")?;
         Ok(())
     }
 
     fn print_func(&self, func: &nodes::Func) -> Result<()> {
-        self.lnwrite(format!("func {}(", func.name))?;
-        if !func.arguments.is_empty() {
+        self.writeln("Func {")?;
+        self.indented(|_| {
+            writeln!(self, "name: {}", func.name)?;
+            self.iwrite("arguments: [")?;
+            if !func.arguments.is_empty() {
+                self.write("\n")?;
+                self.indented(|_| {
+                    for argument in func.arguments.iter() {
+                        iwrite!(self, "{}: ", argument.name)?;
+                        self.write_type(&argument.typ, true)?;
+                        self.write("\n")?;
+                    }
+                    Ok(())
+                })?;
+                self.writeln("]")?;
+            } else {
+                self.write("]\n")?;
+            }
+            // TODO: Body
+            self.iwrite("typ: ")?;
+            self.write_type(&func.typ, true)?;
             self.write("\n")?;
-            self.indented(|this| {
-                for argument in func.arguments.iter() {
-                    this.iwrite(format!("{}: ", argument.name))?;
-                    this.write_type(&argument.typ, true)?;
-                    this.write(",\n")?;
-                }
-                Ok(())
+            self.writeln("body:")?;
+            self.indented(|_| match &func.body {
+                FuncBody::Block(block) => self.print_block(block),
             })?;
-            self.iwrite("): ")?;
-        } else {
-            self.write("): ")?;
-        }
-        let retrn = match &func.typ {
-            Type::Func(func) => func.retrn.borrow(),
-            other @ _ => unreachable!("Func node has non-Func type: {:?}", other),
-        };
-        self.write_type(&retrn, false)?;
-        self.write(" ")?;
-        match &func.body {
-            FuncBody::Block(block) => self.print_block(block, false),
-        }
+            Ok(())
+        })?;
+        self.writeln("}")
     }
 
     fn write_type(&self, typ: &Type, with_children: bool) -> Result<()> {
@@ -247,15 +252,13 @@ impl<O: Write> Printer<O> {
         Ok(())
     }
 
-    fn print_block(&self, block: &Block, initial_indent: bool) -> Result<()> {
-        let opener = "{";
-        if initial_indent {
-            self.iwrite(opener)?;
-        } else {
-            self.write(opener)?;
+    fn print_block(&self, block: &Block) -> Result<()> {
+        self.iwrite("Block {")?;
+        if block.statements.is_empty() {
+            return self.write("}\n");
         }
-
-        self.indented(|this| {
+        self.write("\n")?;
+        self.indented(|_| {
             let last_index = block.statements.len().checked_sub(1).unwrap_or(0);
             for statement in block.statements.iter() {
                 use BlockStatement::*;
@@ -269,8 +272,7 @@ impl<O: Write> Printer<O> {
             }
             Ok(())
         })?;
-        self.write("\n")?;
-        self.iwrite("}")
+        self.writeln("}")
     }
 
     fn print_expression(&self, expression: &Expression) -> Result<()> {
@@ -279,106 +281,115 @@ impl<O: Write> Printer<O> {
             Closure(closure) => self.print_closure(closure),
             Identifier(identifier) => self.print_identifier(identifier),
             Infix(infix) => self.print_infix(infix),
-            LiteralInt(literal) => self.lnwrite(format!("{}", literal.value)),
-            PostfixCall(call) => self.print_postfix_call(call, 0).map(|_| ()),
-            PostfixProperty(property) => self.print_postfix_property(property, 0).map(|_| ()),
+            LiteralInt(literal) => self.print_literal_int(literal),
+            PostfixCall(call) => self.print_postfix_call(call),
+            PostfixProperty(property) => self.print_postfix_property(property),
         }
     }
 
     fn print_closure(&self, closure: &Closure) -> Result<()> {
-        self.lnwrite("Closure(")?;
-        if !closure.arguments.is_empty() {
-            self.write("\n")?;
-            self.indented(|this| {
-                for argument in closure.arguments.iter() {
-                    this.iwrite(format!("{}: ", argument.name))?;
-                    this.write_type(&argument.typ, true)?;
-                    this.write(",\n")?;
-                }
-                Ok(())
+        self.writeln("Closure {")?;
+        self.indented(|_| {
+            self.iwrite("arguments: [")?;
+            if !closure.arguments.is_empty() {
+                self.write("\n")?;
+                self.indented(|_| {
+                    for argument in closure.arguments.iter() {
+                        self.iwrite(format!("{}: ", argument.name))?;
+                        self.write_type(&argument.typ, true)?;
+                        self.write("\n")?;
+                    }
+                    Ok(())
+                })?;
+                self.writeln("]")?;
+            } else {
+                self.write("]\n")?;
+            }
+            self.writeln("body:")?;
+            self.indented(|_| match &*closure.body {
+                ClosureBody::Block(block) => self.print_block(block),
+                ClosureBody::Expression(expression) => self.print_expression(expression),
             })?;
-        }
-        self.iwrite("): ")?;
-        let retrn = match &closure.typ {
-            Type::Func(func) => func.retrn.borrow(),
-            other @ _ => unreachable!("Closure node has non-Func type: {:?}", other),
-        };
-        self.write_type(&retrn, false)?;
-        self.write(" ")?;
-        match &*closure.body {
-            ClosureBody::Block(block) => self.print_block(block, false),
-            ClosureBody::Expression(expression) => self.indented(|this| {
-                this.write("(")?;
-                this.print_expression(expression)?;
-                this.write(")")
-            }),
-        }
+            self.iwrite("typ: ")?;
+            self.write_type(&closure.typ, false)?;
+            self.write("\n")
+        })?;
+        self.writeln("}")
+    }
+
+    fn print_literal_int(&self, literal: &LiteralInt) -> Result<()> {
+        self.writeln("LiteralInt {")?;
+        self.indented(|_| {
+            writeln!(self, "value: {}", literal.value)?;
+            self.iwrite("typ: ")?;
+            self.write_type(&literal.typ, false)?;
+            self.write("\n")
+        })?;
+        self.writeln("}")
     }
 
     fn print_identifier(&self, identifier: &Identifier) -> Result<()> {
-        self.lnwrite(format!("Identifier({}): ", identifier.name.name))?;
-        self.write_type(&identifier.typ, false)
+        self.writeln("Identifier {")?;
+        self.indented(|_| {
+            writeln!(self, "name: {}", identifier.name.name)?;
+            self.iwrite("typ: ")?;
+            self.write_type(&identifier.typ, true)?;
+            self.write("\n")
+        })?;
+        self.writeln("}")
     }
 
     fn print_infix(&self, infix: &Infix) -> Result<()> {
-        self.lnwrite("Infix(")?;
-        self.indented(|this1| {
-            this1.lnwrite("lhs:")?;
-            this1.indented(|this2| this2.print_expression(&infix.lhs))?;
-            this1.lnwrite(format!("op: {}", infix.op.to_string()))?;
-            this1.lnwrite(format!("rhs:"))?;
-            this1.indented(|this2| this2.print_expression(&infix.rhs))
+        self.writeln("Infix {")?;
+        self.indented(|_| {
+            self.writeln("lhs:")?;
+            self.indented(|_| self.print_expression(&infix.lhs))?;
+            writeln!(self, "op: {}", infix.op.to_string())?;
+            self.writeln("rhs:")?;
+            self.indented(|_| self.print_expression(&infix.rhs))?;
+            self.iwrite("typ: ")?;
+            self.write_type(&infix.typ, false)?;
+            self.write("\n")
         })?;
-        self.write(")")
+        self.writeln("}")
     }
 
-    fn is_postfix(&self, expression: &Expression) -> bool {
-        use Expression::*;
-        match expression {
-            PostfixProperty(_) => true,
-            _ => false,
-        }
-    }
-
-    fn print_postfix_call(&self, call: &PostfixCall, current: u8) -> Result<u8> {
-        let max = self.print_postfix_target(&*call.target, current)?;
-        // Have a +1 so that we always indent at least one step.
-        self.indented_steps(max - current + 1, |this1| {
-            this1.lnwrite(format!("Call("))?;
+    fn print_postfix_call(&self, call: &PostfixCall) -> Result<()> {
+        self.writeln("PostfixCall {")?;
+        self.indented(|_| {
+            self.writeln("target:")?;
+            self.indented(|_| self.print_expression(&call.target))?;
+            self.iwrite("arguments: [")?;
             if !call.arguments.is_empty() {
-                for argument in call.arguments.iter() {
-                    this1.indented(|this2| {
-                        this2.print_expression(argument)?;
-                        this2.write(",")
-                    })?;
-                }
+                self.write("\n")?;
+                self.indented(|_| {
+                    for argument in call.arguments.iter() {
+                        self.print_expression(argument)?;
+                    }
+                    Ok(())
+                })?;
+                self.writeln("]")?;
+            } else {
+                self.write("]\n")?;
             }
-            this1.write("): ")?;
-            this1.write_type(&call.typ, false)
+            self.iwrite("typ: ")?;
+            self.write_type(&call.typ, true)?;
+            self.write("\n")
         })?;
-        Ok(max)
+        self.writeln("}")
     }
 
-    fn print_postfix_property(&self, property: &PostfixProperty, current: u8) -> Result<u8> {
-        let max = self.print_postfix_target(&*property.target, current)?;
-        self.indented_steps(max - current + 1, |this| {
-            this.lnwrite(format!("Property({}): ", property.property.name))?;
-            this.write_type(&property.typ, false)
+    fn print_postfix_property(&self, property: &PostfixProperty) -> Result<()> {
+        self.writeln("PostfixCall {")?;
+        self.indented(|_| {
+            self.writeln("target:")?;
+            self.indented(|_| self.print_expression(&property.target))?;
+            writeln!(self, "property: {}", property.property.name)?;
+            self.iwrite("typ: ")?;
+            self.write_type(&property.typ, true)?;
+            self.write("\n")
         })?;
-        Ok(max)
-    }
-
-    fn print_postfix_target(&self, target: &Expression, current: u8) -> Result<u8> {
-        match target {
-            // Links in the chain
-            Expression::PostfixCall(target) => self.print_postfix_call(target, current + 1),
-            Expression::PostfixProperty(target) => self.print_postfix_property(target, current + 1),
-            // Tail of the chain
-            other @ _ => {
-                self.print_expression(other)?;
-                Ok(current)
-            }
-        }
+        self.writeln("}")
     }
 
     /// Write a string.
@@ -400,6 +411,14 @@ impl<O: Write> Printer<O> {
         self.write_output("\n".as_bytes())
             .and_then(|_| self.write_output(indented.as_bytes()))
             .and_then(|_| self.write_output(string.as_ref().as_bytes()))
+    }
+
+    /// Write indentation, a string, and then a newline.
+    fn writeln<S: AsRef<str>>(&self, string: S) -> Result<()> {
+        let indented = " ".repeat(self.indent.get() as usize);
+        self.write_output(indented.as_bytes())
+            .and_then(|_| self.write_output(string.as_ref().as_bytes()))
+            .and_then(|_| self.write_output("\n".as_bytes()))
     }
 
     fn write_output(&self, bytes: &[u8]) -> Result<()> {
