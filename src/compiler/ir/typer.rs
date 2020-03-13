@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use super::super::super::type_ast::{self as ast};
 use super::{FuncPtrType, IrError, RealType, TupleType, Type};
@@ -109,7 +108,7 @@ impl Typer {
     }
 }
 
-struct BuiltinsCache(Arc<InnerBuiltinsCache>);
+struct BuiltinsCache(Rc<InnerBuiltinsCache>);
 
 struct InnerBuiltinsCache {
     /// Map the intrinsic class type IDs to real types.
@@ -121,11 +120,11 @@ impl BuiltinsCache {
     fn new() -> Self {
         let mut intrinsics = HashMap::new();
 
-        let Int = ast::Builtins::get("Int");
+        let Int = ast::Builtins::get_class("Int");
         intrinsics.insert(Int.id(), Type::Real(RealType::Int64));
 
         // Check for completeness.
-        let all = ast::Builtins::get_all();
+        let all = ast::Builtins::get_all_classes();
         for (name, class) in all.iter() {
             if intrinsics.contains_key(&class.id()) {
                 continue;
@@ -133,14 +132,18 @@ impl BuiltinsCache {
             panic!("Builtin not mapped: {}({})", name, class.id());
         }
 
-        BuiltinsCache(Arc::new(InnerBuiltinsCache { intrinsics }))
+        BuiltinsCache(Rc::new(InnerBuiltinsCache { intrinsics }))
     }
 
-    fn lookup_intrinsic(intrinsic: &Arc<ast::IntrinsicClass>) -> Option<Type> {
+    fn lookup_intrinsic(intrinsic: &Rc<ast::IntrinsicClass>) -> Option<Type> {
         let id = &intrinsic.id;
         BUILTINS_CACHE.0.intrinsics.get(id).map(|typ| typ.clone())
     }
 }
+
+// Trick the compiler into thinking it's thread-safe.
+unsafe impl Send for BuiltinsCache {}
+unsafe impl Sync for BuiltinsCache {}
 
 lazy_static! {
     static ref BUILTINS_CACHE: BuiltinsCache = BuiltinsCache::new();

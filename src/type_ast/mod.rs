@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 use super::parser::{Span, Token, Word};
 use super::{parse_ast as past, StageError};

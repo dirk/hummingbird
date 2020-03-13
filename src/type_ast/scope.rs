@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Error, Formatter};
 use std::rc::Rc;
 
-use super::{Closable, RecursionTracker, Type, TypeError, TypeResult};
+use super::{Builtins, Closable, RecursionTracker, Type, TypeError, TypeResult};
 
 /// Proxy so that we can share different kinds of scopes.
 #[derive(Clone, Debug)]
@@ -176,22 +176,23 @@ pub enum ScopeResolution {
     /// is the highest/farthest and the last is the lowest/nearest to the
     /// current scope.
     Closure(String, Type, Vec<Scope>),
-    // TODO: Add the module, import, or class the static was found on.
-    Static(String, Type),
+    /// `Option<Scope>` is the scope where this static was defined. It's `None`
+    /// initially but is filled in by `add_scope`.
+    Static(String, Type, Option<Scope>),
 }
 
 impl ScopeResolution {
     pub fn name(&self) -> String {
         use ScopeResolution::*;
         match self {
-            Local(name, _) | Closure(name, _, _) | Static(name, _) => name.clone(),
+            Local(name, _) | Closure(name, _, _) | Static(name, _, _) => name.clone(),
         }
     }
 
     pub fn typ(&self) -> Type {
         use ScopeResolution::*;
         match self {
-            Local(_, typ) | Closure(_, typ, _) | Static(_, typ) => typ.clone(),
+            Local(_, typ) | Closure(_, typ, _) | Static(_, typ, _) => typ.clone(),
         }
     }
 
@@ -204,6 +205,11 @@ impl ScopeResolution {
                 let mut new_scopes = scopes.clone();
                 new_scopes.push(scope);
                 Closure(name, typ, new_scopes)
+            }
+            // If the static resolution's origin hasn't been filled in then the
+            // current scope can be assumed to be the defining scope.
+            Static(name, typ, None) => {
+                Static(name, typ, Some(scope))
             }
             other @ _ => other,
         }
@@ -240,7 +246,7 @@ impl Closable for ScopeResolution {
         Ok(match self {
             Local(name, typ) => Local(name, typ.close(tracker, scope)?),
             Closure(name, typ, chain) => Closure(name, typ.close(tracker, scope)?, chain),
-            Static(name, typ) => Static(name, typ.close(tracker, scope)?),
+            Static(name, typ, origin) => Static(name, typ.close(tracker, scope)?, origin),
         })
     }
 }
@@ -440,6 +446,10 @@ impl ModuleScope {
             captured_statics: HashSet::new(),
         }
     }
+
+    fn get_builtin(&self, name: &str) -> Option<ScopeResolution> {
+        Builtins::try_get(name).map(|typ| ScopeResolution::Static(name.to_string(), typ, None))
+    }
 }
 
 impl ScopeLike for ModuleScope {
@@ -449,9 +459,9 @@ impl ScopeLike for ModuleScope {
 
     fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
         if let Some(typ) = self.statics.get(name) {
-            return Ok(ScopeResolution::Static(name.to_string(), typ.clone()));
+            return Ok(ScopeResolution::Static(name.to_string(), typ.clone(), None));
         }
-        Err(TypeError::LocalNotFound {
+        self.get_builtin(name).ok_or(TypeError::LocalNotFound {
             name: name.to_string(),
         })
     }
@@ -459,9 +469,9 @@ impl ScopeLike for ModuleScope {
     fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution> {
         if let Some(typ) = self.statics.get(name) {
             self.captured_statics.insert(name.to_string());
-            return Ok(ScopeResolution::Static(name.to_string(), typ.clone()));
+            return Ok(ScopeResolution::Static(name.to_string(), typ.clone(), None));
         }
-        Err(TypeError::LocalNotFound {
+        self.get_builtin(name).ok_or(TypeError::LocalNotFound {
             name: name.to_string(),
         })
     }
@@ -513,7 +523,7 @@ mod tests {
         // Check that module statics are resolved to static.
         assert_eq!(
             level4.get_local("static1").unwrap(),
-            ScopeResolution::Static("static1".to_string(), static1)
+            ScopeResolution::Static("static1".to_string(), static1, Some(level1))
         );
 
         // Check that locals are resolved to local.

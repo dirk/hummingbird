@@ -100,7 +100,7 @@ fn translate_block(pblock: &past::Block, scope: Scope) -> TypeResult<Block> {
         statements.push(statement);
     }
     let typ = if statements.is_empty() {
-        Type::new_empty_tuple(scope)
+        Type::new_unit(scope)
     } else {
         statements.last().unwrap().typ()
     };
@@ -160,7 +160,7 @@ fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeRes
             })
         }
         past::Expression::LiteralInt(pliteral) => {
-            let class = Builtins::get("Int");
+            let class = Builtins::get_class("Int");
             Expression::LiteralInt(LiteralInt {
                 value: pliteral.value,
                 typ: Type::new_object(class, scope),
@@ -369,7 +369,10 @@ mod tests {
         translate_expression(&pexpression, scope.clone()).map(|_| ())?;
         assert_eq!(
             foo,
-            Type::new_substitute(Type::new_object(Builtins::get("Int"), scope.clone()), scope)
+            Type::new_substitute(
+                Type::new_object(Builtins::get_class("Int"), scope.clone()),
+                scope
+            )
         );
 
         Ok(())

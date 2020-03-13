@@ -1,7 +1,6 @@
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use super::super::super::frontend::Module as FrontendModule;
 use super::super::super::type_ast::{self as ast};

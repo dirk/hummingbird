@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 use super::scope::Scope;
 use super::{Closable, RecursionTracker, TypeError, TypeResult};
@@ -90,7 +89,7 @@ impl Type {
         Type::Variable(Rc::new(RefCell::new(variable)))
     }
 
-    pub fn new_empty_tuple(scope: Scope) -> Self {
+    pub fn new_unit(scope: Scope) -> Self {
         Type::Tuple(Tuple {
             id: next_uid(),
             scope,
@@ -627,8 +626,8 @@ impl PartialEq for Object {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Class {
-    Intrinsic(Arc<IntrinsicClass>),
-    Derived(Arc<DerivedClass>),
+    Intrinsic(Rc<IntrinsicClass>),
+    Derived(Rc<DerivedClass>),
 }
 
 impl Class {
