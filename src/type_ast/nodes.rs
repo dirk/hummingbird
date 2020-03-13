@@ -80,7 +80,7 @@ impl Closable for ClosureBody {
 pub struct Func {
     pub name: String,
     pub arguments: Vec<FuncArgument>,
-    pub body: FuncBody,
+    pub body: Block,
     // The scope of variables defined within the function.
     pub scope: Scope,
     pub typ: Type,
@@ -114,31 +114,6 @@ impl Closable for Func {
 pub struct FuncArgument {
     pub name: String,
     pub typ: Type,
-}
-
-#[derive(Clone, Debug)]
-pub enum FuncBody {
-    // TODO: Remove this layer of indirection since func bodies must always
-    //   be blocks.
-    Block(Block),
-}
-
-impl FuncBody {
-    pub fn typ(&self) -> Type {
-        use FuncBody::*;
-        match self {
-            Block(block) => block.typ.clone(),
-        }
-    }
-}
-
-impl Closable for FuncBody {
-    fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<FuncBody> {
-        use FuncBody::*;
-        Ok(match self {
-            Block(block) => Block(block.close(tracker, scope)?),
-        })
-    }
 }
 
 #[derive(Clone, Debug)]

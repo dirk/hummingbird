@@ -354,12 +354,12 @@ fn expect_func(input: &mut TokenStream) -> ParseResult<Func> {
         }
     }
     expect_to_read!(input, { Token::ParenthesesRight(_) => () });
-    let block = expect_block(input)?;
-    let end = block.span.end.clone();
+    let body = expect_block(input)?;
+    let end = body.span.end.clone();
     Ok(Func {
         name,
         arguments,
-        body: FuncBody::Block(block),
+        body,
         span: Span::new(start, end),
     })
 }
@@ -484,10 +484,10 @@ mod tests {
                         span: Span::new(Location::new(5, 1, 6), Location::new(8, 1, 9),)
                     },
                     arguments: vec![],
-                    body: FuncBody::Block(Block {
+                    body: Block {
                         statements: vec![],
                         span: Span::new(Location::new(11, 1, 12), Location::new(12, 1, 13))
-                    }),
+                    },
                     span: Span::new(Location::new(0, 1, 1), Location::new(12, 1, 13))
                 })]
             })

@@ -95,14 +95,11 @@ impl<O: Write> Printer<O> {
             } else {
                 self.write("]\n")?;
             }
-            // TODO: Body
             self.iwrite("typ: ")?;
             self.write_type(&func.typ, true)?;
             self.write("\n")?;
             self.writeln("body:")?;
-            self.indented(|_| match &func.body {
-                FuncBody::Block(block) => self.print_block(block),
-            })?;
+            self.indented(|_| self.print_block(&func.body))?;
             Ok(())
         })?;
         self.writeln("}")

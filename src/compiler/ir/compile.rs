@@ -232,11 +232,9 @@ impl<'a> Builder<'a> {
     }
 }
 
-fn compile_func_body(builder: &Builder, func_value: FuncValue, body: &ast::FuncBody) {
+fn compile_func_body(builder: &Builder, func_value: FuncValue, body: &ast::Block) {
     builder.append_basic_block(Some("entry"));
-    let implicit_retrn = match body {
-        ast::FuncBody::Block(block) => compile_block(builder, block),
-    };
+    let implicit_retrn = compile_block(builder, body);
     builder.build_return(implicit_retrn);
 }
 

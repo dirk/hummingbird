@@ -122,9 +122,7 @@ impl std::fmt::Debug for AbstractType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use AbstractType::*;
         match self {
-            UnspecializedFunc(func) => {
-                write!(f, "UnspecializedFunc({})", func.name())
-            }
+            UnspecializedFunc(func) => write!(f, "UnspecializedFunc({})", func.name()),
         }
     }
 }

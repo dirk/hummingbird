@@ -208,7 +208,7 @@ mod tests {
     use super::super::parse_ast as past;
     use super::super::parser::{Location, Span, Token, Word};
     use super::scope::{ClosureScope, Scope};
-    use super::{unify, Builtins, Closable, FuncBody, ScopeLike, Type, TypeError, Variable};
+    use super::{unify, Builtins, Closable, ScopeLike, Type, TypeError, Variable};
 
     fn new_scope() -> Scope {
         ClosureScope::new(None).into_scope()

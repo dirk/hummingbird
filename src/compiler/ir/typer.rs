@@ -100,7 +100,7 @@ impl Typer {
                     });
                 }
                 // If they're equal then we don't need to re-save.
-                return Ok(())
+                return Ok(());
             }
         }
         let mut types = self.0.types.borrow_mut();
