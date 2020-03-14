@@ -29,6 +29,10 @@ macro_rules! opaque {
                 pub fn open<'a, 'ctx>(&'a self) -> &'a $typ<'ctx> {
                     unsafe { transmute::<&[<$typ Size>], &$typ<'ctx>>(&self.0) }
                 }
+
+                pub fn take<'ctx>(self) -> $typ<'ctx> {
+                    unsafe { transmute::<[<$typ Size>], $typ<'ctx>>(self.0) }
+                }
             }
 
             impl Debug for [<Opaque $typ>] {

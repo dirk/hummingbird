@@ -37,7 +37,7 @@ Module {
   Func {
     name: main
     arguments: []
-    typ: main#8(): #13(
+    typ: main#8(): #16(
       Int,
     ): Int
     body:
@@ -58,7 +58,7 @@ Module {
               typ: Int
             }
           ]
-          typ: #13(
+          typ: #16(
             Int,
           ): Int
         }

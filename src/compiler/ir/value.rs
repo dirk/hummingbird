@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::super::super::type_ast::{self as ast};
+use super::super::super::type_ast::{self as ast, ScopeId};
 use super::compile::{BasicBlock, BasicBlockManager, Buildable};
+use super::frame::Frame;
 use super::typ::{AbstractType, FuncPtrType, RealType, TupleType, Type};
 use super::typer::Typer;
-use super::{Container, Func, InnerFunc};
+use super::{Container, Func, FuncParent, InnerFunc};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ValueId(usize);
@@ -64,6 +65,7 @@ impl Value {
                 AbstractValue::UnspecializedFunc(func) => {
                     Type::Abstract(AbstractType::UnspecializedFunc(func.clone()))
                 }
+                AbstractValue::SpecializableBuiltinFunc(_, retrn) => Type::Real(retrn.clone()),
             },
         }
     }
@@ -105,6 +107,9 @@ pub enum StaticValue {
 #[derive(Clone)]
 pub enum AbstractValue {
     UnspecializedFunc(Func),
+    /// A builtin func that can be dynamically specialized when generating
+    /// target code.
+    SpecializableBuiltinFunc(String, RealType),
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -152,9 +157,8 @@ impl FuncValue {
         parameters: Vec<RealType>,
         retrn: RealType,
     ) -> Self {
-        let typer = Typer::new(Some(func.get_parent_typer()));
-
         let ast_func = &func.0.ast_func;
+        let typer = Typer::new(ast_func.scope.id(), Some(func.get_parent().get_typer()));
 
         // Store the mappings of AST parameter and retrn types to the
         // corresponding real types in this specialization.
@@ -271,15 +275,6 @@ impl Buildable for FuncValue {
         }
         None
     }
-
-    fn find_local(&self, name: &str) -> Option<(usize, RealType)> {
-        for (index, (slot_name, typ)) in self.0.stack_frame.iter().enumerate() {
-            if name == slot_name {
-                return Some((index, typ.clone()));
-            }
-        }
-        None
-    }
 }
 
 impl Container for FuncValue {
@@ -298,3 +293,28 @@ impl Container for FuncValue {
         func
     }
 }
+
+impl Frame for FuncValue {
+    fn get_local(&self, name: &str) -> (usize, RealType) {
+        for (index, (slot_name, typ)) in self.0.stack_frame.iter().enumerate() {
+            if name == slot_name {
+                return (index, typ.clone());
+            }
+        }
+        unreachable!("Local not found in FuncValue: {}", name)
+    }
+
+    fn get_static(&self, name: &str, scope_id: ScopeId) -> Value {
+        let func = Func::upgrade(&self.0.func).unwrap();
+        if func.scope_id() == scope_id {
+            if let Some(func) = self.find_func(name) {
+                return Value::Abstract(AbstractValue::UnspecializedFunc(func));
+            }
+            panic!("Static not found in FuncValue: {}", name)
+        } else {
+            func.get_parent().get_static(name, scope_id)
+        }
+    }
+}
+
+impl FuncParent for FuncValue {}

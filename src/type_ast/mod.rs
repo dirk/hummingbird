@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 use super::parser::{Span, Token, Word};
 use super::{parse_ast as past, StageError};
@@ -25,7 +24,7 @@ mod unify;
 pub use builtins::Builtins;
 pub use nodes::*;
 pub use printer::{Printer, PrinterOptions};
-pub use scope::{ClosureScope, ModuleScope, Scope, ScopeLike, ScopeResolution};
+pub use scope::{ClosureScope, ModuleScope, Scope, ScopeId, ScopeLike, ScopeResolution};
 pub use translate::translate_module;
 pub use typ::{
     Class, Func as TFunc, Generic, GenericConstraint, IntrinsicClass, PropertyConstraint, Type,
@@ -42,6 +41,12 @@ pub enum TypeError {
     },
     LocalNotFound {
         name: String,
+    },
+    StaticAlreadyDefined {
+        name: String,
+    },
+    CannotAddStatic {
+        message: String,
     },
     CannotCapture {
         name: String,
@@ -96,6 +101,8 @@ impl TypeError {
         let message = match self.unwrap() {
             LocalAlreadyDefined { .. } => "LocalAlreadyDefined",
             LocalNotFound { .. } => "LocalNotFound",
+            StaticAlreadyDefined { .. } => "StaticAlreadyDefined",
+            CannotAddStatic { .. } => "CannotAddStatic",
             CannotCapture { .. } => "CannotCapture",
             // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
             CannotUnify { .. } => "CannotUnify",

@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use super::super::super::type_ast::{self as ast};
-use super::{FuncPtrType, IrError, RealType, TupleType, Type};
+use super::{FuncPtrType, IrError, RealType, TupleType, Type, Value};
 
-/// Used to apply generics and cache AST-type-to-IR-type translations.
+/// Tracks types and statics within a given scope. Used to:
+///   - Apply generics
+///   - Cache AST-type-to-IR-type translations
 #[derive(Clone)]
 pub struct Typer(Rc<InnerTyper>);
 
@@ -16,37 +17,11 @@ struct InnerTyper {
 }
 
 impl Typer {
-    pub fn new(parent: Option<Typer>) -> Self {
+    pub fn new(scope_id: ast::ScopeId, parent: Option<Typer>) -> Self {
         Self(Rc::new(InnerTyper {
             parent,
             types: RefCell::new(HashMap::new()),
         }))
-    }
-
-    /// Searches itself and its parent for a type.
-    fn lookup_type(&self, ast_type: &ast::Type) -> Option<Type> {
-        let id = ast_type.id();
-        if let Some(existing) = self.0.types.borrow().get(&id) {
-            return Some(existing.clone());
-        }
-        if let Some(parent) = &self.0.parent {
-            parent.lookup_type(ast_type)
-        } else {
-            // If we don't have a parent then we're the root type and we
-            // can do a builtins lookup.
-            Self::lookup_builtin(ast_type)
-        }
-    }
-
-    fn lookup_builtin(ast_type: &ast::Type) -> Option<Type> {
-        let intrinsic = match ast_type {
-            ast::Type::Object(object) => match &object.class {
-                ast::Class::Intrinsic(intrinsic) => intrinsic,
-                ast::Class::Derived(_) => return None,
-            },
-            _ => return None,
-        };
-        BuiltinsCache::lookup_intrinsic(intrinsic)
     }
 
     pub fn build_type(&self, ast_type: &ast::Type) -> Type {
@@ -107,9 +82,35 @@ impl Typer {
         types.insert(id, typ);
         Ok(())
     }
+
+    /// Searches itself and its parent for a type.
+    fn lookup_type(&self, ast_type: &ast::Type) -> Option<Type> {
+        let id = ast_type.id();
+        if let Some(existing) = self.0.types.borrow().get(&id) {
+            return Some(existing.clone());
+        }
+        if let Some(parent) = &self.0.parent {
+            parent.lookup_type(ast_type)
+        } else {
+            // If we don't have a parent then we're the root type and we
+            // can do a builtins lookup.
+            Self::lookup_builtin(ast_type)
+        }
+    }
+
+    fn lookup_builtin(ast_type: &ast::Type) -> Option<Type> {
+        let intrinsic = match ast_type {
+            ast::Type::Object(object) => match &object.class {
+                ast::Class::Intrinsic(intrinsic) => intrinsic,
+                ast::Class::Derived(_) => return None,
+            },
+            _ => return None,
+        };
+        BuiltinsCache::lookup_intrinsic(intrinsic)
+    }
 }
 
-struct BuiltinsCache(Arc<InnerBuiltinsCache>);
+struct BuiltinsCache(Rc<InnerBuiltinsCache>);
 
 struct InnerBuiltinsCache {
     /// Map the intrinsic class type IDs to real types.
@@ -121,11 +122,11 @@ impl BuiltinsCache {
     fn new() -> Self {
         let mut intrinsics = HashMap::new();
 
-        let Int = ast::Builtins::get("Int");
+        let Int = ast::Builtins::get_class("Int");
         intrinsics.insert(Int.id(), Type::Real(RealType::Int64));
 
         // Check for completeness.
-        let all = ast::Builtins::get_all();
+        let all = ast::Builtins::get_all_classes();
         for (name, class) in all.iter() {
             if intrinsics.contains_key(&class.id()) {
                 continue;
@@ -133,14 +134,18 @@ impl BuiltinsCache {
             panic!("Builtin not mapped: {}({})", name, class.id());
         }
 
-        BuiltinsCache(Arc::new(InnerBuiltinsCache { intrinsics }))
+        BuiltinsCache(Rc::new(InnerBuiltinsCache { intrinsics }))
     }
 
-    fn lookup_intrinsic(intrinsic: &Arc<ast::IntrinsicClass>) -> Option<Type> {
+    fn lookup_intrinsic(intrinsic: &Rc<ast::IntrinsicClass>) -> Option<Type> {
         let id = &intrinsic.id;
         BUILTINS_CACHE.0.intrinsics.get(id).map(|typ| typ.clone())
     }
 }
+
+// Trick the compiler into thinking it's thread-safe.
+unsafe impl Send for BuiltinsCache {}
+unsafe impl Sync for BuiltinsCache {}
 
 lazy_static! {
     static ref BUILTINS_CACHE: BuiltinsCache = BuiltinsCache::new();
