@@ -24,7 +24,7 @@ mod unify;
 pub use builtins::Builtins;
 pub use nodes::*;
 pub use printer::{Printer, PrinterOptions};
-pub use scope::{ClosureScope, ModuleScope, Scope, ScopeLike, ScopeResolution};
+pub use scope::{ClosureScope, ModuleScope, Scope, ScopeId, ScopeLike, ScopeResolution};
 pub use translate::translate_module;
 pub use typ::{
     Class, Func as TFunc, Generic, GenericConstraint, IntrinsicClass, PropertyConstraint, Type,

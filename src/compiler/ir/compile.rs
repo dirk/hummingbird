@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::super::frontend::Module as FrontendModule;
-use super::super::super::type_ast::{self as ast};
+use super::super::super::type_ast::{self as ast, ScopeId};
 use super::super::path_to_name::path_to_name;
 use super::super::vecs_equal::vecs_equal;
 use super::typ::{RealType, TupleType, Type};
@@ -72,7 +72,16 @@ pub fn compile_modules<'m, M: Iterator<Item = &'m FrontendModule>>(
     frontend_modules: M,
     entry_frontend_module: &FrontendModule,
 ) -> Root {
-    let typer = Typer::new(None);
+    let typer = Typer::new(ScopeId::builtin(), None);
+    // Set up builtin functions in the typer.
+    typer.set_static(
+        "println",
+        Value::Abstract(AbstractValue::SpecializableBuiltinFunc(
+            "println".to_string(),
+            RealType::Tuple(TupleType::unit()),
+        )),
+    );
+
     let root = Root::new(typer.clone());
 
     for frontend_module in frontend_modules {
@@ -134,6 +143,12 @@ pub trait Buildable: Container {
 
     fn find_local(&self, name: &str) -> Option<(usize, RealType)>;
 
+    /// Search for a static defined within this scope or any higher scope.
+    /// This MUST not return a `Value::Local`.
+    fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
+        self.get_typer().find_static(ast_resolution)
+    }
+
     fn build_type(&self, ast_type: &ast::Type) -> Type {
         self.get_typer().build_type(ast_type)
     }
@@ -155,6 +170,10 @@ impl<'a> Builder<'a> {
 
     fn find_local(&self, name: &str) -> Option<(usize, RealType)> {
         self.buildable.find_local(name)
+    }
+
+    fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
+        self.buildable.find_static(ast_resolution)
     }
 
     fn build_type(&self, ast_type: &ast::Type) -> Type {
@@ -196,6 +215,21 @@ impl<'a> Builder<'a> {
     fn const_int64(&self, const_value: u64) -> Value {
         let id = self.get_next_value_id();
         Value::Local(LocalValue::Int64(id, Some(const_value)))
+    }
+
+    fn build_call_builtin_func(
+        &self,
+        retrn: RealType,
+        builtin_func_name: String,
+        arguments: Vec<Value>,
+    ) -> Value {
+        let retrn = self.build_value(Type::Real(retrn));
+        self.push_instruction(Instruction::CallBuiltinFunc(
+            retrn.clone(),
+            builtin_func_name,
+            arguments,
+        ));
+        retrn
     }
 
     fn build_call_func(
@@ -294,11 +328,20 @@ fn compile_identifier(builder: &Builder, identifier: &ast::Identifier) -> Value 
                 }
                 return Value::Abstract(AbstractValue::UnspecializedFunc(func));
             }
-            // Then search for a slot in the stack frame.
+            // Search for a slot in the stack frame.
             if let Some((index, typ)) = builder.find_local(name) {
                 return builder.build_get_local(index, typ);
             }
+            // Search for a static in this or a higher scope.
             panic!("Local not found: {}", name)
+        }
+        ast::ScopeResolution::Static(name, _, _) => {
+            if let Some(value) = builder.find_static(resolution) {
+                // Statics are by their nature static, so we don't need to
+                // build any instructions to fetch them.
+                return value
+            }
+            panic!("Static not found: {}", name)
         }
         other @ _ => unreachable!(
             "Cannot compile Identifier with ScopeResolution: {:?}",
@@ -331,6 +374,13 @@ fn compile_postfix_call(builder: &Builder, call: &ast::PostfixCall) -> Value {
                     arguments_types,
                     retrn_type,
                 );
+            }
+            AbstractValue::SpecializableBuiltinFunc(name, retrn) => {
+                let arguments_types = arguments
+                    .iter()
+                    .map(|argument| argument.typ())
+                    .collect::<Vec<_>>();
+                return builder.build_call_builtin_func(retrn, name, arguments);
             }
         },
         Value::Static(static_value) => match static_value {
@@ -386,7 +436,11 @@ fn compile_unspecialized_call(
 
 fn define_module(frontend_module: &FrontendModule, root: Root) -> Module {
     let qualified_name = path_to_name(frontend_module.path());
-    let module = root.add_module(frontend_module.id(), qualified_name);
+    let module = root.add_module(
+        frontend_module.id(),
+        qualified_name,
+        frontend_module.borrow_typed(),
+    );
     // Walk the AST to forward-define all of the funcs.
     let ast_module = frontend_module.unwrap_ast();
     for statement in ast_module.statements.iter() {
@@ -418,6 +472,8 @@ impl BasicBlock {
 }
 
 pub enum Instruction {
+    // $1 = $2($3...)
+    CallBuiltinFunc(Value, String, Vec<Value>),
     // $1 = $2($3...)
     CallFunc(Value, FuncValue, Vec<Value>),
     // $1 = $2($3...)

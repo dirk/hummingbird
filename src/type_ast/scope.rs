@@ -2,21 +2,71 @@ use std::cell::{Ref, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Error, Formatter};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{Builtins, Closable, RecursionTracker, Type, TypeError, TypeResult};
+
+const BUILTIN_SCOPE_ID: usize = 0;
+
+lazy_static! {
+    static ref SCOPE_ID: AtomicUsize = AtomicUsize::new(BUILTIN_SCOPE_ID + 1);
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct ScopeId(usize);
+
+impl ScopeId {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+
+    pub const fn builtin() -> Self {
+        ScopeId(BUILTIN_SCOPE_ID)
+    }
+}
+
+/// Returns an ID that is guaranteed to be unique amongst all threads.
+fn next_scope_id() -> ScopeId {
+    ScopeId(SCOPE_ID.fetch_add(1, Ordering::SeqCst))
+}
 
 /// Proxy so that we can share different kinds of scopes.
 #[derive(Clone, Debug)]
 pub enum Scope {
+    Builtin,
     Closure(Rc<RefCell<ClosureScope>>),
     Func(Rc<RefCell<FuncScope>>),
     Module(Rc<RefCell<ModuleScope>>),
 }
 
 impl Scope {
+    pub fn id(&self) -> ScopeId {
+        use Scope::*;
+        match self {
+            Builtin => ScopeId(BUILTIN_SCOPE_ID),
+            Closure(closure) => closure.borrow().id(),
+            Func(func) => func.borrow().id(),
+            Module(module) => module.borrow().id(),
+        }
+    }
+
     pub fn get_local(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         match self {
+            // Special case for the builtin scope that can act like a scope
+            // but isn't backed by any actual `ScopeLike`.
+            Builtin => {
+                if let Some(typ) = Builtins::try_get(name) {
+                    return Ok(ScopeResolution::Static(
+                        name.to_string(),
+                        typ,
+                        Some(Scope::Builtin),
+                    ));
+                }
+                Err(TypeError::LocalNotFound {
+                    name: name.to_string(),
+                })
+            }
             Closure(closure) => closure.borrow_mut().get_local(name),
             Func(func) => func.borrow_mut().get_local(name),
             Module(module) => module.borrow_mut().get_local(name),
@@ -30,6 +80,7 @@ impl Scope {
     pub fn get_local_from_parent(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
         let resolution = match self {
+            Builtin => unreachable!("Cannot get local from parent of Builtin scope"),
             Closure(closure) => closure.borrow_mut().get_local_as_parent(name),
             Func(func) => func.borrow_mut().get_local_as_parent(name),
             Module(module) => module.borrow_mut().get_local_as_parent(name),
@@ -41,6 +92,7 @@ impl Scope {
     pub fn add_local(&self, name: &str, typ: Type) -> TypeResult<()> {
         use Scope::*;
         match self {
+            Builtin => unreachable!("Cannot add local to Builtin scope"),
             Closure(closure) => closure.borrow_mut().add_local(name, typ),
             Func(func) => func.borrow_mut().add_local(name, typ),
             Module(module) => module.borrow_mut().add_local(name, typ),
@@ -50,6 +102,7 @@ impl Scope {
     fn get_parent(&self) -> Option<Scope> {
         use Scope::*;
         match self {
+            Builtin => unreachable!("Cannot get parent of Builtin scope"),
             Closure(closure) => closure.borrow().get_parent(),
             Func(func) => func.borrow().get_parent(),
             Module(module) => module.borrow().get_parent(),
@@ -93,6 +146,7 @@ impl Closable for Scope {
     fn close(self, tracker: &mut RecursionTracker, scope: Scope) -> TypeResult<Self> {
         use Scope::*;
         Ok(match self {
+            Builtin => unreachable!("Builtin can't be closed"),
             Closure(shared) => {
                 let replacement = {
                     let closure = shared.borrow();
@@ -101,6 +155,7 @@ impl Closable for Scope {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
                     ClosureScope {
+                        id: closure.id.clone(),
                         locals,
                         parent: closure.parent.clone(),
                         captures: closure.captures,
@@ -119,6 +174,7 @@ impl Closable for Scope {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
                     FuncScope {
+                        id: func.id.clone(),
                         locals,
                         parent: func.parent.clone(),
                         captured: func.captured,
@@ -136,6 +192,7 @@ impl Closable for Scope {
                         statics.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
                     ModuleScope {
+                        id: module.id.clone(),
                         statics,
                         captured_statics: module.captured_statics.clone(),
                     }
@@ -208,9 +265,7 @@ impl ScopeResolution {
             }
             // If the static resolution's origin hasn't been filled in then the
             // current scope can be assumed to be the defining scope.
-            Static(name, typ, None) => {
-                Static(name, typ, Some(scope))
-            }
+            Static(name, typ, None) => Static(name, typ, Some(scope)),
             other @ _ => other,
         }
     }
@@ -255,6 +310,8 @@ pub trait ScopeLike {
     /// Consume oneself to produce a shareable `Scope`.
     fn into_scope(self) -> Scope;
 
+    fn id(&self) -> ScopeId;
+
     fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution>;
 
     fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution>;
@@ -265,6 +322,7 @@ pub trait ScopeLike {
 }
 
 pub struct ClosureScope {
+    id: ScopeId,
     pub locals: HashMap<String, Type>,
     parent: Option<Scope>,
     /// Whether or not this scope captures its parent scope.
@@ -279,6 +337,7 @@ pub struct ClosureScope {
 impl ClosureScope {
     pub fn new(parent: Option<Scope>) -> Self {
         Self {
+            id: next_scope_id(),
             locals: HashMap::new(),
             parent,
             captures: false,
@@ -291,6 +350,10 @@ impl ClosureScope {
 impl ScopeLike for ClosureScope {
     fn into_scope(self) -> Scope {
         Scope::Closure(Rc::new(RefCell::new(self)))
+    }
+
+    fn id(&self) -> ScopeId {
+        self.id.clone()
     }
 
     fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
@@ -350,6 +413,7 @@ impl std::fmt::Debug for ClosureScope {
 }
 
 pub struct FuncScope {
+    id: ScopeId,
     pub locals: HashMap<String, Type>,
     /// Only static resolutions are allowed through the parent.
     parent: Option<Scope>,
@@ -361,6 +425,7 @@ pub struct FuncScope {
 impl FuncScope {
     pub fn new(parent: Option<Scope>) -> Self {
         Self {
+            id: next_scope_id(),
             locals: HashMap::new(),
             parent,
             captured: false,
@@ -376,6 +441,10 @@ impl FuncScope {
 impl ScopeLike for FuncScope {
     fn into_scope(self) -> Scope {
         Scope::Func(Rc::new(RefCell::new(self)))
+    }
+
+    fn id(&self) -> ScopeId {
+        self.id.clone()
     }
 
     fn get_local(&mut self, name: &str) -> Result<ScopeResolution, TypeError> {
@@ -434,6 +503,7 @@ impl std::fmt::Debug for FuncScope {
 }
 
 pub struct ModuleScope {
+    id: ScopeId,
     pub statics: HashMap<String, Type>,
     // Keeping track of which statics are used by child scopes. Not sure why...
     captured_statics: HashSet<String>,
@@ -442,13 +512,10 @@ pub struct ModuleScope {
 impl ModuleScope {
     pub fn new() -> Self {
         Self {
+            id: next_scope_id(),
             statics: HashMap::new(),
             captured_statics: HashSet::new(),
         }
-    }
-
-    fn get_builtin(&self, name: &str) -> Option<ScopeResolution> {
-        Builtins::try_get(name).map(|typ| ScopeResolution::Static(name.to_string(), typ, None))
     }
 }
 
@@ -457,13 +524,15 @@ impl ScopeLike for ModuleScope {
         Scope::Module(Rc::new(RefCell::new(self)))
     }
 
+    fn id(&self) -> ScopeId {
+        self.id.clone()
+    }
+
     fn get_local(&mut self, name: &str) -> TypeResult<ScopeResolution> {
         if let Some(typ) = self.statics.get(name) {
             return Ok(ScopeResolution::Static(name.to_string(), typ.clone(), None));
         }
-        self.get_builtin(name).ok_or(TypeError::LocalNotFound {
-            name: name.to_string(),
-        })
+        Scope::Builtin.get_local(name)
     }
 
     fn get_local_as_parent(&mut self, name: &str) -> TypeResult<ScopeResolution> {
@@ -471,9 +540,7 @@ impl ScopeLike for ModuleScope {
             self.captured_statics.insert(name.to_string());
             return Ok(ScopeResolution::Static(name.to_string(), typ.clone(), None));
         }
-        self.get_builtin(name).ok_or(TypeError::LocalNotFound {
-            name: name.to_string(),
-        })
+        Scope::Builtin.get_local(name)
     }
 
     fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()> {

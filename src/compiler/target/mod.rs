@@ -1,7 +1,9 @@
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::io::{self, Write};
+use std::ffi::{OsString, OsStr};
 
 use inkwell::context::Context;
 use inkwell::module::Module as InkModule;
@@ -15,6 +17,8 @@ use inkwell::{AddressSpace, OptimizationLevel};
 use super::ir::{
     self as ir, Func, FuncId, FuncValue, Instruction, Module, StaticValue, Value, ValueId,
 };
+
+mod builtins;
 
 /// Discover all of the funcs in the modules.
 fn collect_all_func_values(modules: &Vec<Module>) -> Vec<FuncValue> {
@@ -89,7 +93,10 @@ impl<'ctx> TypeTracker<'ctx> {
 
 pub fn compile_modules(modules: &Vec<Module>) {
     let ctx = Context::create();
-    let module = ctx.create_module("hummingbird");
+    let module = ctx.create_module("main");
+
+    // Initialize the builtins LLVM module and link it into this one.
+    module.link_in_module(builtins::initialize(&ctx)).unwrap();
 
     let mut type_tracker = TypeTracker::new(&ctx);
     let mut function_tracker = HashMap::new();
@@ -186,6 +193,20 @@ pub fn compile_modules(modules: &Vec<Module>) {
             for instruction in ir_basic_block.instructions.iter() {
                 use Instruction::*;
                 match instruction {
+                    CallBuiltinFunc(ir_retrn, builtin_func_name, ir_arguments) => {
+                        let arguments = ir_arguments
+                            .iter()
+                            .map(|ir_argument| value_resolver.get(ir_argument))
+                            .collect::<Vec<_>>();
+                        let function_value = builtins::get_builtin_func(
+                            &module,
+                            builtin_func_name,
+                            &arguments
+                        );
+                        let call_site = builder.build_call(function_value, arguments.as_slice(), "println");
+                        let retrn = call_site.try_as_basic_value().left().unwrap();
+                        value_resolver.set(ir_retrn, retrn);
+                    }
                     CallFunc(ir_retrn, func_value, ir_arguments) => {
                         let arguments = ir_arguments
                             .iter()
@@ -229,20 +250,21 @@ pub fn compile_modules(modules: &Vec<Module>) {
         }
     }
 
-    generate_module(module, true);
-}
-
-fn generate_module(module: InkModule, print_to_stderr: bool) {
+    let print_to_stderr = true;
     if print_to_stderr {
         module.print_to_stderr();
     }
 
+    generate_module(module);
+}
+
+fn generate_module(module: InkModule) {
     // Set up the paths we'll emit to.
     let object = Path::new("./build/out.o");
     let executable = Path::new("./build/out");
 
     // let optimization_level = OptimizationLevel::Aggressive;
-    let optimization_level = OptimizationLevel::None;
+    let optimization_level = OptimizationLevel::Default;
     let reloc_mode = RelocMode::Default;
     let code_model = CodeModel::Default;
     Target::initialize_x86(&InitializationConfig::default());
@@ -264,10 +286,16 @@ fn generate_module(module: InkModule, print_to_stderr: bool) {
         .unwrap();
 
     // Link the object file into an executable.
-    Command::new("clang")
+    let output = Command::new("clang")
         .args(&[object.to_str().unwrap(), "-o", executable.to_str().unwrap()])
         .output()
         .unwrap();
+
+    if !output.status.success() {
+        println!("Failed to invoke to Clang (exited with {:?})", output.status.code());
+        io::stdout().write_all(&output.stdout).unwrap();
+        io::stderr().write_all(&output.stderr).unwrap();
+    }
 }
 
 struct ValueResolver<'ctx> {

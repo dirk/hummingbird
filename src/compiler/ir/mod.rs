@@ -17,7 +17,7 @@ use typer::Typer;
 pub use compile::{compile_modules, Instruction};
 pub use error::IrError;
 pub use typ::RealType;
-pub use value::{FuncId, FuncValue, LocalValue, StaticValue, Value, ValueId};
+pub use value::{AbstractValue, FuncId, FuncValue, LocalValue, StaticValue, Value, ValueId};
 
 /// A type which:
 ///   - Has a fully-qualified name.
@@ -48,12 +48,17 @@ impl Root {
         }))
     }
 
-    fn add_module(&self, id: usize, qualified_name: String) -> Module {
+    fn add_module(
+        &self,
+        id: usize,
+        qualified_name: String,
+        ast_module: Ref<ast::Module>,
+    ) -> Module {
         let module = Module(Rc::new(InnerModule {
             id,
             qualified_name,
             parent: self.clone(),
-            typer: Typer::new(Some(self.0.typer.clone())),
+            typer: Typer::new(ast_module.scope.id(), Some(self.0.typer.clone())),
             funcs: RefCell::new(vec![]),
         }));
         let mut modules = self.0.modules.borrow_mut();

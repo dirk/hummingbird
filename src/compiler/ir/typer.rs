@@ -3,49 +3,34 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::super::type_ast::{self as ast};
-use super::{FuncPtrType, IrError, RealType, TupleType, Type};
+use super::{FuncPtrType, IrError, RealType, TupleType, Type, Value};
 
-/// Used to apply generics and cache AST-type-to-IR-type translations.
+// FIXME: Rename to something that better reflects it handles scoping of
+//   types and statics (perhaps `Scoper`?).
+/// Tracks types and statics within a given scope. Used to:
+///   - Apply generics
+///   - Cache AST-type-to-IR-type translations
+///   - Look up static and abstract values
 #[derive(Clone)]
 pub struct Typer(Rc<InnerTyper>);
 
 struct InnerTyper {
+    /// The scope that we're typing within.
+    scope_id: ast::ScopeId,
     parent: Option<Typer>,
     types: RefCell<HashMap<ast::TypeId, Type>>,
+    /// Includes both static and abstract values.
+    statics: RefCell<HashMap<String, Value>>,
 }
 
 impl Typer {
-    pub fn new(parent: Option<Typer>) -> Self {
+    pub fn new(scope_id: ast::ScopeId, parent: Option<Typer>) -> Self {
         Self(Rc::new(InnerTyper {
+            scope_id,
             parent,
             types: RefCell::new(HashMap::new()),
+            statics: RefCell::new(HashMap::new()),
         }))
-    }
-
-    /// Searches itself and its parent for a type.
-    fn lookup_type(&self, ast_type: &ast::Type) -> Option<Type> {
-        let id = ast_type.id();
-        if let Some(existing) = self.0.types.borrow().get(&id) {
-            return Some(existing.clone());
-        }
-        if let Some(parent) = &self.0.parent {
-            parent.lookup_type(ast_type)
-        } else {
-            // If we don't have a parent then we're the root type and we
-            // can do a builtins lookup.
-            Self::lookup_builtin(ast_type)
-        }
-    }
-
-    fn lookup_builtin(ast_type: &ast::Type) -> Option<Type> {
-        let intrinsic = match ast_type {
-            ast::Type::Object(object) => match &object.class {
-                ast::Class::Intrinsic(intrinsic) => intrinsic,
-                ast::Class::Derived(_) => return None,
-            },
-            _ => return None,
-        };
-        BuiltinsCache::lookup_intrinsic(intrinsic)
     }
 
     pub fn build_type(&self, ast_type: &ast::Type) -> Type {
@@ -105,6 +90,60 @@ impl Typer {
         let mut types = self.0.types.borrow_mut();
         types.insert(id, typ);
         Ok(())
+    }
+
+    /// Searches itself and its parent for a static or abstract.
+    pub fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
+        let (name, typ, scope_id) = match ast_resolution {
+            ast::ScopeResolution::Static(name, typ, scope) => {
+                let scope_id = scope.as_ref().map(|scope| scope.id()).unwrap();
+                (name, typ, scope_id)
+            }
+            other @ _ => unreachable!(
+                "Cannot look up static on non-static ScopeResolution: {:?}",
+                ast_resolution
+            ),
+        };
+        if self.0.scope_id == scope_id {
+            let statics = self.0.statics.borrow();
+            return statics.get(name).map(|value| value.clone());
+        }
+        if let Some(parent) = &self.0.parent {
+            return parent.find_static(ast_resolution);
+        }
+        None
+    }
+
+    pub fn set_static(&self, name: &str, value: Value) {
+        let mut statics = self.0.statics.borrow_mut();
+        // TODO: Assert that value is not a LocalValue.
+        statics.insert(name.to_string(), value);
+    }
+
+    /// Searches itself and its parent for a type.
+    fn lookup_type(&self, ast_type: &ast::Type) -> Option<Type> {
+        let id = ast_type.id();
+        if let Some(existing) = self.0.types.borrow().get(&id) {
+            return Some(existing.clone());
+        }
+        if let Some(parent) = &self.0.parent {
+            parent.lookup_type(ast_type)
+        } else {
+            // If we don't have a parent then we're the root type and we
+            // can do a builtins lookup.
+            Self::lookup_builtin(ast_type)
+        }
+    }
+
+    fn lookup_builtin(ast_type: &ast::Type) -> Option<Type> {
+        let intrinsic = match ast_type {
+            ast::Type::Object(object) => match &object.class {
+                ast::Class::Intrinsic(intrinsic) => intrinsic,
+                ast::Class::Derived(_) => return None,
+            },
+            _ => return None,
+        };
+        BuiltinsCache::lookup_intrinsic(intrinsic)
     }
 }
 

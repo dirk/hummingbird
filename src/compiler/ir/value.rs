@@ -64,6 +64,7 @@ impl Value {
                 AbstractValue::UnspecializedFunc(func) => {
                     Type::Abstract(AbstractType::UnspecializedFunc(func.clone()))
                 }
+                AbstractValue::SpecializableBuiltinFunc(_, retrn) => Type::Real(retrn.clone()),
             },
         }
     }
@@ -105,6 +106,9 @@ pub enum StaticValue {
 #[derive(Clone)]
 pub enum AbstractValue {
     UnspecializedFunc(Func),
+    /// A builtin func that can be dynamically specialized when generating
+    /// target code.
+    SpecializableBuiltinFunc(String, RealType),
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -152,9 +156,8 @@ impl FuncValue {
         parameters: Vec<RealType>,
         retrn: RealType,
     ) -> Self {
-        let typer = Typer::new(Some(func.get_parent_typer()));
-
         let ast_func = &func.0.ast_func;
+        let typer = Typer::new(ast_func.scope.id(), Some(func.get_parent_typer()));
 
         // Store the mappings of AST parameter and retrn types to the
         // corresponding real types in this specialization.
