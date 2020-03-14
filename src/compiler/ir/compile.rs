@@ -6,6 +6,7 @@ use super::super::super::frontend::Module as FrontendModule;
 use super::super::super::type_ast::{self as ast, ScopeId};
 use super::super::path_to_name::path_to_name;
 use super::super::vecs_equal::vecs_equal;
+use super::frame::Frame;
 use super::typ::{RealType, TupleType, Type};
 use super::typer::Typer;
 use super::value::{AbstractValue, FuncValue, LocalValue, StaticValue, Value, ValueId};
@@ -73,16 +74,16 @@ pub fn compile_modules<'m, M: Iterator<Item = &'m FrontendModule>>(
     entry_frontend_module: &FrontendModule,
 ) -> Root {
     let typer = Typer::new(ScopeId::builtin(), None);
-    // Set up builtin functions in the typer.
-    typer.set_static(
+
+    let root = Root::new(typer.clone());
+    // Set up builtin functions in the root "frame".
+    root.set_static(
         "println",
         Value::Abstract(AbstractValue::SpecializableBuiltinFunc(
             "println".to_string(),
             RealType::Tuple(TupleType::unit()),
         )),
     );
-
-    let root = Root::new(typer.clone());
 
     for frontend_module in frontend_modules {
         define_module(frontend_module, root.clone());
@@ -136,18 +137,10 @@ fn compile_func_specialization(func: Func, parameters: Vec<Type>, retrn: Type) -
 
 // Abstraction so that we can compile both funcs and closures with the
 // same functions.
-pub trait Buildable: Container {
+pub trait Buildable: Container + Frame {
     /// Search for a func defined within this scope (including the
     /// current func).
     fn find_func(&self, name: &str) -> Option<Func>;
-
-    fn find_local(&self, name: &str) -> Option<(usize, RealType)>;
-
-    /// Search for a static defined within this scope or any higher scope.
-    /// This MUST not return a `Value::Local`.
-    fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
-        self.get_typer().find_static(ast_resolution)
-    }
 
     fn build_type(&self, ast_type: &ast::Type) -> Type {
         self.get_typer().build_type(ast_type)
@@ -168,12 +161,12 @@ impl<'a> Builder<'a> {
         self.buildable.find_func(name)
     }
 
-    fn find_local(&self, name: &str) -> Option<(usize, RealType)> {
-        self.buildable.find_local(name)
+    fn get_local(&self, name: &str) -> (usize, RealType) {
+        self.buildable.get_local(name)
     }
 
-    fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
-        self.buildable.find_static(ast_resolution)
+    fn get_static(&self, name: &str, scope_id: ScopeId) -> Value {
+        self.buildable.get_static(name, scope_id)
     }
 
     fn build_type(&self, ast_type: &ast::Type) -> Type {
@@ -329,19 +322,13 @@ fn compile_identifier(builder: &Builder, identifier: &ast::Identifier) -> Value 
                 return Value::Abstract(AbstractValue::UnspecializedFunc(func));
             }
             // Search for a slot in the stack frame.
-            if let Some((index, typ)) = builder.find_local(name) {
-                return builder.build_get_local(index, typ);
-            }
-            // Search for a static in this or a higher scope.
-            panic!("Local not found: {}", name)
+            let (index, typ) = builder.get_local(name);
+            return builder.build_get_local(index, typ);
         }
-        ast::ScopeResolution::Static(name, _, _) => {
-            if let Some(value) = builder.find_static(resolution) {
-                // Statics are by their nature static, so we don't need to
-                // build any instructions to fetch them.
-                return value
-            }
-            panic!("Static not found: {}", name)
+        ast::ScopeResolution::Static(name, _, scope) => {
+            // `scope` is guaranteed to be a `Some` once the static is resolved.
+            let scope = scope.as_ref().unwrap();
+            builder.get_static(name, scope.id())
         }
         other @ _ => unreachable!(
             "Cannot compile Identifier with ScopeResolution: {:?}",

@@ -42,6 +42,12 @@ pub enum TypeError {
     LocalNotFound {
         name: String,
     },
+    StaticAlreadyDefined {
+        name: String,
+    },
+    CannotAddStatic {
+        message: String,
+    },
     CannotCapture {
         name: String,
     },
@@ -95,6 +101,8 @@ impl TypeError {
         let message = match self.unwrap() {
             LocalAlreadyDefined { .. } => "LocalAlreadyDefined",
             LocalNotFound { .. } => "LocalNotFound",
+            StaticAlreadyDefined { .. } => "StaticAlreadyDefined",
+            CannotAddStatic { .. } => "CannotAddStatic",
             CannotCapture { .. } => "CannotCapture",
             // PropertyAlreadyDefined { .. } => "PropertyAlreadyDefined",
             CannotUnify { .. } => "CannotUnify",

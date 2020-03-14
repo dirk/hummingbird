@@ -5,31 +5,22 @@ use std::rc::Rc;
 use super::super::super::type_ast::{self as ast};
 use super::{FuncPtrType, IrError, RealType, TupleType, Type, Value};
 
-// FIXME: Rename to something that better reflects it handles scoping of
-//   types and statics (perhaps `Scoper`?).
 /// Tracks types and statics within a given scope. Used to:
 ///   - Apply generics
 ///   - Cache AST-type-to-IR-type translations
-///   - Look up static and abstract values
 #[derive(Clone)]
 pub struct Typer(Rc<InnerTyper>);
 
 struct InnerTyper {
-    /// The scope that we're typing within.
-    scope_id: ast::ScopeId,
     parent: Option<Typer>,
     types: RefCell<HashMap<ast::TypeId, Type>>,
-    /// Includes both static and abstract values.
-    statics: RefCell<HashMap<String, Value>>,
 }
 
 impl Typer {
     pub fn new(scope_id: ast::ScopeId, parent: Option<Typer>) -> Self {
         Self(Rc::new(InnerTyper {
-            scope_id,
             parent,
             types: RefCell::new(HashMap::new()),
-            statics: RefCell::new(HashMap::new()),
         }))
     }
 
@@ -90,34 +81,6 @@ impl Typer {
         let mut types = self.0.types.borrow_mut();
         types.insert(id, typ);
         Ok(())
-    }
-
-    /// Searches itself and its parent for a static or abstract.
-    pub fn find_static(&self, ast_resolution: &ast::ScopeResolution) -> Option<Value> {
-        let (name, typ, scope_id) = match ast_resolution {
-            ast::ScopeResolution::Static(name, typ, scope) => {
-                let scope_id = scope.as_ref().map(|scope| scope.id()).unwrap();
-                (name, typ, scope_id)
-            }
-            other @ _ => unreachable!(
-                "Cannot look up static on non-static ScopeResolution: {:?}",
-                ast_resolution
-            ),
-        };
-        if self.0.scope_id == scope_id {
-            let statics = self.0.statics.borrow();
-            return statics.get(name).map(|value| value.clone());
-        }
-        if let Some(parent) = &self.0.parent {
-            return parent.find_static(ast_resolution);
-        }
-        None
-    }
-
-    pub fn set_static(&self, name: &str, value: Value) {
-        let mut statics = self.0.statics.borrow_mut();
-        // TODO: Assert that value is not a LocalValue.
-        statics.insert(name.to_string(), value);
     }
 
     /// Searches itself and its parent for a type.

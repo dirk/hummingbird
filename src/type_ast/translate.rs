@@ -64,8 +64,7 @@ fn translate_func(pfunc: &past::Func, scope: Scope) -> TypeResult<Func> {
         scope.clone(),
     );
     // Add the function to its defining scope.
-    // TODO: This should be an `add_static` once functions are static.
-    scope.add_local(&name, typ.clone())?;
+    scope.add_static(&name, typ.clone())?;
 
     let body = translate_block(&pfunc.body, func_scope.clone())?;
 
@@ -129,22 +128,26 @@ fn translate_var(pvar: &past::Var, scope: Scope) -> TypeResult<Var> {
     })
 }
 
+fn translate_identifier(pidentifier: &past::Identifier, scope: Scope) -> TypeResult<Identifier> {
+    let name = pidentifier.name.clone();
+    let resolution = scope
+        .get_local(&name.name)
+        .map_err(|err| err.with_span(pidentifier.name.span.clone()))?;
+    let typ = resolution.typ();
+    Ok(Identifier {
+        name,
+        resolution,
+        typ,
+    })
+}
+
 fn translate_expression(pexpression: &past::Expression, scope: Scope) -> TypeResult<Expression> {
     Ok(match pexpression {
         past::Expression::Closure(pclosure) => {
             Expression::Closure(translate_closure(pclosure, scope)?)
         }
         past::Expression::Identifier(pidentifier) => {
-            let name = pidentifier.name.clone();
-            let resolution = scope
-                .get_local(&name.name)
-                .map_err(|err| err.with_span(pidentifier.name.span.clone()))?;
-            let typ = resolution.typ();
-            Expression::Identifier(Identifier {
-                name,
-                resolution,
-                typ,
-            })
+            Expression::Identifier(translate_identifier(pidentifier, scope)?)
         }
         past::Expression::Infix(pinfix) => {
             let lhs = translate_expression(&*pinfix.lhs, scope.clone())?;

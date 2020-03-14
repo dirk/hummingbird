@@ -1,8 +1,8 @@
-use inkwell::values::{BasicValueEnum, FunctionValue, PointerValue};
-use inkwell::module::{Module, Linkage};
+use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::memory_buffer::MemoryBuffer;
-use inkwell::builder::Builder;
+use inkwell::module::{Linkage, Module};
+use inkwell::values::{BasicValueEnum, FunctionValue, PointerValue};
 
 use super::super::opaque::OpaqueModule;
 
@@ -11,9 +11,10 @@ pub fn initialize(ctx: &Context) -> Module {
     let memory_buffer = MemoryBuffer::create_from_memory_range_copy(data_ir, "builtins");
     match ctx.create_module_from_ir(memory_buffer) {
         Ok(module) => module,
-        Err(string) => {
-            panic!("Error initializing builtins module from LLVM IR:\n{}", string.to_string())
-        }
+        Err(string) => panic!(
+            "Error initializing builtins module from LLVM IR:\n{}",
+            string.to_string()
+        ),
     }
 }
 

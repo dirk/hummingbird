@@ -4,6 +4,7 @@ use std::fmt::{Error, Formatter};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::typ::Func;
 use super::{Builtins, Closable, RecursionTracker, Type, TypeError, TypeResult};
 
 const BUILTIN_SCOPE_ID: usize = 0;
@@ -12,16 +13,20 @@ lazy_static! {
     static ref SCOPE_ID: AtomicUsize = AtomicUsize::new(BUILTIN_SCOPE_ID + 1);
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScopeId(usize);
 
 impl ScopeId {
+    pub const fn builtin() -> Self {
+        ScopeId(BUILTIN_SCOPE_ID)
+    }
+
     pub fn get(&self) -> usize {
         self.0
     }
 
-    pub const fn builtin() -> Self {
-        ScopeId(BUILTIN_SCOPE_ID)
+    pub fn is_builtin(&self) -> bool {
+        self.0 == BUILTIN_SCOPE_ID
     }
 }
 
@@ -52,7 +57,7 @@ impl Scope {
 
     pub fn get_local(&self, name: &str) -> TypeResult<ScopeResolution> {
         use Scope::*;
-        match self {
+        let resolution = match self {
             // Special case for the builtin scope that can act like a scope
             // but isn't backed by any actual `ScopeLike`.
             Builtin => {
@@ -70,7 +75,9 @@ impl Scope {
             Closure(closure) => closure.borrow_mut().get_local(name),
             Func(func) => func.borrow_mut().get_local(name),
             Module(module) => module.borrow_mut().get_local(name),
-        }
+        };
+        // Add ourselves onto the end of the scope chain.
+        resolution.map(|resolution| resolution.add_scope(self.clone()))
     }
 
     /// Called by a child scope to get its parent's local.
@@ -96,6 +103,16 @@ impl Scope {
             Closure(closure) => closure.borrow_mut().add_local(name, typ),
             Func(func) => func.borrow_mut().add_local(name, typ),
             Module(module) => module.borrow_mut().add_local(name, typ),
+        }
+    }
+
+    pub fn add_static(&self, name: &str, typ: Type) -> TypeResult<()> {
+        use Scope::*;
+        match self {
+            Builtin => unreachable!("Cannot add static to Builtin scope"),
+            Closure(closure) => closure.borrow_mut().add_static(name, typ),
+            Func(func) => func.borrow_mut().add_static(name, typ),
+            Module(module) => module.borrow_mut().add_static(name, typ),
         }
     }
 
@@ -154,9 +171,14 @@ impl Closable for Scope {
                     for (name, typ) in closure.locals.iter() {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
+                    let mut funcs = HashMap::new();
+                    for (name, typ) in closure.funcs.iter() {
+                        funcs.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
+                    }
                     ClosureScope {
                         id: closure.id.clone(),
                         locals,
+                        funcs,
                         parent: closure.parent.clone(),
                         captures: closure.captures,
                         captured: closure.captured,
@@ -173,9 +195,14 @@ impl Closable for Scope {
                     for (name, typ) in func.locals.iter() {
                         locals.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
                     }
+                    let mut funcs = HashMap::new();
+                    for (name, typ) in func.funcs.iter() {
+                        funcs.insert(name.clone(), typ.clone().close(tracker, scope.clone())?);
+                    }
                     FuncScope {
                         id: func.id.clone(),
                         locals,
+                        funcs,
                         parent: func.parent.clone(),
                         captured: func.captured,
                         captured_locals: func.captured_locals.clone(),
@@ -230,8 +257,7 @@ pub enum ScopeResolution {
     Local(String, Type),
     /// A local that was found in a func and/or block scope above the current
     /// scope. The `Vec<Scope>` lists the chain of scopes traversed: the first
-    /// is the highest/farthest and the last is the lowest/nearest to the
-    /// current scope.
+    /// is the scope where the value lives and the last is where it's read.
     Closure(String, Type, Vec<Scope>),
     /// `Option<Scope>` is the scope where this static was defined. It's `None`
     /// initially but is filled in by `add_scope`.
@@ -318,12 +344,16 @@ pub trait ScopeLike {
 
     fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()>;
 
+    fn add_static(&mut self, name: &str, typ: Type) -> TypeResult<()>;
+
     fn get_parent(&self) -> Option<Scope>;
 }
 
 pub struct ClosureScope {
     id: ScopeId,
     pub locals: HashMap<String, Type>,
+    /// Funcs can be defined within closures.
+    pub funcs: HashMap<String, Type>,
     parent: Option<Scope>,
     /// Whether or not this scope captures its parent scope.
     captures: bool,
@@ -339,6 +369,7 @@ impl ClosureScope {
         Self {
             id: next_scope_id(),
             locals: HashMap::new(),
+            funcs: HashMap::new(),
             parent,
             captures: false,
             captured: false,
@@ -360,6 +391,9 @@ impl ScopeLike for ClosureScope {
         use ScopeResolution::*;
         if let Some(typ) = self.locals.get(name) {
             return Ok(Local(name.to_string(), typ.clone()));
+        }
+        if let Some(typ) = self.funcs.get(name) {
+            return Ok(Static(name.to_string(), typ.clone(), None));
         }
         if let Some(parent) = &self.parent {
             return parent
@@ -401,6 +435,28 @@ impl ScopeLike for ClosureScope {
         Ok(())
     }
 
+    fn add_static(&mut self, name: &str, typ: Type) -> TypeResult<()> {
+        if self.funcs.contains_key(name) {
+            return Err(TypeError::StaticAlreadyDefined {
+                name: name.to_string(),
+            });
+        }
+        match typ {
+            Type::Func(_) => {
+                self.funcs.insert(name.to_string(), typ.clone());
+                Ok(())
+            }
+            _ => {
+                return Err(TypeError::CannotAddStatic {
+                    message: format!(
+                        "Cannot add non-Func static to ClosureScope; tried adding '{}': {:?}",
+                        name, typ
+                    ),
+                })
+            }
+        }
+    }
+
     fn get_parent(&self) -> Option<Scope> {
         self.parent.clone()
     }
@@ -415,6 +471,8 @@ impl std::fmt::Debug for ClosureScope {
 pub struct FuncScope {
     id: ScopeId,
     pub locals: HashMap<String, Type>,
+    /// Funcs are statics and therefore will be resolved as static.
+    pub funcs: HashMap<String, Type>,
     /// Only static resolutions are allowed through the parent.
     parent: Option<Scope>,
     /// Whether or not this scope is captured by child scopes (closures).
@@ -427,6 +485,7 @@ impl FuncScope {
         Self {
             id: next_scope_id(),
             locals: HashMap::new(),
+            funcs: HashMap::new(),
             parent,
             captured: false,
             captured_locals: HashSet::new(),
@@ -452,6 +511,9 @@ impl ScopeLike for FuncScope {
         if let Some(typ) = self.locals.get(name) {
             return Ok(Local(name.to_string(), typ.clone()));
         }
+        if let Some(typ) = self.funcs.get(name) {
+            return Ok(Static(name.to_string(), typ.clone(), None));
+        }
         if let Some(parent) = &self.parent {
             return parent
                 .get_local_from_parent(name)
@@ -470,6 +532,9 @@ impl ScopeLike for FuncScope {
             self.captured_locals.insert(name.to_string());
             return Ok(Closure(name.to_string(), typ.clone(), vec![]));
         }
+        if let Some(typ) = self.funcs.get(name) {
+            return Ok(Static(name.to_string(), typ.clone(), None));
+        }
         if let Some(parent) = &self.parent {
             return parent
                 .get_local_from_parent(name)
@@ -481,7 +546,7 @@ impl ScopeLike for FuncScope {
         })
     }
 
-    fn add_local(&mut self, name: &str, typ: Type) -> Result<(), TypeError> {
+    fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()> {
         if self.locals.contains_key(name) {
             return Err(TypeError::LocalAlreadyDefined {
                 name: name.to_string(),
@@ -489,6 +554,28 @@ impl ScopeLike for FuncScope {
         }
         self.locals.insert(name.to_string(), typ);
         Ok(())
+    }
+
+    fn add_static(&mut self, name: &str, typ: Type) -> TypeResult<()> {
+        if self.funcs.contains_key(name) {
+            return Err(TypeError::StaticAlreadyDefined {
+                name: name.to_string(),
+            });
+        }
+        match typ {
+            Type::Func(_) => {
+                self.funcs.insert(name.to_string(), typ.clone());
+                Ok(())
+            }
+            _ => {
+                return Err(TypeError::CannotAddStatic {
+                    message: format!(
+                        "Cannot add non-Func static to FuncScope; tried adding '{}': {:?}",
+                        name, typ
+                    ),
+                })
+            }
+        }
     }
 
     fn get_parent(&self) -> Option<Scope> {
@@ -544,6 +631,15 @@ impl ScopeLike for ModuleScope {
     }
 
     fn add_local(&mut self, name: &str, typ: Type) -> TypeResult<()> {
+        Err(TypeError::CannotAddStatic {
+            message: format!(
+                "Cannot add local to ModuleScope; tried adding '{}': {:?}",
+                name, typ
+            ),
+        })
+    }
+
+    fn add_static(&mut self, name: &str, typ: Type) -> TypeResult<()> {
         if self.statics.contains_key(name) {
             return Err(TypeError::LocalAlreadyDefined {
                 name: name.to_string(),
@@ -573,7 +669,7 @@ mod tests {
     fn test_scope_resolution() {
         let level1 = ModuleScope::new().into_scope();
         let static1 = Type::new_phantom();
-        level1.add_local("static1", static1.clone()).unwrap();
+        level1.add_static("static1", static1.clone()).unwrap();
 
         let level2 = ClosureScope::new(Some(level1.clone())).into_scope();
         let local2 = Type::new_phantom();
@@ -606,12 +702,12 @@ mod tests {
             ScopeResolution::Closure(
                 "local2".to_string(),
                 local2,
-                vec![level2.clone(), level3.clone()]
+                vec![level2.clone(), level3.clone(), level4.clone()]
             )
         );
         assert_eq!(
             level4.get_local("local3").unwrap(),
-            ScopeResolution::Closure("local3".to_string(), local3, vec![level3.clone()])
+            ScopeResolution::Closure("local3".to_string(), local3, vec![level3.clone(), level4.clone()])
         );
     }
 }

@@ -1,9 +1,9 @@
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::io::{self, Write};
-use std::ffi::{OsString, OsStr};
 
 use inkwell::context::Context;
 use inkwell::module::Module as InkModule;
@@ -198,12 +198,10 @@ pub fn compile_modules(modules: &Vec<Module>) {
                             .iter()
                             .map(|ir_argument| value_resolver.get(ir_argument))
                             .collect::<Vec<_>>();
-                        let function_value = builtins::get_builtin_func(
-                            &module,
-                            builtin_func_name,
-                            &arguments
-                        );
-                        let call_site = builder.build_call(function_value, arguments.as_slice(), "println");
+                        let function_value =
+                            builtins::get_builtin_func(&module, builtin_func_name, &arguments);
+                        let call_site =
+                            builder.build_call(function_value, arguments.as_slice(), "println");
                         let retrn = call_site.try_as_basic_value().left().unwrap();
                         value_resolver.set(ir_retrn, retrn);
                     }
@@ -292,7 +290,10 @@ fn generate_module(module: InkModule) {
         .unwrap();
 
     if !output.status.success() {
-        println!("Failed to invoke to Clang (exited with {:?})", output.status.code());
+        println!(
+            "Failed to invoke to Clang (exited with {:?})",
+            output.status.code()
+        );
         io::stdout().write_all(&output.stdout).unwrap();
         io::stderr().write_all(&output.stderr).unwrap();
     }
