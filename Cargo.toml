@@ -18,3 +18,4 @@ tokio = { version = "1.27.0", features = ["fs", "io-util", "macros", "rt", "rt-m
 parking_lot = "0.12.1"
 sha2 = "0.10.6"
 async-recursion = "1.0.4"
+unicode-ident = "1.0.8"

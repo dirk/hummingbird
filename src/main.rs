@@ -1,5 +1,6 @@
 use tokio::sync::OnceCell;
 
+mod parser;
 mod vm;
 
 use vm::ShortChecksum;
@@ -18,5 +19,5 @@ async fn main() {
     let vm = vm::new(".");
     vm::run(vm.clone(), "hello.hb").await;
     vm::run(vm.clone(), "hello.hb").await;
-    println!("{:#?}", vm);
+    // println!("{:#?}", vm);
 }
