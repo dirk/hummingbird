@@ -78,6 +78,10 @@ impl Loader {
             epoch.modules.resize(module.id + 1, None);
         }
 
+        // Look for matching generations based on the mtime and checksum. Don't
+        // need to acquire a lock around all of this because mtimes and
+        // checksums are read-only and determinstic (famous last words).
+
         let metadata = fs::metadata(module.canonical.clone()).await.unwrap();
         let mtime = metadata.modified().unwrap();
         if let Some(gen) = module.gen_matching_mtime(mtime) {
