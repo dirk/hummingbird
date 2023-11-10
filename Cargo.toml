@@ -14,7 +14,7 @@ edition = "2021"
 # inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm8-0" }
 inkwell = { version = "0.1.1", features = ["llvm15-0"] }
 llvm-sys = "150.0.3"
-tokio = { version = "1.27.0", features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"] }
+tokio = { version = "1.27.0", features = ["fs", "io-util", "macros", "parking_lot", "rt", "rt-multi-thread", "sync"] }
 parking_lot = "0.12.1"
 sha2 = "0.10.6"
 async-recursion = "1.0.4"

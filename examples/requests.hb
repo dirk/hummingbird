@@ -5,18 +5,17 @@ import fs from "std/fs"
 
 // nil and false are the only falsey values.
 // nil is an alias for Optional.None.
-// ? operator only works on Results.
+// ? and ! operators only work on Result's.
 // ?. and ?[] and ?() chaining operators only work on Optionals.
 
 // Function declarations have four parts:
 //     Function, parameters' types, return type, body
 //
 // The body can be either a block (`{}`) or an expression (`=> expr`), since
-// blocks are also expressions one could also supply `=> { expr }` as a body,
-// but `return` is not allowed in the latter case since it's within a regular
-// block rather than a function block. `return` looks for the closest parent
-// function block for control flow. (Conversely, `break` and `continue` control
-// the closest parent block).
+// blocks are also expressions one could also supply `=> { expr }` as a body
+// (may disallow that just to prevent unnecessary extra options). `return`
+// looks for the closest parent function block for control flow. Conversely,
+// `break` and `continue` control the closest parent block.
 
 // Function statements:
 //     func nothing() -> nil {
@@ -45,6 +44,10 @@ async func main() {
     //         println("Could not read README.md")
     //         return
     //     }
+    // `guard let`/`guard var` are assignments where the right hand side of the
+    // assignment must evaluate to an optional. `guard` is a statement which
+    // matches the pseudo-syntax "guard EXPRESSION else EXPRESSION".
+    //
     // Alternative that just panics:
     //     let file = fs.readFileSync("README.md")!
     // Alternative that's async:
@@ -55,10 +58,30 @@ async func main() {
         .split("\n")
         .map(fn(url) => http.defaultClient().get(url))
     let responses = await requests
+    // HttpClient#get() returns Future[Result[HttpResponse, HttpError]]
     // Alternative using for-await-in:
     //     for await response in requests {
     // Convert errors to nils:
-    //     map(async fn(url) => http.defaultClient().get(url).ok())
+    //     .map(fn(url) => http.defaultClient().get(url).then(fn(result) => result.ok()))
+}
+
+// Hummingbird is gradually typed: all values are subtypes of Any, and if it
+// can't determine a more precise type it will default to Any. For example,
+// a `dequeue` function can be written a number of ways:
+
+// Func(Any) -> Any
+func dequeue(array) {
+    array.shift()
+}
+
+// Func[T](Array[T]) -> Option[T]
+func dequeue[T](array: Array[T]) {
+    array.shift()
+}
+
+// Func[A: { shift(): B }, B](A) -> B
+func dequeue(array: infer) {
+    array.shift()
 }
 
 // read a file in Swift

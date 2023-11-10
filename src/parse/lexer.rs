@@ -92,10 +92,9 @@ impl TokenStream {
 
         let location = self.input.location();
         let character = self.input.read();
-        
+
         if alphabetical(character) || character == '_' {
             self.lex_word(location, character)
-
         } else if character == '/' {
             if *self.input.peek() == '/' {
                 let (tail, end) = self
@@ -105,12 +104,14 @@ impl TokenStream {
             } else {
                 Token::Slash(location)
             }
-
         } else if character == '\r' {
             let location = self.input.location();
             assert_eq!(self.input.read(), '\n');
             Token::Newline(location)
-
+        } else if character == '"' {
+            let (string, end) = self.input.read_while(|character| *character != '"');
+            assert_eq!(self.input.read(), '"');
+            Token::LiteralString(string, Span::new(location, end))
         } else {
             match character {
                 '\0' => Token::EOF(location),
@@ -120,17 +121,21 @@ impl TokenStream {
     }
 
     fn lex_word(&mut self, start: Location, head: char) -> Token {
-        let (tail, end) = self.input.read_while(
-            |character| alphabetical(*character) || digit(*character) || *character == '_',
-        );
+        let (tail, end) = self.input.read_while(|character| {
+            alphabetical(*character) || digit(*character) || *character == '_'
+        });
         let name = head.to_string() + &tail;
         match name.as_str() {
+            "as" => Token::As(start),
             "func" => Token::Func(start),
             "import" => Token::Import(start),
             "let" => Token::Let(start),
             "struct" => Token::Struct(start),
             "var" => Token::Var(start),
-            _ => Token::Word(Word { name, span: Span::new(start, end) }),
+            _ => Token::Word(Word {
+                name,
+                span: Span::new(start, end),
+            }),
         }
     }
 
@@ -142,6 +147,38 @@ impl TokenStream {
             } else {
                 break;
             }
+        }
+    }
+}
+
+pub struct PeekableTokenStream {
+    stream: TokenStream,
+    peeked: Option<Token>,
+}
+
+impl PeekableTokenStream {
+    pub fn new_from_string(input: &str) -> Self {
+        Self {
+            stream: TokenStream::new(StringStream::new(input)),
+            peeked: None,
+        }
+    }
+
+    pub fn peek(&mut self) -> Token {
+        match &self.peeked {
+            Some(token) => token.clone(),
+            None => {
+                let token = self.stream.read();
+                self.peeked = Some(token.clone());
+                token
+            }
+        }
+    }
+
+    pub fn read(&mut self) -> Token {
+        match self.peeked.take() {
+            Some(token) => token,
+            None => self.stream.read(),
         }
     }
 }
@@ -165,6 +202,7 @@ pub struct Word {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Arrow(Location),
+    As(Location),
     BraceLeft(Location),
     BraceRight(Location),
     Comma(Location),
@@ -174,6 +212,7 @@ pub enum Token {
     Equals(Location),
     Func(Location),
     Import(Location),
+    LiteralString(String, Span),
     Minus(Location),
     Newline(Location),
     Let(Location),
@@ -188,9 +227,51 @@ pub enum Token {
 }
 
 impl Token {
+    pub fn location(&self) -> Location {
+        use Token::*;
+        match self {
+            CommentLine(_, span) | LiteralString(_, span) => span.start.clone(),
+            Word(word) => word.span.start.clone(),
+            Arrow(location)
+            | As(location)
+            | BraceLeft(location)
+            | BraceRight(location)
+            | Comma(location)
+            | Dot(location)
+            | EOF(location)
+            | Equals(location)
+            | Func(location)
+            | Import(location)
+            | Minus(location)
+            | Newline(location)
+            | Let(location)
+            | ParenthesesLeft(location)
+            | ParenthesesRight(location)
+            | Plus(location)
+            | Slash(location)
+            | Star(location)
+            | Struct(location)
+            | Var(location) => location.clone(),
+        }
+    }
+
+    pub fn is_comma(&self) -> bool {
+        match self {
+            Token::Comma(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_eof(&self) -> bool {
         match self {
             Token::EOF(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_literal_string(&self) -> bool {
+        match self {
+            Token::LiteralString(_, _) => true,
             _ => false,
         }
     }
@@ -201,7 +282,9 @@ mod tests {
     use super::{Location, Span, StringStream, Token, TokenStream, Word};
 
     macro_rules! loc {
-        ($index:literal, $line:literal, $column:literal) => { Location::new($index, $line, $column) };
+        ($index:literal, $line:literal, $column:literal) => {
+            Location::new($index, $line, $column)
+        };
     }
 
     fn parse(input: &str) -> Vec<Token> {
@@ -222,10 +305,7 @@ mod tests {
     fn test_parse_words() {
         assert_eq!(
             parse("func"),
-            vec![
-                Token::Func(loc!(0, 1, 1)),
-                Token::EOF(loc!(4, 1, 5))
-            ]
+            vec![Token::Func(loc!(0, 1, 1)), Token::EOF(loc!(4, 1, 5))]
         );
 
         assert_eq!(
@@ -285,6 +365,18 @@ mod tests {
                     span: Span::new(loc!(5, 2, 1), loc!(8, 2, 4)),
                 }),
                 Token::EOF(loc!(8, 2, 4))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_import() {
+        assert_eq!(
+            parse("import \"foo\""),
+            vec![
+                Token::Import(loc!(0, 1, 1)),
+                Token::LiteralString("foo".to_string(), Span::new(loc!(7, 1, 8), loc!(11, 1, 12)),),
+                Token::EOF(loc!(12, 1, 13))
             ]
         );
     }
